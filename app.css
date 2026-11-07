@@ -263,14 +263,58 @@ body{background:var(--paper)}
 .clickpin{border-color:var(--accent);border-radius:0;transform:rotate(45deg)}
 .leaflet-tooltip.dlabel{font-family:var(--display);letter-spacing:.1em;text-shadow:0 0 3px var(--paper),0 0 3px var(--paper),0 0 2px var(--paper)}
 
+#grab{display:none}
+/* ===== 手機版：地圖全螢幕＋底部拉板（body[data-sheet] = peek／half／full） ===== */
 @media (max-width:760px){
-  body{grid-template-columns:1fr;grid-template-rows:55vh 1fr;overflow:auto}
-  #mapwrap{grid-row:1}
-  #side{grid-row:2;border-right:0;border-top:1px solid var(--rule)}
-  .titleblock,.controls,#list li,.foot{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-  #layers{width:200px}
-  #card{max-height:calc(100% - 24px)}
+  :root{--peek:calc(132px + env(safe-area-inset-bottom,0px));--gut-l:max(16px,env(safe-area-inset-left,0px));--gut-r:max(16px,env(safe-area-inset-right,0px))}
+  body{display:block;overflow:hidden}
+  #mapwrap{position:fixed;left:0;right:0;top:0;bottom:calc(var(--peek) - 14px)}
+  #neat{inset:6px 6px 20px}
+  #side{position:fixed;left:0;right:0;bottom:0;z-index:700;height:var(--peek);transition:height .28s cubic-bezier(.2,.8,.2,1);
+    border-top:2px solid var(--ink);box-shadow:0 -8px 24px rgba(40,28,14,.22)!important;padding-bottom:env(safe-area-inset-bottom,0px);overflow:hidden}
+  body[data-sheet="half"] #side{height:56%}
+  body[data-sheet="full"] #side{height:calc(100% - 52px - env(safe-area-inset-top,0px))}
+  #grab{display:flex;flex:none;height:26px;align-items:center;justify-content:center;touch-action:none;cursor:grab}
+  #grab span{width:44px;height:5px;border-radius:3px;background:var(--muted);opacity:.55}
+  #grab:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+  .titleblock{padding:0 var(--gut-r) 12px var(--gut-l)}
+  .titleblock::after{left:var(--gut-l);right:var(--gut-r)}
+  .titleblock h1{font-size:22px;letter-spacing:.12em}
+  html[lang="en"] .titleblock h1{font-size:19px}
+  .titleblock .sub{display:none}
+  .titleblock .switch{margin-top:4px;font-size:13px}
+  .langbtn{margin-top:0;padding:5px 10px}
+  .controls,.foot,.lhead{padding-left:var(--gut-l);padding-right:var(--gut-r)}
+  #list li,#plist li{padding-left:var(--gut-l);padding-right:var(--gut-r)}
+  .tabs button{padding:11px 0}
+  /* 整個拉板一起捲動，把手黏在頂端，資料來源說明放在最下面 */
+  #side{overflow-y:auto;overscroll-behavior:contain}
+  body[data-sheet="peek"] #side{overflow:hidden}
+  #side .pane,#side .geopane,#paneL{flex:none;overflow:visible;min-height:auto}
+  #paneB #list,#paneL #plist{overflow:visible;flex:none}
+  #grab{position:sticky;top:0;z-index:2;background:var(--sheet)}
+  /* 觸控尺寸：輸入框 16px 以上，iOS 才不會自動放大畫面 */
+  #q,select,#lno{font-size:16px}
+  .chip{padding:6px 12px}
+  #list li{padding-top:12px;padding-bottom:12px}
+  .geopane #geochecks label{padding:7px 0}
+  /* 圖層面板：右上角，預設收合 */
+  #layers{top:calc(14px + env(safe-area-inset-top,0px));right:max(14px,env(safe-area-inset-right,0px));width:min(300px,calc(100% - 28px));max-height:calc(100% - 40px - env(safe-area-inset-top,0px));padding:10px 12px}
+  #layers{z-index:1050}
+  #layers.min{width:auto}
+  #layers.min h2{gap:14px;border-bottom:0;padding-bottom:0}
+  #layers h2 button{font-size:13px;padding:4px 0 4px 8px}
+  /* 建築詳細卡片：從拉板上緣升起；拉板展開時先藏起來 */
+  #card{position:fixed;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));top:auto;bottom:calc(var(--peek) + 8px);
+    width:auto;max-width:none;max-height:min(46vh,calc(100% - var(--peek) - 72px - env(safe-area-inset-top,0px)));z-index:1100}
+  body:not([data-sheet="peek"]) #card{display:none}
+  #card h3{font-size:21px}
+  #card .links a{padding:7px 11px}
   #coord{display:none}
+  .leaflet-control-zoom{margin:0 14px 26px 0!important}
+  .leaflet-control-scale{margin:0 14px 8px 0!important}
+  .earthbtn{margin:0 14px 8px 0!important}
+  .leaflet-control-attribution{margin:0 8px 18px 0!important;font-size:10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 

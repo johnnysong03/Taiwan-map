@@ -1,4 +1,8 @@
 const APP=document.body.dataset.app||"arch"; // arch = 臺灣建築地圖, geo = 臺灣地熱地圖
+// 手機版（螢幕寬度 760px 以下）：地圖全螢幕，側欄變成底部拉板，狀態有 peek（收合）、half（半開）、full（全開）
+const MOBILE=matchMedia("(max-width:760px)");
+document.body.dataset.sheet="peek";
+function sheet(s){ if(!MOBILE.matches) return; document.body.dataset.sheet=s; if(s==="peek") document.getElementById("side").scrollTop=0; }
 // ---------- 語言切換（中文／English） ----------
 // 介面文字的英文翻譯。資料本身（建築名稱、地址）多數只有中文，會照原文顯示。
 const LANG=(()=>{try{return localStorage.getItem("lang")==="en"?"en":"zh"}catch(e){return "zh"}})();
@@ -437,7 +441,7 @@ function select(id,fly){
       <a href="${earthUrl(b.lat,b.lng,600)}" target="_blank" rel="noopener">Google Earth</a>
       <a href="${g}" target="_blank" rel="noopener">${L2("Google 地圖","Google Maps")}</a>
     </div>${cur?"":`<div class="src" style="font-size:11.5px;color:var(--muted)">${L2("資料：文化部文化資產局 國家文化資產網開放資料","Data: Bureau of Cultural Heritage, Ministry of Culture (open data)")}</div>`}</div>`;
-  card.hidden=false;
+  card.hidden=false; sheet("peek");
   card.querySelector(".x").onclick=()=>{card.hidden=true;markers[id].setIcon(pinIcon(b,false));state.sel=null;render(false)};
   render(false);
   document.querySelector(`#list li[data-id="${id}"]`)?.scrollIntoView({block:"nearest"});
@@ -818,7 +822,7 @@ map.on("click", async e=>{
   if(!LQ.mode) return;
   const {lat,lng}=e.latlng;
   if(LQ.pin) LQ.pin.setLatLng(e.latlng); else LQ.pin=L.marker(e.latlng,{icon:L.divIcon({className:"",iconSize:[14,14],html:'<div class="clickpin"></div>'}),interactive:false}).addTo(map);
-  const info=$("sectinfo"); info.hidden=false; info.innerHTML=`<div class="m">${L2("查詢地段中…","Looking up the land section…")}</div>`;
+  const info=$("sectinfo"); info.hidden=false; sheet("half"); info.innerHTML=`<div class="m">${L2("查詢地段中…","Looking up the land section…")}</div>`;
   try{
     await loadPub();
     const xml=await fetch(`https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lng.toFixed(6)}/${lat.toFixed(6)}`).then(r=>r.text());
@@ -832,3 +836,48 @@ map.on("click", async e=>{
 });
 
 }
+
+// ---------- 手機版底部拉板：拖曳或點把手切換 收合／半開／全開 ----------
+(()=>{
+  const side=document.getElementById("side"), body=document.body, lay=document.getElementById("layers");
+  const grab=document.createElement("div");
+  grab.id="grab"; grab.tabIndex=0; grab.setAttribute("role","button");
+  grab.setAttribute("aria-label",L2("展開或收合面板","Expand or collapse the panel"));
+  grab.innerHTML="<span></span>"; side.prepend(grab);
+  const order=["peek","half","full"];
+  const next=()=>sheet(order[(order.indexOf(body.dataset.sheet)+1)%order.length]);
+  grab.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();next();}};
+  let y0=null,h0=0,moved=false;
+  grab.addEventListener("pointerdown",e=>{
+    if(!MOBILE.matches) return;
+    y0=e.clientY; h0=side.getBoundingClientRect().height; moved=false;
+    grab.setPointerCapture(e.pointerId); side.style.transition="none";
+  });
+  grab.addEventListener("pointermove",e=>{
+    if(y0===null) return;
+    const dy=y0-e.clientY; if(Math.abs(dy)>6) moved=true;
+    if(moved) side.style.height=Math.max(90,Math.min(innerHeight-40,h0+dy))+"px";
+  });
+  const end=()=>{
+    if(y0===null) return;
+    const h=side.getBoundingClientRect().height; y0=null;
+    side.style.transition=""; side.style.height="";
+    if(!moved){next();return;}
+    sheet(h<innerHeight*.3?"peek":h<innerHeight*.72?"half":"full");
+  };
+  grab.addEventListener("pointerup",end); grab.addEventListener("pointercancel",end);
+  // 收合時點標題區也能展開（連結和按鈕照常運作）
+  side.querySelector(".titleblock").addEventListener("click",e=>{
+    if(body.dataset.sheet==="peek"&&!e.target.closest("a,button")) sheet("half");
+  });
+  // 打字時鍵盤會擋住下半部，直接全開
+  side.addEventListener("focusin",e=>{ if(e.target.matches('input[type="search"],input[type="text"]')) sheet("full"); });
+  // 分頁、地區、資料勾選放在拉板裡，切換時至少半開
+  side.addEventListener("change",e=>{ if(body.dataset.sheet==="peek"&&e.target.matches("select")) sheet("half"); });
+  document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{ if(body.dataset.sheet==="peek") sheet("half"); }));
+  // 圖層面板在手機上預設收合，點地圖時也自動收起
+  const fold=()=>{ if(MOBILE.matches&&!lay.classList.contains("min")) document.getElementById("lmin").click(); };
+  fold(); map.on("click",fold);
+  side.addEventListener("transitionend",e=>{ if(e.propertyName==="height") map.invalidateSize(); });
+  MOBILE.addEventListener("change",()=>{ fold(); setTimeout(()=>map.invalidateSize(),60); });
+})();
