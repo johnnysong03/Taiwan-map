@@ -1,5 +1,7 @@
 # 臺灣建築地圖／臺灣地熱地圖
 
+Different map layer in Taiwan.
+
 兩張以 Leaflet 製作的互動地圖，共用 `app.js` 與 `app.css`。
 
 - `taiwan-architecture.html`：臺灣建築地圖（精選建築＋國家文化資產網的古蹟與歷史建築、臺北市地號查詢、土地權屬統計）
