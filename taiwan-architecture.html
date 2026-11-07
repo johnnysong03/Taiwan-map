@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>臺灣建築地圖</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-app="arch" data-en-title="Taiwan Architecture Map">
+<aside id="side">
+  <div class="titleblock">
+    <div class="titlerow"><h1 data-en="Taiwan Architecture Map">臺灣建築地圖</h1><button type="button" id="langbtn" class="langbtn">English</button></div>
+    <div class="sub">TAIWAN ARCHITECTURE ATLAS · TWD97 / TM2 121°</div>
+    <a class="switch" href="taiwan-geothermal.html" data-en="Go to Taiwan Geothermal Map →">切換到臺灣地熱地圖 →</a>
+  </div>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tabB" aria-selected="true" data-en="Buildings">建築作品</button>
+    <button type="button" role="tab" id="tabL" aria-selected="false" data-en="Parcel lookup">地號查詢</button>
+  </div>
+  <div id="paneL" class="pane" hidden>
+    <div class="controls">
+      <div class="hint" id="lhint" data-en="Click anywhere on the map to find its land section and list the public parcels in it (Taipei City only).">在地圖上點任一點，查出那裡的地段，並列出該地段的公有地號。</div>
+      <div id="sectinfo" hidden></div>
+      <div class="row">
+        <select id="lsect" aria-label="地段"><option value="" data-en="Loading land sections…">載入地段清單中…</option></select>
+      </div>
+      <form id="lform" class="row">
+        <input id="lno" type="text" inputmode="numeric" placeholder="地號，例如 6-1" data-en-ph="Parcel no., e.g. 6-1" aria-label="地號">
+        <button type="submit" class="btn" data-en="Look up">查詢</button>
+      </form>
+      <div id="lresult" hidden></div>
+    </div>
+    <div class="lhead" id="lhead" hidden></div>
+    <ol id="plist"></ol>
+    <div class="foot"><span data-en="Public land data: Department of Land Administration, Taipei City Government, ">公有地資料：臺北市政府地政局「臺北市公有土地資料」，</span><span id="lupd"></span><span data-en=". Parcels not in the register are private or unregistered; a land register transcript shows who owns them.">。不在清冊內的地號為私有地或未登記地；私有地的所有權人類別需申請謄本才能得知。</span></div>
+  </div>
+  <div id="paneB" class="pane">
+  <div class="controls">
+    <input id="q" type="search" placeholder="搜尋建築名稱、建築師、地址…" data-en-ph="Search name, architect, address…" aria-label="搜尋">
+    <div>
+      <div class="label" style="margin-bottom:6px" data-en="Period">年代</div>
+      <div class="chips" id="eras"></div>
+    </div>
+    <div class="fgrid">
+      <div><div class="label" style="margin-bottom:6px" data-en="Source">來源</div>
+        <select id="srcsel" aria-label="來源"><option value="" data-en="All sources">全部來源</option></select></div>
+      <div><div class="label" style="margin-bottom:6px" data-en="City / county">縣市</div>
+        <select id="city" aria-label="縣市"><option value="" data-en="All Taiwan">全臺</option></select></div>
+      <div class="wide"><div class="label" style="margin-bottom:6px" data-en="Type">類型</div>
+        <select id="type" aria-label="類型"><option value="" data-en="All types">全部類型</option></select></div>
+    </div>
+    <label class="inview"><input type="checkbox" id="inview" checked> <span data-en="Only list what is in view">清單只列出目前地圖範圍內</span></label>
+    <div class="count" id="count"></div>
+  </div>
+  <ol id="list"></ol>
+  </div>
+  <div class="foot" id="footB" data-en="“Featured” entries are compiled by hand with approximate locations. Monuments and historic buildings come from the &lt;a href=&quot;https://nchdb.boch.gov.tw/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;National Cultural Heritage Database&lt;/a&gt; open data (downloaded 2026-11-07); dates are taken from the history text and are approximate. Building names and addresses are shown in Chinese. Base maps: National Land Surveying and Mapping Center.">「精選建築」為整理資料，座標為約略位置。古蹟、歷史建築等來自<a href="https://nchdb.boch.gov.tw/" target="_blank" rel="noopener">國家文化資產網</a>開放資料（2026-11-07 下載），年代由沿革文字推得，僅供參考。底圖與圖資：內政部國土測繪中心。</div>
+</aside>
+
+<main id="mapwrap">
+  <div id="map"></div>
+  <div id="grain"></div>
+  <div id="neat"></div>
+
+  <section id="layers" aria-label="圖層">
+    <h2><span data-en="Layers">圖層</span> <button id="lmin" type="button" data-en="Collapse">收合</button></h2>
+    <fieldset id="toneset"><legend class="label" data-en="Style">色調</legend>
+      <div class="tones" id="tones"></div>
+      <div class="tonename" id="tonename"></div>
+    </fieldset>
+    <fieldset id="impset"><legend class="label" data-en="Import points">匯入點位</legend>
+      <label class="btn filebtn"><input type="file" id="impfile" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden><span data-en="Choose Excel / CSV file">選擇 Excel／CSV 檔</span></label>
+      <div class="src" data-en="Needs latitude/longitude or TWD97 X/Y columns.">需要有經緯度或 TWD97 X／Y 欄位。</div>
+      <div id="impcfg" hidden></div>
+      <div id="implist"></div>
+    </fieldset>
+    <fieldset id="bases"><legend class="label" data-en="Base map">底圖</legend></fieldset>
+    <fieldset id="roadset"><legend class="label" data-en="Roads">道路</legend>
+      <div class="src roadnote" data-en="Road emphasis works on the NLSC base maps only.">道路強調只用在國土測繪中心的底圖。</div>
+      <label for="roadop" data-en="Road line strength">道路線條濃淡</label>
+      <input id="roadop" type="range" min="0" max="1" step="0.05" value="0.45">
+    </fieldset>
+    <fieldset id="overs"><legend class="label" data-en="Overlays">疊加圖資</legend></fieldset>
+    <fieldset id="own"><legend class="label" data-en="Land ownership (Taipei districts)">土地權屬（臺北市行政區統計）</legend>
+      <label><input type="radio" name="own" id="own0" value="" checked> <span data-en="Off">不顯示</span></label>
+      <label><input type="radio" name="own" id="own1" value="pub"> <span data-en="Public land share">公有面積比例</span></label>
+      <label><input type="radio" name="own" id="own2" value="pri"> <span data-en="Private land share">私有面積比例</span></label>
+      <div id="ownlegend" hidden></div>
+    </fieldset>
+    <div class="op">
+      <label for="opacity" class="label" style="display:block;margin-bottom:2px" data-en="Overlay opacity">疊加透明度</label>
+      <input id="opacity" type="range" min="0.2" max="1" step="0.05" value="0.85">
+      <div class="src" data-en="Zoom to level 17 or closer for cadastral layers.">地籍類圖資建議放大至 17 級以上檢視</div>
+    </div>
+  </section>
+
+  <div id="coord"><b>WGS84</b><span id="cw">—</span><br><b>TWD97</b><span id="ct">—</span></div>
+  <article id="card" hidden></article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+<script src="navy-style.js"></script>
+<script src="heritage-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

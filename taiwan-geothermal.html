@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>臺灣地熱地圖</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-app="geo" data-en-title="Taiwan Geothermal Map">
+<aside id="side">
+  <div class="titleblock">
+    <div class="titlerow"><h1 data-en="Taiwan Geothermal Map">臺灣地熱地圖</h1><button type="button" id="langbtn" class="langbtn">English</button></div>
+    <div class="sub" data-en="TAIWAN GEOTHERMAL ATLAS · 11 survey areas · 92 datasets">TAIWAN GEOTHERMAL ATLAS · 11 個調查區 · 92 組資料</div>
+    <a class="switch" href="taiwan-architecture.html" data-en="Go to Taiwan Architecture Map →">切換到臺灣建築地圖 →</a>
+  </div>
+  <div class="geopane">
+    <div class="controls" id="geoset">
+      <div class="label" data-en="Survey area">調查地區</div>
+      <div id="geochecks"></div>
+      <div id="geolegend" hidden></div>
+      <button type="button" class="btn" id="kmlbtn" disabled data-en="Export KML (select layers first)">匯出 KML（先勾選圖層）</button>
+      <div class="ghint" data-en="Choose an area and tick the datasets to show. Click a point, line or area to see its values and open the spot in Google Earth. Exported KML files open in Google Earth on the web or desktop.">選一個地區，勾選要看的資料。點地圖上的點、線或區塊可以看數值，也能在 Google Earth 開啟該位置。匯出的 KML 檔可以用 Google Earth 網頁版或桌面版開啟。</div>
+    </div>
+  </div>
+  <div class="foot" data-en="Data: Geological Survey and Mining Management Agency, MOEA, &lt;a href=&quot;https://geotex.geologycloud.tw/main/openapi&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Geothermal Exploration Information Platform&lt;/a&gt; open data (downloaded 2026-11-07). Water chemistry in mg/L; geothermometers and water temperature in °C. Site names are shown in Chinese. Base maps: National Land Surveying and Mapping Center.">資料：經濟部地質調查及礦業管理中心「<a href="https://geotex.geologycloud.tw/main/openapi" target="_blank" rel="noopener">地熱探勘資訊平臺</a>」第一類開放資料（2026-11-07 下載）。水化學濃度單位為 mg/L，地溫計與水溫為 °C。底圖與圖資：內政部國土測繪中心。</div>
+</aside>
+
+<main id="mapwrap">
+  <div id="map"></div>
+  <div id="grain"></div>
+  <div id="neat"></div>
+
+  <section id="layers" aria-label="圖層">
+    <h2><span data-en="Layers">圖層</span> <button id="lmin" type="button" data-en="Collapse">收合</button></h2>
+    <fieldset id="toneset"><legend class="label" data-en="Style">色調</legend>
+      <div class="tones" id="tones"></div>
+      <div class="tonename" id="tonename"></div>
+    </fieldset>
+    <fieldset id="impset"><legend class="label" data-en="Import points">匯入點位</legend>
+      <label class="btn filebtn"><input type="file" id="impfile" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden><span data-en="Choose Excel / CSV file">選擇 Excel／CSV 檔</span></label>
+      <div class="src" data-en="Needs latitude/longitude or TWD97 X/Y columns.">需要有經緯度或 TWD97 X／Y 欄位。</div>
+      <div id="impcfg" hidden></div>
+      <div id="implist"></div>
+    </fieldset>
+    <fieldset id="bases"><legend class="label" data-en="Base map">底圖</legend></fieldset>
+    <fieldset id="roadset"><legend class="label" data-en="Roads">道路</legend>
+      <div class="src roadnote" data-en="Road emphasis works on the NLSC base maps only.">道路強調只用在國土測繪中心的底圖。</div>
+      <label for="roadop" data-en="Road line strength">道路線條濃淡</label>
+      <input id="roadop" type="range" min="0" max="1" step="0.05" value="0.3">
+    </fieldset>
+    <fieldset id="overs"><legend class="label" data-en="Overlays">疊加圖資</legend></fieldset>
+    <div class="op">
+      <label for="opacity" class="label" style="display:block;margin-bottom:2px" data-en="Overlay opacity">疊加透明度</label>
+      <input id="opacity" type="range" min="0.2" max="1" step="0.05" value="0.85">
+    </div>
+  </section>
+
+  <div id="coord"><b>WGS84</b><span id="cw">—</span><br><b>TWD97</b><span id="ct">—</span></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+<script src="navy-style.js"></script>
+<script src="geotex/catalog.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
