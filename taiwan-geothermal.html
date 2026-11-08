@@ -47,6 +47,17 @@
       <div id="impcfg" hidden></div>
       <div id="implist"></div>
     </fieldset>
+    <fieldset id="markset"><legend class="label" data-en="My markers">我的標示</legend>
+      <button type="button" class="btn filebtn" id="markadd" data-en="Add a marker">新增標示</button>
+      <div class="src" id="markhint" data-en="Saved in this browser only. Export to keep a copy or move to another device.">只存在這個瀏覽器。要備份或換裝置請匯出。</div>
+      <div id="marklist"></div>
+      <div class="markbtns">
+        <button type="button" class="linkbtn" id="markkml" data-en="Export KML">匯出 KML</button>
+        <button type="button" class="linkbtn" id="markcsv" data-en="Export CSV">匯出 CSV</button>
+        <label class="linkbtn"><input type="file" id="markimp" accept=".kml,.kmz" hidden><span data-en="Import KML/KMZ">匯入 KML／KMZ</span></label>
+        <button type="button" class="linkbtn" id="markclear" data-en="Delete all">全部刪除</button>
+      </div>
+    </fieldset>
     <fieldset id="bases"><legend class="label" data-en="Base map">底圖</legend></fieldset>
     <fieldset id="roadset"><legend class="label" data-en="Roads">道路</legend>
       <div class="src roadnote" data-en="Road emphasis works on the NLSC base maps only.">道路強調只用在國土測繪中心的底圖。</div>

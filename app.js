@@ -715,6 +715,135 @@ const _geoLegend=geoLegend;
 geoLegend=function(){_geoLegend(); if(kmlBtn){const n=GEO_CAT.filter(c=>geoOn[c.key]).length; kmlBtn.disabled=!n; kmlBtn.textContent=n?L2(`匯出 KML（${n} 個圖層）`,`Export KML (${n} layer${n>1?"s":""})`):L2("匯出 KML（先勾選圖層）","Export KML (select layers first)");}};
 geoLegend();
 
+// ---------- 我的標示：點地圖新增、可編輯名稱／備註／顏色／形狀／照片／連結，可拖曳；存在瀏覽器 localStorage ----------
+const MK_KEY="geo-mymarks";
+const MK_COLORS=["#c0392b","#e67e22","#d4ac0d","#2e8b57","#1f6fb5","#7d3c98","#3a2816"];
+const MK_SHAPES=[["circle",L2("圓","Circle")],["square",L2("方","Square")],["diamond",L2("菱","Diamond")],["flag",L2("旗","Flag")]];
+let marks=[]; try{marks=JSON.parse(localStorage.getItem(MK_KEY)||"[]")||[];}catch(e){marks=[];}
+const mkSave=()=>{try{localStorage.setItem(MK_KEY,JSON.stringify(marks.map(({layer,...m})=>m)));}catch(e){}};
+map.createPane("mymarks"); map.getPane("mymarks").style.zIndex=640;
+const mkGroup=L.layerGroup().addTo(map);
+const mkIconHtml=m=>{const c=m.color||MK_COLORS[0];
+  if(m.shape==="flag") return `<div style="position:relative;width:22px;height:26px"><div style="position:absolute;left:3px;top:0;width:2px;height:26px;background:#3a2816"></div><div style="position:absolute;left:5px;top:1px;width:15px;height:11px;background:${c};border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div></div>`;
+  const r=m.shape==="circle"?"50%":"2px", rot=m.shape==="diamond"?"transform:rotate(45deg);":"";
+  return `<div style="width:18px;height:18px;margin:2px;background:${c};border:2.5px solid #fff;border-radius:${r};${rot}box-shadow:0 0 0 1.5px ${c},0 2px 4px rgba(0,0,0,.4)"></div>`;};
+const mkIcon=m=>L.divIcon({className:"",iconSize:m.shape==="flag"?[22,26]:[22,22],iconAnchor:m.shape==="flag"?[4,26]:[11,11],popupAnchor:m.shape==="flag"?[6,-24]:[0,-10],html:mkIconHtml(m)});
+const lines=s=>String(s||"").split(/\s*\n\s*/).map(x=>x.trim()).filter(Boolean);
+const safeUrl=u=>/^https?:\/\//i.test(u)?u:"";
+function mkView(m){
+  const ll=m.layer.getLatLng();
+  return `<div class="geopop mkpop"><h4>${hesc(m.name||L2("未命名標示","Untitled marker"))}</h4>
+    <div class="m">WGS84 ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}<br>TWD97 ${fmtTM2(ll.lat,ll.lng)}</div>
+    ${m.note?`<p style="margin:0 0 6px;white-space:pre-wrap">${hesc(m.note)}</p>`:""}
+    ${lines(m.imgs).map(safeUrl).filter(Boolean).map(u=>`<a href="${hesc(u)}" target="_blank" rel="noopener"><img src="${hesc(u)}" alt="" loading="lazy" style="display:block;width:100%;max-height:220px;object-fit:contain;margin:4px 0;border:1px solid var(--rule);background:#fff" onerror="this.parentNode.remove()"></a>`).join("")}
+    ${lines(m.links).map(safeUrl).filter(Boolean).map(u=>`<div style="word-break:break-all"><a href="${hesc(u)}" target="_blank" rel="noopener">${hesc(u)}</a></div>`).join("")}
+    <div class="mkrow"><button type="button" class="btn" data-a="edit">${L2("編輯","Edit")}</button>
+      <a href="${earthUrl(ll.lat,ll.lng,1500)}" target="_blank" rel="noopener">Google Earth</a></div>
+    <div class="src">${L2("拖曳標示可以移動位置","Drag the marker to move it")}</div></div>`;
+}
+function mkEdit(m){
+  return `<form class="geopop mkform"><h4>${L2("編輯標示","Edit marker")}</h4>
+    <label>${L2("名稱","Name")}<input name="name" type="text" value="${hesc(m.name)}" placeholder="${L2("例如：GZP-E 預定井位","e.g. planned well site")}"></label>
+    <label>${L2("備註","Note")}<textarea name="note" rows="3">${hesc(m.note)}</textarea></label>
+    <div class="mkl">${L2("顏色","Colour")}</div>
+    <div class="mkchoice">${MK_COLORS.map(c=>`<button type="button" data-c="${c}" aria-label="${c}" aria-pressed="${c===m.color}" style="background:${c}"></button>`).join("")}</div>
+    <div class="mkl">${L2("形狀","Shape")}</div>
+    <div class="mkchoice mkshape">${MK_SHAPES.map(([s,n])=>`<button type="button" data-s="${s}" aria-pressed="${s===m.shape}">${n}</button>`).join("")}</div>
+    <label>${L2("照片網址（一行一個）","Photo URLs (one per line)")}<textarea name="imgs" rows="2" placeholder="https://…">${hesc(m.imgs)}</textarea></label>
+    <label>${L2("連結（一行一個）","Links (one per line)")}<textarea name="links" rows="2" placeholder="https://…">${hesc(m.links)}</textarea></label>
+    <div class="mkrow"><button type="submit" class="btn">${L2("完成","Done")}</button><button type="button" class="linkbtn" data-a="del">${L2("刪除這個標示","Delete this marker")}</button></div></form>`;
+}
+function mkOpen(m,edit){
+  // 彈出內容用 DOM 元素綁定，重新開啟時保留輸入中的內容與事件
+  const el=document.createElement("div"); el.innerHTML=edit?mkEdit(m):mkView(m);
+  if(!edit) el.querySelector('[data-a="edit"]').onclick=()=>mkOpen(m,true);
+  else{
+    const f=el.querySelector("form");
+    const sync=()=>{m.name=f.name.value.trim();m.note=f.note.value;m.imgs=f.imgs.value;m.links=f.links.value;mkSave();mkList();};
+    f.addEventListener("input",sync);
+    const pick=(sel,attr,key)=>f.querySelectorAll(sel).forEach(b=>b.onclick=()=>{m[key]=b.dataset[attr];f.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b));m.layer.setIcon(mkIcon(m));m.layer.getPopup()?.update();mkSave();mkList();});
+    pick("[data-c]","c","color"); pick("[data-s]","s","shape");
+    f.onsubmit=e=>{e.preventDefault();sync();mkOpen(m,false);};
+    f.querySelector('[data-a="del"]').onclick=()=>{m.layer.closePopup();mkGroup.removeLayer(m.layer);marks=marks.filter(x=>x!==m);mkSave();mkList();};
+    if(!m.name) setTimeout(()=>f.name.focus(),80);
+  }
+  m.layer.unbindPopup().bindPopup(el,{maxWidth:300,minWidth:250,maxHeight:edit?420:320}).openPopup();
+}
+function mkAddLayer(m){
+  m.layer=L.marker([m.lat,m.lng],{pane:"mymarks",icon:mkIcon(m),draggable:true,autoPan:true}).addTo(mkGroup);
+  m.layer.on("click",()=>{ if(!m.layer.isPopupOpen()) mkOpen(m,false); });
+  m.layer.on("dragend",()=>{const ll=m.layer.getLatLng();m.lat=+ll.lat.toFixed(7);m.lng=+ll.lng.toFixed(7);mkSave();});
+  if(m.name) m.layer.bindTooltip(()=>hesc(m.name),{direction:"top",offset:[0,-10]});
+  return m;
+}
+function mkList(){
+  const box=document.getElementById("marklist"); if(!box) return;
+  box.innerHTML=marks.map((m,i)=>`<button type="button" class="mkitem" data-i="${i}"><span class="sw" style="background:${m.color}"></span><span class="nm">${hesc(m.name||L2("未命名標示","Untitled marker"))}</span></button>`).join("");
+  box.querySelectorAll(".mkitem").forEach(b=>b.onclick=()=>{const m=marks[+b.dataset.i];map.flyTo([m.lat,m.lng],Math.max(map.getZoom(),15),{duration:.6});map.once("moveend",()=>mkOpen(m,false));});
+  ["markkml","markcsv","markclear"].forEach(id=>{const b=document.getElementById(id);if(b) b.disabled=!marks.length;});
+  marks.forEach(m=>{ if(m.layer){ m.layer.unbindTooltip(); if(m.name) m.layer.bindTooltip(()=>hesc(m.name),{direction:"top",offset:[0,-10]}); } });
+}
+marks.forEach(mkAddLayer); mkList();
+// 新增模式：按「新增標示」後點地圖放下標示
+let mkAdding=false;
+const mkBanner=document.createElement("div"); mkBanner.id="mkbanner"; mkBanner.hidden=true;
+mkBanner.innerHTML=`<span>${L2("點地圖放置標示","Tap the map to place a marker")}</span><button type="button" class="linkbtn">${L2("取消","Cancel")}</button>`;
+document.getElementById("mapwrap").appendChild(mkBanner);
+const mkMode=on=>{mkAdding=on;mkBanner.hidden=!on;map.getContainer().style.cursor=on?"crosshair":"";
+  const b=document.getElementById("markadd"); if(b) b.textContent=on?L2("取消新增","Cancel adding"):L2("新增標示","Add a marker");};
+mkBanner.querySelector("button").onclick=()=>mkMode(false);
+document.getElementById("markadd").onclick=()=>{mkMode(!mkAdding); if(mkAdding&&MOBILE.matches){const lay=document.getElementById("layers");if(!lay.classList.contains("min"))document.getElementById("lmin").click();sheet("peek");}};
+map.on("click",e=>{ if(!mkAdding) return;
+  const m=mkAddLayer({id:Date.now(),name:"",note:"",color:MK_COLORS[0],shape:"circle",imgs:"",links:"",lat:+e.latlng.lat.toFixed(7),lng:+e.latlng.lng.toFixed(7)});
+  marks.push(m); mkSave(); mkList(); mkMode(false); setTimeout(()=>mkOpen(m,true),30); });
+// 匯出
+const mkDownload=(text,name,type)=>{const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);};
+const mkStamp=()=>new Date().toISOString().slice(0,10);
+document.getElementById("markkml").onclick=()=>{ if(!marks.length) return;
+  const pm=marks.map(m=>{const desc=[m.note?hesc(m.note).replace(/\n/g,"<br>"):"",...lines(m.imgs).map(safeUrl).filter(Boolean).map(u=>`<img src="${hesc(u)}" width="400">`),...lines(m.links).map(safeUrl).filter(Boolean).map(u=>`<a href="${hesc(u)}">${hesc(u)}</a>`)].filter(Boolean).join("<br>");
+    const ed=["note","color","shape","imgs","links"].map(k=>`<Data name="${k}"><value>${xesc(m[k]||"")}</value></Data>`).join("");
+    return `<Placemark><name>${xesc(m.name||"未命名標示")}</name><Style><IconStyle><color>${kcolor(m.color||MK_COLORS[0])}</color><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style><description><![CDATA[${desc}]]></description><ExtendedData>${ed}</ExtendedData><Point><coordinates>${m.lng},${m.lat},0</coordinates></Point></Placemark>`;}).join("\n");
+  mkDownload(`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>我的標示</name>\n${pm}\n</Document></kml>`,`我的標示_${mkStamp()}.kml`,"application/vnd.google-earth.kml+xml");};
+document.getElementById("markcsv").onclick=()=>{ if(!marks.length) return;
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const rows=[["名稱","備註","緯度","經度","TWD97_X","TWD97_Y","顏色","形狀","照片","連結"].map(q).join(",")].concat(marks.map(m=>{const [x,y]=toTM2(m.lat,m.lng);
+    return [m.name,m.note,m.lat,m.lng,x.toFixed(2),y.toFixed(2),m.color,m.shape,lines(m.imgs).join(" "),lines(m.links).join(" ")].map(q).join(",");}));
+  mkDownload("﻿"+rows.join("\r\n"),`我的標示_${mkStamp()}.csv`,"text/csv;charset=utf-8");};
+document.getElementById("markclear").onclick=()=>{ if(!marks.length) return;
+  if(!confirm(L2(`確定刪除全部 ${marks.length} 個標示？建議先匯出備份。`,`Delete all ${marks.length} markers? Export a backup first.`))) return;
+  mkGroup.clearLayers(); marks=[]; mkSave(); mkList(); };
+// 匯入 KML／KMZ（本工具匯出的檔案會還原所有欄位；其他 KML 取名稱、說明與座標）
+document.getElementById("markimp").onchange=async e=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  const hint=document.getElementById("markhint");
+  try{
+    let text;
+    if(/\.kmz$/i.test(file.name)){
+      if(!window.JSZip) await new Promise((ok,fail)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=ok;s.onerror=fail;document.head.appendChild(s);});
+      const zip=await JSZip.loadAsync(file); const kml=Object.values(zip.files).find(f=>/\.kml$/i.test(f.name)); if(!kml) throw 0;
+      text=await kml.async("string");
+    } else text=await file.text();
+    const d=new DOMParser().parseFromString(text,"text/xml"); let n=0;
+    d.querySelectorAll("Placemark").forEach(p=>{
+      const co=p.querySelector("Point coordinates"); if(!co) return;
+      const [lng,lat]=co.textContent.trim().split(/[\s,]+/).map(Number); if(isNaN(lat)||isNaN(lng)) return;
+      const ed=k=>p.querySelector(`ExtendedData Data[name="${k}"] value`)?.textContent;
+      const raw=p.querySelector("description")?.textContent||"";
+      const tmp=document.createElement("div"); tmp.innerHTML=raw.replace(/<\/?br\s*\/?>/gi,"\n").replace(/<img[^>]*>/gi,"");
+      const imgs=ed("imgs")??[...raw.matchAll(/<img[^>]*src="([^"]+)"/gi)].map(x=>x[1]).join("\n");
+      const links=ed("links")??[...raw.matchAll(/href="([^"]+)"/gi)].map(x=>x[1]).join("\n");
+      tmp.querySelectorAll("a").forEach(a=>a.remove());
+      const color=ed("color"), shape=ed("shape");
+      const m=mkAddLayer({id:Date.now()+n,name:(p.querySelector("name")?.textContent||"").trim(),note:ed("note")??tmp.textContent.replace(/\n{2,}/g,"\n").trim(),
+        color:MK_COLORS.includes(color)?color:MK_COLORS[4],shape:MK_SHAPES.some(s=>s[0]===shape)?shape:"circle",imgs,links,lat:+lat.toFixed(7),lng:+lng.toFixed(7)});
+      marks.push(m); n++;
+    });
+    mkSave(); mkList();
+    hint.textContent=L2(`已從 ${file.name} 匯入 ${n} 個標示。`,`Imported ${n} markers from ${file.name}.`);
+    if(n) map.flyToBounds(L.latLngBounds(marks.slice(-n).map(m=>[m.lat,m.lng])).pad(.2),{maxZoom:15,duration:.7});
+  }catch(err){ hint.textContent=L2("讀不到這個檔案，請確認是 KML 或 KMZ。","Could not read this file. Check that it is a KML or KMZ."); }
+};
+
 if(!GEO_CAT.length){document.getElementById("geochecks").innerHTML='<div class="src">找不到 geotex/catalog.js，地熱資料無法顯示。</div>';} else renderGeoChecks();
 
 }
@@ -892,6 +1021,7 @@ map.on("click", async e=>{
   // 圖層面板在手機上預設收合，點地圖時也自動收起
   const fold=()=>{ if(MOBILE.matches&&!lay.classList.contains("min")) document.getElementById("lmin").click(); };
   fold(); map.on("click",fold);
+  map.on("popupopen",()=>document.body.classList.add("popup-on")).on("popupclose",()=>document.body.classList.remove("popup-on"));
   side.addEventListener("transitionend",e=>{ if(e.propertyName==="height") map.invalidateSize(); });
   MOBILE.addEventListener("change",()=>{ fold(); setTimeout(()=>map.invalidateSize(),60); });
 })();

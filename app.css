@@ -359,3 +359,33 @@ body{background:var(--paper)}
 html[lang="en"] .titleblock h1{font-size:24px;letter-spacing:.03em;line-height:1.15}
 html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 [hidden]{display:none!important}
+
+/* ===== 我的標示（地熱地圖） ===== */
+#markset .src{margin-top:2px}
+.markbtns{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px}
+.markbtns .linkbtn:disabled{opacity:.4;cursor:default;text-decoration:none}
+#marklist{display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto}
+.mkitem{display:flex;align-items:center;gap:8px;border:0;border-bottom:1px dotted var(--rule);background:none;color:var(--ink);font:13px var(--body);padding:4px 0;cursor:pointer;text-align:left;min-width:0}
+.mkitem .sw{width:10px;height:10px;border-radius:50%;flex:none}
+.mkitem .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkitem:hover{color:var(--accent)}
+#mkbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+#mkbanner .linkbtn{color:var(--sheet);font-size:13px}
+.mkform{display:flex;flex-direction:column;gap:8px}
+.mkform h4{margin:0}
+.mkform label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.mkform input,.mkform textarea{font:14px var(--body);color:var(--ink);background:var(--paper);border:1px solid var(--ink);padding:6px 8px;width:100%;resize:vertical}
+.mkl{font-size:12px;color:var(--muted)}
+.mkchoice{display:flex;flex-wrap:wrap;gap:6px}
+.mkchoice button{width:26px;height:26px;border:1px solid var(--ink);cursor:pointer;padding:0}
+.mkchoice button[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.mkshape button{width:auto;padding:3px 10px;background:var(--sheet);color:var(--ink);font:13px var(--body)}
+.mkrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.mkrow .btn{padding:6px 16px}
+@media (max-width:760px){ .mkform input,.mkform textarea{font-size:16px} .mkchoice button{width:32px;height:32px} .mkshape button{width:auto;padding:5px 12px} }
+@media (max-width:760px){
+  #mkbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none}
+  /* 開著彈出視窗時，先藏起右下角的按鈕，避免蓋住內容 */
+  .popup-on .leaflet-bottom.leaflet-right,.popup-on #layers.min{opacity:0;pointer-events:none;transition:opacity .15s}
+}
