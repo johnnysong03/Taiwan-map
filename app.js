@@ -1033,10 +1033,11 @@ const NU_NAMES={AA:"特定農業區",AB:"一般農業區",AC:"鄉村區",AD:"工
 const NU_EN={AA:"Special agricultural zone",AB:"General agricultural zone",AC:"Rural zone",AD:"Industrial zone",AE:"Forest zone",AF:"Slopeland conservation zone",AG:"Scenic zone",AH:"Special-use zone",AJ:"National park zone",
   EA:"Class A building land",EB:"Class B building land",EC:"Class C building land",ED:"Class D building land",EE:"Agriculture & husbandry land",EF:"Mining land",EG:"Transport land",EH:"Water conservancy land",EJ:"Recreation land",
   EK:"Heritage preservation land",EL:"Ecological protection land",EM:"National security land",EN:"Cemetery land",EP:"Special-purpose business land",EQ:"Salt industry land",ER:"Kiln industry land",ES:"Forestry land",ET:"Aquaculture land",EZ:"Not yet designated"};
-// 使用分區：依「非都市土地使用分區類別圖」圖例，和圖磚實際的 10 種主色逐一比對而得。
+// 使用分區：依「非都市土地使用分區類別圖」與「11種使用分區」圖例，和圖磚實際的 10 種主色逐一比對而得（淺藍依地政司代碼表定名為特定專用區）。
+// 圖磚在海上是透明的，沒有畫出海域區；偶見的灰色 (102,102,102) 對不到圖例，維持顯示「圖例未列」。
 const NU1_KEY=[[[255,255,0],"AA"],[[255,165,0],"AB"],[[115,0,0],"AD"],[[255,0,0],"AC"],[[38,115,0],"AE"],[[76,230,0],"AF"],
-  [[255,0,197],"AG"],[[115,0,76],"AJ"],[[0,38,115],"RIV"],[[0,197,255],"OTH"]];
-NU_NAMES.RIV="河川區"; NU_EN.RIV="River zone"; NU_NAMES.OTH="其他使用區或專用區"; NU_EN.OTH="Other use or special-use zone";
+  [[255,0,197],"AG"],[[115,0,76],"AJ"],[[0,38,115],"RIV"],[[0,197,255],"AH"]];
+NU_NAMES.RIV="河川區"; NU_EN.RIV="River zone";
 const NU2_KEY=[]; // 使用地類別：官方圖例尚待補上
 const nuName=c=>EN?NU_EN[c]:NU_NAMES[c];
 // 取最接近的圖例色（容許圖磚邊緣的混色），差太多就當作圖例未列
