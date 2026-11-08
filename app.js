@@ -1275,9 +1275,12 @@ const SRC_HSP=L2("資料：經濟部地質調查及礦業管理中心「溫泉�
 const SRC_HFL=L2("資料：經濟部地質調查及礦業管理中心「西南海域地熱流探測調查」93～104 年度（2025-06-20 更新）","Data: GSMMA SW offshore heat-flow surveys 2004–2015 (updated 2025-06-20)");
 const SRC_DEB=L2("資料：農業部農村發展及水土保持署「115年度土石流潛勢溪流」（2026-08-24 更新）","Data: ARDSWC debris-flow potential streams, 2026 edition (updated 2026-08-24)");
 const DEB_COL={"高":"#c0392b","中":"#e67e22","低":"#d4ac0d","持續觀察":"#7f8c8d"};
+// 原住民族委員會「原住民族地區溫泉服務網」（嘉南藥理大學執行）：原住民族地區溫泉的法令、輔導與旅遊資訊
+const APC_URL="https://apc.cnu.edu.tw/";
+const APC_LINK=`<div style="margin-top:4px"><a href="${APC_URL}" target="_blank" rel="noopener">${L2("原住民族地區溫泉服務網（法令、輔導與旅遊資訊）","Indigenous-area hot spring service site (rules, guidance, travel)")}</a></div>`;
 async function hspLayer(){ const D=await loadEnv("hotspring");
   return L.layerGroup(D.rows.map(([lat,lng,n,c,t,q])=>L.circleMarker([lat,lng],{renderer:envRd,radius:5.5,color:"#fff",weight:1.2,fillColor:"#d35400",fillOpacity:.95})
-    .bindTooltip(eesc(n),{direction:"top"}).bindPopup(()=>epop(n,`${eesc(c)}${eesc(t)}`,erow([[L2("泉質","Spring type"),eesc(q)]])+eEarth(lat,lng,3000),SRC_HSP)))); }
+    .bindTooltip(eesc(n),{direction:"top"}).bindPopup(()=>epop(n,`${eesc(c)}${eesc(t)}`,erow([[L2("泉質","Spring type"),eesc(q)]])+eEarth(lat,lng,3000)+APC_LINK,SRC_HSP)))); }
 async function hflLayer(){ const D=await loadEnv("heatflow");
   return L.layerGroup(D.rows.map(([lat,lng,no,yr,dep,probe,ty,period])=>L.circleMarker([lat,lng],{renderer:envRd,radius:4.5,color:"#fff",weight:1,fillColor:"#16a085",fillOpacity:.95})
     .bindTooltip(`${L2("站位","Station")} ${eesc(no)}`,{direction:"top"})
@@ -1389,7 +1392,7 @@ function envLegend(msg){
     `<div class="src">${L2("圓越大規模越大。","Larger circles mean larger magnitude.")}</div></div>`);
   if(on("envWst")) parts.push(`<div class="zl"><b>${L2("氣象測站（現存）","Weather stations (active)")}</b><span><i style="background:#1b6f8a;border-radius:50%"></i>${L2("有人站","Staffed")}</span><span><i style="background:#5fa8c4;border-radius:50%"></i>${L2("無人站","Automatic")}</span></div>`);
   if(on("envDeb")) parts.push(`<div class="zl"><b>${L2("土石流潛勢溪流","Debris-flow potential streams")}</b>`+Object.entries(DEB_COL).map(([k,c])=>`<span><i style="background:${c}"></i>${L2(k==="持續觀察"?"持續觀察":k+"潛勢",k==="持續觀察"?"Under observation":({"高":"High","中":"Medium","低":"Low"})[k])}</span>`).join("")+`</div>`);
-  if(on("envHsp")) parts.push(`<div class="zl"><span><i style="background:#d35400;border-radius:50%"></i>${L2("溫泉露頭","Hot spring outcrop")}</span></div>`);
+  if(on("envHsp")) parts.push(`<div class="zl"><span><i style="background:#d35400;border-radius:50%"></i>${L2("溫泉露頭","Hot spring outcrop")}</span><div class="src">${L2("原住民族地區溫泉的法令與輔導資訊見","For rules and guidance on hot springs in indigenous areas, see the")} <a href="${APC_URL}" target="_blank" rel="noopener">${L2("原住民族地區溫泉服務網","indigenous-area hot spring service site")}</a>${L2("。",".")}</div></div>`);
   if(on("envHfl")) parts.push(`<div class="zl"><span><i style="background:#16a085;border-radius:50%"></i>${L2("西南海域地熱流探測站","SW offshore heat-flow station")}</span></div>`);
   if(on("envFlt")||on("envFsa")) parts.push(`<div class="zl"><b>${L2("活動斷層","Active faults")}</b><div class="src">${L2("地調中心 WMS 圖層，線型與顏色依原圖；點不出屬性。","GSMMA WMS layer drawn as published; not clickable.")}</div></div>`);
   if(on("envLsl")) parts.push(`<div class="zl"><b>${L2("大規模崩塌潛勢區","Large-scale landslide potential")}</b>`+Object.entries(RISK_COL).map(([k,c])=>`<span><i style="background:${c}"></i>${L2(k+"潛勢",({"高":"High","中":"Medium","低":"Low"})[k])}</span>`).join("")+
