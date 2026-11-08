@@ -1020,6 +1020,127 @@ function lookup(){
 }
 $("lform").onsubmit=e=>{e.preventDefault();lookup();};
 
+// ---------- 土地使用分區 ----------
+// 臺北市：都發局「臺北市都市計畫使用分區圖」細部計畫 SHP 轉成 zoning-tpe.js，用點位落在哪個分區面判斷。
+// 其他縣市的非都市土地：讀國土測繪中心 WMTS 圖磚 nURBAN1（使用分區）、nURBAN2（使用地類別）在該點的顏色，對照下面的色表。
+// 都是以點位判斷，不是逐筆地號的邊界。
+const ZONE_SRC_TPE=L2("臺北市政府都市發展局「臺北市都市計畫使用分區圖」（細部計畫）","Taipei City Urban Development Dept., urban plan zoning map (detailed plans)");
+const ZONE_SRC_NU=L2("內政部國土測繪中心 WMTS「非都市土地使用分區圖」「非都市土地使用地類別圖」","NLSC WMTS layers: non-urban land zoning and land-use type");
+// 非都市圖磚顏色 → 內政部地政司代碼（data.gov.tw/dataset/25113）。官方圖例尚待確認，未列入的顏色會直接顯示色塊。
+const NU_NAMES={AA:"特定農業區",AB:"一般農業區",AC:"鄉村區",AD:"工業區",AE:"森林區",AF:"山坡地保育區",AG:"風景區",AH:"特定專用區",AJ:"國家公園區",
+  EA:"甲種建築用地",EB:"乙種建築用地",EC:"丙種建築用地",ED:"丁種建築用地",EE:"農牧用地",EF:"礦業用地",EG:"交通用地",EH:"水利用地",EJ:"遊憩用地",
+  EK:"古蹟保存用地",EL:"生態保護用地",EM:"國土保安用地",EN:"墳墓用地",EP:"特定目的事業用地",EQ:"鹽業用地",ER:"窯業用地",ES:"林業用地",ET:"養殖用地",EZ:"暫未編定"};
+const NU_EN={AA:"Special agricultural zone",AB:"General agricultural zone",AC:"Rural zone",AD:"Industrial zone",AE:"Forest zone",AF:"Slopeland conservation zone",AG:"Scenic zone",AH:"Special-use zone",AJ:"National park zone",
+  EA:"Class A building land",EB:"Class B building land",EC:"Class C building land",ED:"Class D building land",EE:"Agriculture & husbandry land",EF:"Mining land",EG:"Transport land",EH:"Water conservancy land",EJ:"Recreation land",
+  EK:"Heritage preservation land",EL:"Ecological protection land",EM:"National security land",EN:"Cemetery land",EP:"Special-purpose business land",EQ:"Salt industry land",ER:"Kiln industry land",ES:"Forestry land",ET:"Aquaculture land",EZ:"Not yet designated"};
+const NU1_COLORS={}, NU2_COLORS={}; // "r,g,b" → 代碼，例如 "255,255,0":"AA"（待官方圖例補上）
+const nuName=c=>EN?NU_EN[c]:NU_NAMES[c];
+// 臺北市分區依代碼分組上色（本站自訂配色，不是都發局圖例）
+const ZG=[
+  {k:"park",re:/^PE/,c:"#79b866",zh:"公園、綠地、廣場",en:"Parks, green space, plazas"},
+  {k:"water",re:/^(PW|W$|PF)/,c:"#5b9bd5",zh:"河川、水利設施",en:"Rivers, water facilities"},
+  {k:"tran",re:/^PT/,c:"#a59d92",zh:"交通設施",en:"Transport"},
+  {k:"pub",re:/^P/,c:"#7f93b5",zh:"其他公共設施（學校、機關等）",en:"Other public facilities"},
+  {k:"res",re:/^R/,c:"#f0cf62",zh:"住宅區",en:"Residential"},
+  {k:"com",re:/^B/,c:"#e0675a",zh:"商業區",en:"Commercial"},
+  {k:"ind",re:/^I/,c:"#9b7bc4",zh:"工業區",en:"Industrial"},
+  {k:"edu",re:/^C/,c:"#6cc0c8",zh:"文教區",en:"Education"},
+  {k:"cons",re:/^(T|A|L)$/,c:"#bcd99b",zh:"保護區、農業區、風景區",en:"Conservation, agriculture, scenic"},
+  {k:"other",re:/./,c:"#e8a87c",zh:"特定專用區、保存區等",en:"Special-use, preservation, etc."},
+];
+const zGroup=code=>ZG.find(g=>g.re.test(code));
+const ZN={tpe:null, tpeLoad:null, tpeLayer:null, n1:nlsc("nURBAN1",Object.assign({maxNativeZoom:17,opacity:.7},OP)), n2:nlsc("nURBAN2",Object.assign({maxNativeZoom:17,opacity:.7},OP))};
+function loadTpeZoning(){
+  if(ZN.tpeLoad) return ZN.tpeLoad;
+  ZN.tpeLoad=new Promise((ok,fail)=>{const s=document.createElement("script");s.src="zoning-tpe.js";s.onload=ok;s.onerror=fail;document.head.appendChild(s);})
+  .then(()=>{
+    const D=window.TPE_ZONING;
+    // 解碼差分整數座標，順便算每個面的外框
+    D.f.forEach(f=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      f.r=f[1].map(fl=>{const pts=[];let x=0,y=0;for(let i=0;i<fl.length;i+=2){x+=fl[i];y+=fl[i+1];const X=x/1e6,Y=y/1e6;pts.push([X,Y]);
+        if(X<x0)x0=X;if(X>x1)x1=X;if(Y<y0)y0=Y;if(Y>y1)y1=Y;}return pts;});
+      f.b=[x0,y0,x1,y1]; f.a=(x1-x0)*(y1-y0);});
+    ZN.tpe=D; return D;
+  }).catch(err=>{ZN.tpeLoad=null; throw err;});
+  return ZN.tpeLoad;
+}
+// 奇偶規則判斷點是否在面內（SHP 的環方向不一致，不分內外環）
+function inRings(rings,x,y){let inside=false;
+  for(const p of rings) for(let i=0,j=p.length-1;i<p.length;j=i++){const [xi,yi]=p[i],[xj,yj]=p[j];
+    if((yi>y)!==(yj>y) && x<(xj-xi)*(y-yi)/(yj-yi)+xi) inside=!inside;}
+  return inside;}
+async function tpeZoneAt(lat,lng){
+  const D=await loadTpeZoning(); let best=null;
+  for(const f of D.f){const b=f.b; if(lng<b[0]||lng>b[2]||lat<b[1]||lat>b[3]) continue;
+    if((!best||f.a<best.a) && inRings(f.r,lng,lat)) best=f;}
+  return best?{code:D.codes[best[0]][0],name:D.codes[best[0]][1],note:best[2]||""}:null;
+}
+// 讀 WMTS 圖磚在該點的像素顏色（第 17 級，約 1.2 公尺一格；圖磚有開放 CORS）
+const tileCache=new Map();
+async function pixelAt(layer,lat,lng,z=17){
+  const n=2**z, xf=(lng+180)/360*n, r=lat*Math.PI/180, yf=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n;
+  const tx=Math.floor(xf), ty=Math.floor(yf), key=`${layer}/${z}/${ty}/${tx}`;
+  let ctx=tileCache.get(key);
+  if(!ctx){
+    const blob=await fetch(`https://wmts.nlsc.gov.tw/wmts/${layer}/default/GoogleMapsCompatible/${z}/${ty}/${tx}`).then(r=>{if(!r.ok) throw new Error(r.status);return r.blob();});
+    const bmp=await createImageBitmap(blob), c=document.createElement("canvas"); c.width=bmp.width; c.height=bmp.height;
+    ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(bmp,0,0);
+    if(tileCache.size>40) tileCache.delete(tileCache.keys().next().value);
+    tileCache.set(key,ctx);
+  }
+  const s=ctx.canvas.width/256, d=ctx.getImageData(Math.min(255,Math.floor((xf-tx)*256))*s|0,Math.min(255,Math.floor((yf-ty)*256))*s|0,1,1).data;
+  return d[3]<128?null:[d[0],d[1],d[2]];
+}
+const sw=rgb=>`<span class="zsw" style="background:rgb(${rgb.join(",")})"></span>`;
+const zNote=()=>`<div class="src">${L2("以點選位置判斷，不是逐筆地號的邊界；位在分區交界時可能判斷錯誤。正式分區請以主管機關核發的土地使用分區證明為準。","Based on the clicked point, not on parcel boundaries, so it may be wrong near zone edges. Official zoning comes from a zoning certificate issued by the local government.")}</div>`;
+async function zoneHTML(cty,lat,lng){
+  if(cty==="臺北市"){
+    const z=await tpeZoneAt(lat,lng), g=z&&zGroup(z.code);
+    const body=z?`<dt>${L2("都市計畫使用分區","Urban plan zoning")}</dt><dd><span class="zsw" style="background:${g.c}"></span>${z.name}（${z.code}）${z.note?`・${z.note}`:""}</dd>`
+      :`<dt>${L2("都市計畫使用分區","Urban plan zoning")}</dt><dd>${L2("這個點不在任何分區面內，多半是道路。","This point is not inside any zone polygon. It is most likely a road.")}</dd>`;
+    return `<dl class="zone">${body}</dl><div class="src">${L2(`資料：${ZONE_SRC_TPE}，資料集更新 ${ZN.tpe.date}。`,`Data: ${ZONE_SRC_TPE}, dataset updated ${ZN.tpe.date}.`)}</div>${zNote()}`;
+  }
+  const [c1,c2]=await Promise.all([pixelAt("nURBAN1",lat,lng),pixelAt("nURBAN2",lat,lng)]);
+  if(!c1&&!c2) return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，可能是都市計畫區或國家公園。本站目前只有臺北市的都市計畫分區資料，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is probably inside an urban plan area or a national park. This site only has urban plan zoning for Taipei City; check the local government's urban planning service for other cities and counties.")}</dd></dl>`+
+    `<div class="src">${L2(`資料：${ZONE_SRC_NU}。`,`Data: ${ZONE_SRC_NU}.`)}</div>`;
+  const row=(lab,rgb,tbl)=>{if(!rgb) return `<dt>${lab}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`;
+    const code=tbl[rgb.join(",")];
+    return `<dt>${lab}</dt><dd>${sw(rgb)}${code?`${nuName(code)}`:L2("顏色對照尚待官方圖例確認","Colour key not yet confirmed against the official legend")}</dd>`;};
+  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row(L2("使用分區","Zone"),c1,NU1_COLORS)}${row(L2("使用地類別","Land-use type"),c2,NU2_COLORS)}</dl>`+
+    `<div class="src">${L2(`資料：${ZONE_SRC_NU}，依圖磚顏色判讀，圖磚未標示更新日期。`,`Data: ${ZONE_SRC_NU}, read from the tile colour; the tiles carry no update date.`)}</div>${zNote()}`;
+}
+async function appendZone(info,cty,lat,lng){
+  const box=document.createElement("div"); box.className="zonebox"; box.innerHTML=`<div class="m">${L2("查詢土地使用分區中…","Looking up land-use zoning…")}</div>`; info.appendChild(box);
+  try{ box.innerHTML=await zoneHTML(cty,lat,lng); }
+  catch(err){ box.innerHTML=`<div class="m">${L2("土地使用分區查詢失敗，請確認網路連線後再點一次。","Zoning lookup failed. Check your connection and click again.")}</div>`; }
+}
+// 分區疊圖與圖例
+function zoneLegend(){
+  const lg=$("zonelegend"), parts=[];
+  if($("zTpe").checked) parts.push(`<div class="zl"><b>${L2("臺北市都市計畫使用分區","Taipei urban plan zoning")}</b>`+ZG.map(g=>`<span><i style="background:${g.c}"></i>${L2(g.zh,g.en)}</span>`).join("")+
+    `<div class="src">${L2("本站自訂分組配色，不是都發局圖例。","Grouped colours chosen by this site, not the official legend.")}</div></div>`);
+  if($("zN1").checked||$("zN2").checked) parts.push(`<div class="zl"><b>${L2("非都市土地","Non-urban land")}</b><div class="src">${L2("國土測繪中心圖磚，只畫非都市土地；放大超過 17 級會沿用 17 級圖磚。顏色代表的分區請點地圖查詢。","NLSC tiles cover non-urban land only; beyond zoom 17 the level-17 tiles are stretched. Click the map to read the zone at a point.")}</div></div>`);
+  lg.innerHTML=parts.join(""); lg.hidden=!parts.length;
+}
+$("zTpe").onchange=async e=>{
+  if(!e.target.checked){ if(ZN.tpeLayer) map.removeLayer(ZN.tpeLayer); zoneLegend(); return; }
+  e.target.disabled=true;
+  try{
+    const D=await loadTpeZoning();
+    if(!ZN.tpeLayer){
+      const rd=L.canvas({pane:"otiles",padding:.3}), op=+$("opacity").value;
+      ZN.tpeLayer=L.layerGroup(D.f.map(f=>L.polygon(f.r.map(p=>p.map(([x,y])=>[y,x])),
+        {renderer:rd,interactive:false,stroke:true,weight:.4,color:"#4a3a28",opacity:.5,fillColor:zGroup(D.codes[f[0]][0]).c,fillOpacity:.55*op})));
+    }
+    ZN.tpeLayer.addTo(map);
+    if(!map.getBounds().intersects(L.latLngBounds([24.96,121.45],[25.21,121.67]))) map.flyTo([25.05,121.55],13,{duration:.6});
+  }catch(err){ e.target.checked=false; $("zonelegend").hidden=false; $("zonelegend").innerHTML=`<div class="src">${L2("臺北市分區資料載入失敗，請確認 zoning-tpe.js 和網頁放在同一個資料夾。","Taipei zoning data failed to load. Keep zoning-tpe.js in the same folder as this page.")}</div>`; e.target.disabled=false; return; }
+  e.target.disabled=false; zoneLegend();
+};
+[["zN1","n1"],["zN2","n2"]].forEach(([id,k])=>$(id).onchange=e=>{ if(e.target.checked){ZN[k].addTo(map); if(map.getZoom()<12) map.setZoom(12);} else map.removeLayer(ZN[k]); zoneLegend(); });
+$("opacity").addEventListener("input",e=>{const v=+e.target.value; ZN.n1.setOpacity(v); ZN.n2.setOpacity(v);
+  ZN.tpeLayer?.eachLayer(l=>l.setStyle({fillOpacity:.55*v}));});
+
 map.on("click", async e=>{
   if(!LQ.mode) return;
   const {lat,lng}=e.latlng;
@@ -1029,10 +1150,13 @@ map.on("click", async e=>{
     await loadPub();
     const xml=await fetch(`https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lng.toFixed(6)}/${lat.toFixed(6)}`).then(r=>r.text());
     const d=new DOMParser().parseFromString(xml,"text/xml"), g=t=>d.querySelector(t)?.textContent||"";
-    if(!g("sectCode")){info.innerHTML=`<div class="m">${L2("這個位置查不到地段，可能在河川或未登記地。","No land section here. It may be a river or unregistered land.")}</div>`;return;}
-    if(g("ctyName")!=="臺北市"){info.innerHTML=`<div class="t">${g("sectName")}</div><div class="m">${g("ctyName")}${g("townName")}${L2("：公有地清冊只涵蓋臺北市。",": the public land register covers Taipei City only.")}</div>`;showSect("");return;}
+    if(!g("sectCode")){info.innerHTML=`<div class="m">${L2("這個位置查不到地段，可能在河川或未登記地。","No land section here. It may be a river or unregistered land.")}</div>`;
+      if(g("ctyName")) appendZone(info,g("ctyName"),lat,lng); return;}
+    if(g("ctyName")!=="臺北市"){info.innerHTML=`<div class="t">${g("sectName")}</div><div class="m">${g("ctyName")}${g("townName")}・${g("officeName")}${L2("地政事務所・段代碼 ","Land Office · section code ")}${g("sectCode")}<br>${L2("公有地清冊只涵蓋臺北市。","The public land register covers Taipei City only.")}</div>`;showSect("");
+      appendZone(info,g("ctyName"),lat,lng); return;}
     info.innerHTML=`<div class="t">${g("sectName")}</div><div class="m">${g("ctyName")}${g("townName")}・${g("villageName")}・${g("officeName")}${L2("地政事務所・段代碼 ","Land Office · section code ")}${g("sectCode")}<br>TWD97 ${fmtTM2(lat,lng)}</div>`;
     showSect(g("sectCode"));
+    appendZone(info,g("ctyName"),lat,lng);
     if(map.getZoom()<17) map.setView(e.latlng,17);
   }catch(err){ info.innerHTML=`<div class="m">${L2("地段查詢失敗，請確認網路連線後再點一次。","Land section lookup failed. Check your connection and click again.")}</div>`; }
 });

@@ -81,6 +81,16 @@ select{padding:7px 10px;border:1px solid var(--rule);border-radius:4px;backgroun
 #plist .ar{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
 #plist .more{color:var(--muted);cursor:default;display:block;text-align:center}
 .clickpin{width:14px;height:14px;border:3px solid var(--accent);border-radius:50%;background:var(--sheet);box-shadow:0 0 0 2px var(--sheet)}
+.zonebox{margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule)}
+.zonebox dl.zone{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}
+.zonebox dt{color:var(--muted)}
+.zonebox dt.h{grid-column:1/-1;color:var(--ink);font-weight:700}
+.zonebox dd{margin:0;font-weight:500}
+.zsw{display:inline-block;width:11px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px;margin-right:6px;vertical-align:-1px}
+#zonelegend{margin-top:6px}
+#zonelegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:4px}
+#zonelegend .zl b{font-size:12px}
+#zonelegend .zl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
 #ownlegend{margin-top:6px}
 #ownlegend .ramp{height:10px;border-radius:2px;border:1px solid var(--rule)}
 #ownlegend .ticks{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
