@@ -718,16 +718,31 @@ geoLegend();
 // ---------- 我的標示：點地圖新增、可編輯名稱／備註／顏色／形狀／照片／連結，可拖曳；存在瀏覽器 localStorage ----------
 const MK_KEY="geo-mymarks";
 const MK_COLORS=["#c0392b","#e67e22","#d4ac0d","#2e8b57","#1f6fb5","#7d3c98","#3a2816"];
-const MK_SHAPES=[["circle",L2("圓","Circle")],["square",L2("方","Square")],["diamond",L2("菱","Diamond")],["flag",L2("旗","Flag")]];
+const MK_SHAPES=[["circle",L2("圓形","Circle")],["square",L2("方形","Square")],["diamond",L2("菱形","Diamond")],["triangle",L2("三角形","Triangle")],
+  ["star",L2("星形","Star")],["spring",L2("溫泉符號 ♨","Hot spring ♨")],["flag",L2("旗子","Flag")]];
+// 各形狀的 SVG（24×24 畫布）；標示與選擇按鈕共用同一套圖形
+function mkSvg(shape,c,px=24,halo=true){
+  const st=halo?`stroke="#fff" stroke-width="2.2" stroke-linejoin="round"`:`stroke="none"`;
+  const f=`fill="${c}" ${st}`;
+  const g={
+    circle:`<circle cx="12" cy="12" r="8.5" ${f}/>`,
+    square:`<rect x="4" y="4" width="16" height="16" rx="1.5" ${f}/>`,
+    diamond:`<path d="M12 2.5 21.5 12 12 21.5 2.5 12Z" ${f}/>`,
+    triangle:`<path d="M12 3 21.5 20h-19Z" ${f}/>`,
+    star:`<path d="M12 2.2l2.9 6.2 6.7.8-5 4.6 1.3 6.7L12 17.1l-5.9 3.4 1.3-6.7-5-4.6 6.7-.8Z" ${f}/>`,
+    spring:(()=>{const steam="M7.5 10.5c-1.6-1.8 1.6-3 0-5.2s0-3 0-3M12 10.5c-1.6-1.8 1.6-3 0-5.2s0-3 0-3M16.5 10.5c-1.6-1.8 1.6-3 0-5.2s0-3 0-3";
+      return (halo?`<path d="${steam}" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round"/>`:"")+
+        `<path d="${steam}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><path d="M2.5 13.5h19a9.5 8 0 0 1-19 0Z" ${f}/>`;})(),
+    flag:`<path d="M5 2.5V22" stroke="#3a2816" stroke-width="2" stroke-linecap="round"/><path d="M6 3h13l-3 4.5 3 4.5H6Z" ${f}/>`,
+  }[shape]||"";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true" style="display:block;overflow:visible;${halo?"filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))":""}">${g}</svg>`;
+}
 let marks=[]; try{marks=JSON.parse(localStorage.getItem(MK_KEY)||"[]")||[];}catch(e){marks=[];}
 const mkSave=()=>{try{localStorage.setItem(MK_KEY,JSON.stringify(marks.map(({layer,...m})=>m)));}catch(e){}};
 map.createPane("mymarks"); map.getPane("mymarks").style.zIndex=640;
 const mkGroup=L.layerGroup().addTo(map);
-const mkIconHtml=m=>{const c=m.color||MK_COLORS[0];
-  if(m.shape==="flag") return `<div style="position:relative;width:22px;height:26px"><div style="position:absolute;left:3px;top:0;width:2px;height:26px;background:#3a2816"></div><div style="position:absolute;left:5px;top:1px;width:15px;height:11px;background:${c};border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div></div>`;
-  const r=m.shape==="circle"?"50%":"2px", rot=m.shape==="diamond"?"transform:rotate(45deg);":"";
-  return `<div style="width:18px;height:18px;margin:2px;background:${c};border:2.5px solid #fff;border-radius:${r};${rot}box-shadow:0 0 0 1.5px ${c},0 2px 4px rgba(0,0,0,.4)"></div>`;};
-const mkIcon=m=>L.divIcon({className:"",iconSize:m.shape==="flag"?[22,26]:[22,22],iconAnchor:m.shape==="flag"?[4,26]:[11,11],popupAnchor:m.shape==="flag"?[6,-24]:[0,-10],html:mkIconHtml(m)});
+const mkIcon=m=>{const flag=m.shape==="flag";
+  return L.divIcon({className:"mkicon",iconSize:[26,26],iconAnchor:flag?[6,26]:[13,13],popupAnchor:flag?[4,-24]:[0,-12],html:mkSvg(m.shape||"circle",m.color||MK_COLORS[0],26)});};
 const lines=s=>String(s||"").split(/\s*\n\s*/).map(x=>x.trim()).filter(Boolean);
 const safeUrl=u=>/^https?:\/\//i.test(u)?u:"";
 function mkView(m){
@@ -748,7 +763,7 @@ function mkEdit(m){
     <div class="mkl">${L2("顏色","Colour")}</div>
     <div class="mkchoice">${MK_COLORS.map(c=>`<button type="button" data-c="${c}" aria-label="${c}" aria-pressed="${c===m.color}" style="background:${c}"></button>`).join("")}</div>
     <div class="mkl">${L2("形狀","Shape")}</div>
-    <div class="mkchoice mkshape">${MK_SHAPES.map(([s,n])=>`<button type="button" data-s="${s}" aria-pressed="${s===m.shape}">${n}</button>`).join("")}</div>
+    <div class="mkchoice mkshape">${MK_SHAPES.map(([s,n])=>`<button type="button" data-s="${s}" aria-pressed="${s===m.shape}" title="${n}" aria-label="${n}">${mkSvg(s,m.color||MK_COLORS[0],22,false)}</button>`).join("")}</div>
     <label>${L2("照片網址（一行一個）","Photo URLs (one per line)")}<textarea name="imgs" rows="2" placeholder="https://…">${hesc(m.imgs)}</textarea></label>
     <label>${L2("連結（一行一個）","Links (one per line)")}<textarea name="links" rows="2" placeholder="https://…">${hesc(m.links)}</textarea></label>
     <div class="mkrow"><button type="submit" class="btn">${L2("完成","Done")}</button><button type="button" class="linkbtn" data-a="del">${L2("刪除這個標示","Delete this marker")}</button></div></form>`;
@@ -763,6 +778,7 @@ function mkOpen(m,edit){
     f.addEventListener("input",sync);
     const pick=(sel,attr,key)=>f.querySelectorAll(sel).forEach(b=>b.onclick=()=>{m[key]=b.dataset[attr];f.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b));m.layer.setIcon(mkIcon(m));m.layer.getPopup()?.update();mkSave();mkList();});
     pick("[data-c]","c","color"); pick("[data-s]","s","shape");
+    f.querySelectorAll("[data-c]").forEach(b=>b.addEventListener("click",()=>f.querySelectorAll("[data-s]").forEach(x=>x.innerHTML=mkSvg(x.dataset.s,m.color,22,false))));
     f.onsubmit=e=>{e.preventDefault();sync();mkOpen(m,false);};
     f.querySelector('[data-a="del"]').onclick=()=>{m.layer.closePopup();mkGroup.removeLayer(m.layer);marks=marks.filter(x=>x!==m);mkSave();mkList();};
     if(!m.name) setTimeout(()=>f.name.focus(),80);
