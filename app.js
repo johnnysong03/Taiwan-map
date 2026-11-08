@@ -1051,6 +1051,14 @@ const NU_EN={AA:"Special agricultural zone",AB:"General agricultural zone",AC:"R
 const NU1_KEY=[[[255,255,0],"AA"],[[255,165,0],"AB"],[[115,0,0],"AD"],[[255,0,0],"AC"],[[38,115,0],"AE"],[[76,230,0],"AF"],
   [[255,0,197],"AG"],[[115,0,76],"AJ"],[[0,38,115],"AK"],[[0,197,255],"AH"],[[102,102,102],"AL"]];
 const NU_RGB=Object.fromEntries(NU1_KEY.map(([c,k])=>[k,c]));
+// 顯示分類依「圖3-1-1 非都市土地使用分區類別圖」的 10 類；圖例沒有單獨列出的特定專用區（AH）、海域區（AL）等歸入「其他使用區或專用區」。
+const NU_CLASS=[["AA","特定農業區","Special agricultural zone"],["AB","一般農業區","General agricultural zone"],["AD","工業區","Industrial zone"],["AC","鄉村區","Rural zone"],
+  ["AE","森林區","Forest zone"],["AF","山坡地保育區","Slopeland conservation zone"],["AG","風景區","Scenic zone"],["AJ","國家公園區","National park zone"],["AK","河川區","River zone"],
+  ["AH","其他使用區或專用區","Other use or special-use zone"]].map(([k,zh,en])=>({k,zh,en,c:NU_RGB[k]}));
+const nuClass=code=>NU_CLASS.find(x=>x.k===code)||NU_CLASS[NU_CLASS.length-1];
+// 卡片上的分區文字：圖例類別名稱；原始分區名稱與圖例不同時，括號附上原名與代碼
+const nuZoneText=code=>{const c=nuClass(code), own=NU_NAMES[code], lab=L2(c.zh,c.en);
+  return own&&own!==c.zh?`${lab}（${L2(own,NU_EN[code])}，${code}）`:`${lab}（${code}）`;};
 const NU2_KEY=[]; // 使用地類別：官方圖例尚待補上
 const nuName=c=>EN?NU_EN[c]:NU_NAMES[c];
 // 取最接近的圖例色（容許圖磚邊緣的混色），差太多就當作圖例未列
@@ -1075,7 +1083,7 @@ const ZG=[
   {k:"other",re:/./,nre:/./,c:"#cfc6b4",zh:"附件三未訂定（特定專用區、道路交通、水利設施等）",en:"Not defined in the standard legend (special-use, transport, drainage, etc.)"},
 ];
 const zGroup=(key,code,name)=>key==="ntpc"?ZG.find(g=>g.nre.test(name)):ZG.find(g=>g.re.test(code));
-const zColor=(key,code,name)=>key.startsWith("nu-")?`rgb(${(NU_RGB[code]||[200,200,200]).join(",")})`:zGroup(key,code,name).c;
+const zColor=(key,code,name)=>key.startsWith("nu-")?`rgb(${nuClass(code).c.join(",")})`:zGroup(key,code,name).c;
 const ZN={data:{}, load:{}, urbanLayers:{}, n1:nlsc("nURBAN1",Object.assign({maxNativeZoom:17,opacity:.7},OP)), n2:nlsc("nURBAN2",Object.assign({maxNativeZoom:17,opacity:.7},OP))};
 // 載入 zoning/<key>.js，解碼差分整數座標，順便算每個面的外框
 function loadZone(key){
@@ -1141,7 +1149,7 @@ async function zoneHTML(cc,lat,lng){
   // 2. 非都市土地：使用分區用內政部向量檔，使用地類別讀圖磚
   if(NU_CTY.has(cc)){
     const [z,c2]=await Promise.all([zoneAt("nu-"+cc,lat,lng),pixelAt("nURBAN2",lat,lng).catch(()=>null)]);
-    if(z) return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}<dt>${L2("使用分區","Zone")}</dt><dd>${swc(zColor(z.key,z.code))}${nuName(z.code)||z.name}（${z.code}）</dd>${useTypeRow(c2)}</dl>`+
+    if(z) return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}<dt>${L2("使用分區","Zone")}</dt><dd>${swc(zColor(z.key,z.code))}${nuZoneText(z.code)}</dd>${useTypeRow(c2)}</dl>`+
       srcLine("nu",z.date)+`<div class="src">${L2(`使用地類別：${ZSRC.tile.zh}，依圖磚顏色判讀，圖磚未標示更新日期。`,`Land-use type: ${ZSRC.tile.en}, read from the tile colour; the tiles carry no update date.`)}</div>`+zNote();
     return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，多半位在都市計畫區或國家公園。本站目前只有臺北市、新北市的都市計畫分區，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is most likely inside an urban plan area or a national park. This site only has urban plan zoning for Taipei and New Taipei; check the local government's urban planning service elsewhere.")}</dd></dl>`+
       srcLine(cc==="F"?"ntpc":"nu",cc==="F"?ZN.data.ntpc.date:ZN.data["nu-"+cc].date);
@@ -1151,7 +1159,7 @@ async function zoneHTML(cc,lat,lng){
   if(!c1&&!c2) return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，可能是都市計畫區或國家公園。本站目前只有臺北市、新北市的都市計畫分區，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is probably inside an urban plan area or a national park. This site only has urban plan zoning for Taipei and New Taipei; check the local government's urban planning service elsewhere.")}</dd></dl>`+
     `<div class="src">${L2(`資料：${ZSRC.tile.zh}。`,`Data: ${ZSRC.tile.en}.`)}</div>`;
   const c1code=c1&&nuMatch(c1,NU1_KEY);
-  const row1=!c1?`<dt>${L2("使用分區","Zone")}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`:`<dt>${L2("使用分區","Zone")}</dt><dd>${sw(c1)}${c1code?nuName(c1code):L2("圖例未列的顏色","Colour not in the legend")}</dd>`;
+  const row1=!c1?`<dt>${L2("使用分區","Zone")}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`:`<dt>${L2("使用分區","Zone")}</dt><dd>${sw(c1)}${c1code?nuZoneText(c1code):L2("圖例未列的顏色","Colour not in the legend")}</dd>`;
   return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row1}${useTypeRow(c2)}</dl>`+
     `<div class="src">${L2(`資料：${ZSRC.tile.zh}，依圖磚顏色對照圖例判讀，圖磚未標示更新日期。`,`Data: ${ZSRC.tile.en}, read from the tile colour against the legend; the tiles carry no update date.`)}</div>${zNote()}`;
 }
@@ -1165,7 +1173,8 @@ function zoneLegend(){
   const lg=$("zonelegend"), parts=[];
   if($("zTpe").checked) parts.push(`<div class="zl"><b>${L2("都市計畫使用分區（臺北市、新北市）","Urban plan zoning (Taipei, New Taipei)")}</b>`+ZG.map(g=>`<span><i style="background:${g.c}"></i>${L2(g.zh,g.en)}</span>`).join("")+
     `<div class="src">${L2("顏色依內政部「都市計畫書圖製作要點」第七點附件三「都市計畫圖例」；最後一類附件三未訂定，為本站自訂。新北市資料只有分區名稱，依名稱歸類。","Colours follow the standard urban plan legend (Ministry of the Interior, Urban Plan Documents and Maps Production Directions, Point 7, Annex 3); the last group is not defined there and was chosen by this site. New Taipei data only has zone names, so it is grouped by name.")}</div></div>`);
-  if($("zN1").checked) parts.push(`<div class="zl"><b>${L2("非都市土地使用分區","Non-urban land zoning")}</b>`+NU1_KEY.map(([c,code])=>`<span><i style="background:rgb(${c.join(",")})"></i>${nuName(code)}</span>`).join("")+`</div>`);
+  if($("zN1").checked) parts.push(`<div class="zl"><b>${L2("非都市土地使用分區","Non-urban land zoning")}</b>`+NU_CLASS.map(x=>`<span><i style="background:rgb(${x.c.join(",")})"></i>${L2(x.zh,x.en)}</span>`).join("")+
+    `<div class="src">${L2("分類依「圖3-1-1 非都市土地使用分區類別圖」；特定專用區、海域區等歸入「其他使用區或專用區」。","Classes follow Figure 3-1-1 (non-urban land zoning classes); special-use and marine zones are grouped under “other use or special-use zone”.")}</div></div>`);
   if($("zN1").checked||$("zN2").checked) parts.push(`<div class="zl"><b>${L2("非都市土地","Non-urban land")}</b><div class="src">${L2("國土測繪中心圖磚，只畫非都市土地；放大超過 17 級會沿用 17 級圖磚。點地圖可查該點的分區。","NLSC tiles cover non-urban land only; beyond zoom 17 the level-17 tiles are stretched. Click the map to read the zone at a point.")}</div></div>`);
   lg.innerHTML=parts.join(""); lg.hidden=!parts.length;
 }
