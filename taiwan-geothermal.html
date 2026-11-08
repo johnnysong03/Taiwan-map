@@ -89,6 +89,19 @@
         <option value="火山灰(冬季)" data-en="Ash fall (winter)">火山灰（冬季）</option>
         <option value="海嘯" data-en="Tsunami (Guishan Island)">海嘯（龜山島）</option>
       </select>
+      <label><input type="checkbox" id="envWel"> <span data-en="Hydrogeological observation wells (GSMMA, live)">水文地質觀測井（地調中心，即時）</span></label>
+      <label><input type="checkbox" id="envDip"> <span data-en="Dip slopes (GSMMA)">順向坡（地調中心）</span></label>
+      <label><input type="checkbox" id="envEco"> <span data-en="National ecological network (Forestry Agency)">國土生態綠網（林業保育署）</span></label>
+      <select id="ecosel" aria-label="國土生態綠網圖資" hidden>
+        <option value="zone" data-en="Network zones">綠網分區圖</option>
+        <option value="focus" data-en="Areas of concern">關注區域</option>
+        <option value="axis" data-en="Regional conservation corridors">區域保育軸帶</option>
+        <option value="hotspot" data-en="Biodiversity hotspots">生物多樣性熱區</option>
+        <option value="satoyama" data-en="Satoyama landscapes of concern">重要關注里山地景</option>
+        <option value="river" data-en="Rivers of concern">關注河川</option>
+        <option value="stream" data-en="Independent streams of concern">關注獨流溪</option>
+        <option value="pond" data-en="Paddy ditches and ponds of concern">關注農田圳溝或埤塘池沼</option>
+      </select>
       <div id="envlegend" hidden></div>
     </fieldset>
     <div class="op">

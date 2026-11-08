@@ -1319,6 +1319,47 @@ async function volLayer(){ const D=await loadEnv("volcano"), sel=$e("volhaz").va
     });
   });
   return g; }
+// 地調中心「臺灣水文地質資訊系統」觀測井：勾選時即時以 POST 取得 GeoJSON（不需金鑰，CORS 開放）
+const HYDRO="https://hydro.geologycloud.tw";
+const SRC_WEL=L2("資料：經濟部地質調查及礦業管理中心「臺灣水文地質資訊系統」（即時查詢）","Data: GSMMA Taiwan Hydrogeological Information System (live)");
+const WEL_SET=[["mt","#6d4c41",L2("地礦中心・山區","GSMMA mountain")],["p","#1e88e5",L2("地礦中心・平原","GSMMA plain")],["wra","#00897b",L2("水利署","Water Resources Agency")],["wrap","#8e24aa",L2("水利規劃分署","WRA Planning Branch")]];
+async function welLayer(){
+  const g=L.layerGroup(); let n=0;
+  const res=await Promise.all(WEL_SET.map(([k])=>fetch(`${HYDRO}/data/${k}/hydrostation`,{method:"POST"}).then(r=>{if(!r.ok) throw new Error("http "+r.status);return r.json();})));
+  res.forEach((j,i)=>{const [k,c,lab]=WEL_SET[i]; (j.data?.features||[]).forEach(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates; n++;
+    const yn=v=>v?L2("有","yes"):L2("無","no");
+    L.circleMarker([lat,lng],{renderer:envRd,radius:4.5,color:"#fff",weight:1,fillColor:c,fillOpacity:.95}).bindTooltip(eesc(p.STATION_NAME),{direction:"top"})
+      .bindPopup(()=>epop(p.STATION_NAME,`${lab}・${eesc(p.STATION_NMBR)}`,erow([[L2("縣市","County"),eesc(p.City_Name)],[L2("流域","Basin"),eesc(p.River_Name)],[L2("水文地質分區","Hydrogeological unit"),eesc(p.Wsect_Name)],
+        [L2("井深","Well depth"),p.Well_Depth!=null?`${p.Well_Depth} m`:""],[L2("地面高程","Ground elevation"),p.CUR_ELEVATION!=null?`${p.CUR_ELEVATION} m`:""],[L2("鑽井年","Drilled"),eesc(p.EXEYEAR)],[L2("鑽井方式","Drilling"),eesc(p.Drill_Type)],
+        [L2("岩心影像","Core images"),yn(p.Rock_Image)],[L2("水位資料","Water level data"),yn(p.Water_Line)],[L2("水質資料","Water quality data"),yn(p.Water_Test)]])+
+        `<div style="margin-top:6px"><a href="${HYDRO}/map" target="_blank" rel="noopener">${L2("在臺灣水文地質資訊系統查看岩心與水位","View cores and water levels in the official system")}</a></div>`+eEarth(lat,lng,3000),SRC_WEL)).addTo(g);});});
+  if(!n) throw new Error("empty");
+  return g;
+}
+// 地調中心順向坡目錄圖磚（只到第 15 級）
+const dipLayer=async()=>L.tileLayer("https://landslide.geologycloud.tw/jlwmts/jetlink/Dislope/GoogleMapsCompatible/{z}/{x}/{y}.png",{pane:"envtiles",maxZoom:20,maxNativeZoom:15,opacity:.85,attribution:"© 經濟部地質調查及礦業管理中心"});
+// 林業保育署國土生態綠網：下拉選單切換 8 種圖資
+const SRC_ECO=d=>L2(`資料：農業部林業及自然保育署「國土生態綠網」圖資（${d}）`,`Data: Forestry and Nature Conservation Agency, national ecological network (${d})`);
+const ECO_ZONE_COL=["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5","#d9d9d9","#bc80bd","#ccebc5","#ffed6f"];
+const HOT_COL={1:"#fee08b",2:"#fdae61",3:"#f46d43",4:"#a50026"};
+async function ecoLayer(){
+  const k=$e("ecosel").value, D=await loadEnv("eco-"+k), g=L.layerGroup(), src=SRC_ECO(D.date), F=D.fields||[], ix=n=>F.indexOf(n);
+  const poly=(ps,st,tip,pop)=>ps.forEach(rings=>{const l=L.polygon(rings.map(dec5),Object.assign({renderer:envRd,weight:1.2},st)); if(tip) l.bindTooltip(tip,{sticky:true}); if(pop) l.bindPopup(pop); l.addTo(g);});
+  if(k==="zone") D.f.forEach(([a,ps],i)=>poly(ps,{color:"#555",fillColor:ECO_ZONE_COL[i%12],fillOpacity:.35},eesc(a[0]),()=>epop(a[0],"",erow([[L2("面積","Area"),`${Math.round(a[1]).toLocaleString()} ha`]]),src)));
+  if(k==="focus"||k==="axis"){ const nm=k==="focus"?"Name":"name";
+    D.f.forEach(([a,ps])=>poly(ps,{color:k==="focus"?"#2e7d32":"#00838f",fillColor:k==="focus"?"#66bb6a":"#4dd0e1",fillOpacity:.3},eesc(a[ix(nm)]),
+      ()=>epop(a[ix(nm)],k==="focus"?eesc(a[ix("Zone")]):`${eesc(a[ix("zone")])}・${eesc(a[ix("type")])}・${eesc(a[ix("fd")])}`,
+        erow(k==="focus"?[[L2("位置","Location"),eesc(a[ix("Location")])],[L2("棲地","Habitat"),eesc(a[ix("Habitat")])],[L2("關注動物","Animals"),eesc(a[ix("Animal")])],[L2("關注植物","Plants"),eesc(a[ix("Plant")])],[L2("目的","Purpose"),eesc(a[ix("Purpose")])],[L2("面積","Area"),`${Math.round(+a[ix("Area_ha")]).toLocaleString()} ha`]]
+          :[[L2("範圍","Area"),eesc(a[ix("region")])],[L2("棲地","Habitat"),eesc(a[ix("habitat")])],[L2("策略","Strategy"),eesc(a[ix("strategy")])],[L2("面積","Area"),`${Math.round(+a[ix("area_ha")]).toLocaleString()} ha`],[L2("版本","Edition"),eesc(a[ix("Edition")])]]),src))); }
+  if(k==="hotspot") D.f.forEach(([v,ps])=>poly(ps,{color:HOT_COL[v],weight:.5,fillColor:HOT_COL[v],fillOpacity:.55},L2(`${v}${v>=4?" 類以上":" 類"}動物類群熱點`,`Hotspot for ${v}${v>=4?"+":""} animal groups`)));
+  if(k==="satoyama") D.f.forEach(([v,ps])=>poly(ps,{color:"#689f38",weight:.5,fillColor:"#9ccc65",fillOpacity:.5},L2("重要關注里山地景","Satoyama landscape of concern")));
+  if(k==="stream") D.f.forEach(([a,ps])=>poly(ps,{color:"#0277bd",fillColor:"#29b6f6",fillOpacity:.6,weight:2},eesc(a[0]),()=>epop(a[0],L2("關注獨流溪","Independent stream of concern"),erow([[L2("備註","Note"),eesc(a[2])]]),src)));
+  if(k==="river") D.f.forEach(([a,parts])=>L.polyline(parts.map(dec5),{renderer:envRd,color:"#0277bd",weight:3,opacity:.9}).bindTooltip(eesc(a[ix("NAME")]),{sticky:true})
+    .bindPopup(()=>epop(a[ix("NAME")],`${eesc(a[ix("drainage_t")])}・${eesc(a[ix("COUNTY20_1")])}`,erow([[L2("關注物種","Species of concern"),eesc(a[ix("Note")])]]),src)).addTo(g));
+  if(k==="pond") D.rows.forEach(([lat,lng,sp,sn,de,so])=>L.circleMarker([lat,lng],{renderer:envRd,radius:5,color:"#fff",weight:1,fillColor:"#00897b",fillOpacity:.95}).bindTooltip(eesc(sp),{direction:"top"})
+    .bindPopup(()=>epop(sp,`<i>${eesc(sn)}</i>`,erow([[L2("地點","Place"),eesc(de)],[L2("資料來源","Source"),eesc(so)]])+eEarth(lat,lng,3000),src)).addTo(g));
+  return g;
+}
 const ENV_DEF={
   envEqS:{cwa:1,make:()=>eqLayer("E-A0015-001",L2("顯著有感地震","Notable felt earthquake"))},
   envEqL:{cwa:1,make:()=>eqLayer("E-A0016-001",L2("小區域有感地震","Local felt earthquake"))},
@@ -1326,6 +1367,7 @@ const ENV_DEF={
   envHsp:{make:hspLayer}, envDeb:{make:debLayer}, envHfl:{make:hflLayer},
   envFlt:{make:async()=>gsmmaWms("WMS/25K_Geomap_fault_2021")}, envFsa:{make:async()=>gsmmaWms("WMS/Sensitive_area_fault")},
   envLsl:{make:lslLayer}, envVol:{make:volLayer},
+  envWel:{make:welLayer}, envDip:{make:dipLayer}, envEco:{make:ecoLayer},
 };
 function envLegend(msg){
   const on=id=>$e(id).checked, parts=[];
@@ -1342,6 +1384,11 @@ function envLegend(msg){
   if(on("envVol")){ const s=$e("volhaz").value; parts.push(`<div class="zl"><b>${L2("火山災害潛勢","Volcanic hazard potential")}・${$e("volhaz").selectedOptions[0].textContent}</b>`+
     `<span><i style="background:${VOL_COL[s]}"></i>${L2("影響範圍","Affected area")}${s.startsWith("火山灰")?L2("（虛線為等厚線）"," (dashed: isopachs)"):""}</span><span><i style="background:#b03a2e;border-radius:50%"></i>${L2("火山口位置","Crater")}</span>`+
     `<div class="src">${L2("磺嘴山火山灰（冬季）官方檔案內容不符且損毀，未收錄；另有兩個損毀的子檔略過。","The official file for Huangzuishan winter ash fall is mislabelled and corrupt, so it is not shown; two other corrupt sub-files were skipped.")}</div></div>`); }
+  if(on("envWel")) parts.push(`<div class="zl"><b>${L2("水文地質觀測井","Hydrogeological wells")}</b>`+WEL_SET.map(([k,c,lab])=>`<span><i style="background:${c};border-radius:50%"></i>${lab}</span>`).join("")+`</div>`);
+  if(on("envDip")) parts.push(`<div class="zl"><b>${L2("順向坡","Dip slopes")}</b><div class="src">${L2("地調中心圖磚，顏色依原圖；放大超過 15 級會沿用 15 級圖磚。","GSMMA tiles drawn as published; level-15 tiles are stretched beyond zoom 15.")}</div></div>`);
+  if(on("envEco")){ const k=$e("ecosel").value; parts.push(`<div class="zl"><b>${L2("國土生態綠網","National ecological network")}・${$e("ecosel").selectedOptions[0].textContent}</b>`+
+    (k==="hotspot"?Object.entries(HOT_COL).map(([v,c])=>`<span><i style="background:${c}"></i>${L2(v+(v==4?" 類以上":" 類")+"動物類群",`${v}${v==4?"+":""} animal groups`)}</span>`).join(""):"")+
+    `<div class="src">${L2("日期依官方檔名標示的版本年月。","Dates follow the version stamped in the official file names.")}</div></div>`); }
   if(msg) parts.push(`<div class="src">${msg}</div>`);
   $e("envlegend").innerHTML=parts.join(""); $e("envlegend").hidden=!parts.length;
 }
@@ -1363,6 +1410,8 @@ async function envToggle(id){
 Object.keys(ENV_DEF).forEach(id=>$e(id).onchange=()=>envToggle(id));
 // 火山：顯示災害類型選單；換類型時重畫
 const volSync=()=>{ $e("volhaz").hidden=!$e("envVol").checked; };
+$e("envEco").addEventListener("change",()=>{ $e("ecosel").hidden=!$e("envEco").checked; });
+$e("ecosel").onchange=()=>{ if(ENV.layers.envEco) map.removeLayer(ENV.layers.envEco); delete ENV.layers.envEco; if($e("envEco").checked) envToggle("envEco"); };
 $e("envVol").addEventListener("change",volSync);
 $e("volhaz").onchange=()=>{ if(ENV.layers.envVol) map.removeLayer(ENV.layers.envVol); delete ENV.layers.envVol; if($e("envVol").checked) envToggle("envVol"); };
 $e("envVol").addEventListener("change",()=>{ if($e("envVol").checked&&map.getZoom()<10) map.flyTo([25.12,121.62],11,{duration:.6}); });
