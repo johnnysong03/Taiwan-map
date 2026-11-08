@@ -1026,15 +1026,21 @@ $("lform").onsubmit=e=>{e.preventDefault();lookup();};
 // 都是以點位判斷，不是逐筆地號的邊界。
 const ZONE_SRC_TPE=L2("臺北市政府都市發展局「臺北市都市計畫使用分區圖」（細部計畫）","Taipei City Urban Development Dept., urban plan zoning map (detailed plans)");
 const ZONE_SRC_NU=L2("內政部國土測繪中心 WMTS「非都市土地使用分區圖」「非都市土地使用地類別圖」","NLSC WMTS layers: non-urban land zoning and land-use type");
-// 非都市圖磚顏色 → 內政部地政司代碼（data.gov.tw/dataset/25113）。官方圖例尚待確認，未列入的顏色會直接顯示色塊。
+// 非都市圖磚顏色 → 分區／使用地名稱（名稱與代碼依內政部地政司代碼表 data.gov.tw/dataset/25113）。對不到的顏色只顯示色塊。
 const NU_NAMES={AA:"特定農業區",AB:"一般農業區",AC:"鄉村區",AD:"工業區",AE:"森林區",AF:"山坡地保育區",AG:"風景區",AH:"特定專用區",AJ:"國家公園區",
   EA:"甲種建築用地",EB:"乙種建築用地",EC:"丙種建築用地",ED:"丁種建築用地",EE:"農牧用地",EF:"礦業用地",EG:"交通用地",EH:"水利用地",EJ:"遊憩用地",
   EK:"古蹟保存用地",EL:"生態保護用地",EM:"國土保安用地",EN:"墳墓用地",EP:"特定目的事業用地",EQ:"鹽業用地",ER:"窯業用地",ES:"林業用地",ET:"養殖用地",EZ:"暫未編定"};
 const NU_EN={AA:"Special agricultural zone",AB:"General agricultural zone",AC:"Rural zone",AD:"Industrial zone",AE:"Forest zone",AF:"Slopeland conservation zone",AG:"Scenic zone",AH:"Special-use zone",AJ:"National park zone",
   EA:"Class A building land",EB:"Class B building land",EC:"Class C building land",ED:"Class D building land",EE:"Agriculture & husbandry land",EF:"Mining land",EG:"Transport land",EH:"Water conservancy land",EJ:"Recreation land",
   EK:"Heritage preservation land",EL:"Ecological protection land",EM:"National security land",EN:"Cemetery land",EP:"Special-purpose business land",EQ:"Salt industry land",ER:"Kiln industry land",ES:"Forestry land",ET:"Aquaculture land",EZ:"Not yet designated"};
-const NU1_COLORS={}, NU2_COLORS={}; // "r,g,b" → 代碼，例如 "255,255,0":"AA"（待官方圖例補上）
+// 使用分區：依「非都市土地使用分區類別圖」圖例，和圖磚實際的 10 種主色逐一比對而得。
+const NU1_KEY=[[[255,255,0],"AA"],[[255,165,0],"AB"],[[115,0,0],"AD"],[[255,0,0],"AC"],[[38,115,0],"AE"],[[76,230,0],"AF"],
+  [[255,0,197],"AG"],[[115,0,76],"AJ"],[[0,38,115],"RIV"],[[0,197,255],"OTH"]];
+NU_NAMES.RIV="河川區"; NU_EN.RIV="River zone"; NU_NAMES.OTH="其他使用區或專用區"; NU_EN.OTH="Other use or special-use zone";
+const NU2_KEY=[]; // 使用地類別：官方圖例尚待補上
 const nuName=c=>EN?NU_EN[c]:NU_NAMES[c];
+// 取最接近的圖例色（容許圖磚邊緣的混色），差太多就當作圖例未列
+const nuMatch=(rgb,key)=>{let best=null,bd=1e9;for(const [c,code] of key){const d=Math.hypot(rgb[0]-c[0],rgb[1]-c[1],rgb[2]-c[2]);if(d<bd){bd=d;best=code;}}return bd<=40?best:null;};
 // 臺北市分區依代碼分組上色（本站自訂配色，不是都發局圖例）
 const ZG=[
   {k:"park",re:/^PE/,c:"#79b866",zh:"公園、綠地、廣場",en:"Parks, green space, plazas"},
@@ -1103,11 +1109,11 @@ async function zoneHTML(cty,lat,lng){
   const [c1,c2]=await Promise.all([pixelAt("nURBAN1",lat,lng),pixelAt("nURBAN2",lat,lng)]);
   if(!c1&&!c2) return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，可能是都市計畫區或國家公園。本站目前只有臺北市的都市計畫分區資料，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is probably inside an urban plan area or a national park. This site only has urban plan zoning for Taipei City; check the local government's urban planning service for other cities and counties.")}</dd></dl>`+
     `<div class="src">${L2(`資料：${ZONE_SRC_NU}。`,`Data: ${ZONE_SRC_NU}.`)}</div>`;
-  const row=(lab,rgb,tbl)=>{if(!rgb) return `<dt>${lab}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`;
-    const code=tbl[rgb.join(",")];
-    return `<dt>${lab}</dt><dd>${sw(rgb)}${code?`${nuName(code)}`:L2("顏色對照尚待官方圖例確認","Colour key not yet confirmed against the official legend")}</dd>`;};
-  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row(L2("使用分區","Zone"),c1,NU1_COLORS)}${row(L2("使用地類別","Land-use type"),c2,NU2_COLORS)}</dl>`+
-    `<div class="src">${L2(`資料：${ZONE_SRC_NU}，依圖磚顏色判讀，圖磚未標示更新日期。`,`Data: ${ZONE_SRC_NU}, read from the tile colour; the tiles carry no update date.`)}</div>${zNote()}`;
+  const row=(lab,rgb,key)=>{if(!rgb) return `<dt>${lab}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`;
+    const code=nuMatch(rgb,key);
+    return `<dt>${lab}</dt><dd>${sw(rgb)}${code?nuName(code):key.length?L2("圖例未列的顏色","Colour not in the legend"):L2("顏色對照尚待官方圖例確認","Colour key not yet confirmed against the official legend")}</dd>`;};
+  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row(L2("使用分區","Zone"),c1,NU1_KEY)}${row(L2("使用地類別","Land-use type"),c2,NU2_KEY)}</dl>`+
+    `<div class="src">${L2(`資料：${ZONE_SRC_NU}，依圖磚顏色對照「非都市土地使用分區類別圖」圖例判讀，圖磚未標示更新日期。`,`Data: ${ZONE_SRC_NU}, read from the tile colour against the zoning legend; the tiles carry no update date.`)}</div>${zNote()}`;
 }
 async function appendZone(info,cty,lat,lng){
   const box=document.createElement("div"); box.className="zonebox"; box.innerHTML=`<div class="m">${L2("查詢土地使用分區中…","Looking up land-use zoning…")}</div>`; info.appendChild(box);
@@ -1119,6 +1125,7 @@ function zoneLegend(){
   const lg=$("zonelegend"), parts=[];
   if($("zTpe").checked) parts.push(`<div class="zl"><b>${L2("臺北市都市計畫使用分區","Taipei urban plan zoning")}</b>`+ZG.map(g=>`<span><i style="background:${g.c}"></i>${L2(g.zh,g.en)}</span>`).join("")+
     `<div class="src">${L2("本站自訂分組配色，不是都發局圖例。","Grouped colours chosen by this site, not the official legend.")}</div></div>`);
+  if($("zN1").checked) parts.push(`<div class="zl"><b>${L2("非都市土地使用分區","Non-urban land zoning")}</b>`+NU1_KEY.map(([c,code])=>`<span><i style="background:rgb(${c.join(",")})"></i>${nuName(code)}</span>`).join("")+`</div>`);
   if($("zN1").checked||$("zN2").checked) parts.push(`<div class="zl"><b>${L2("非都市土地","Non-urban land")}</b><div class="src">${L2("國土測繪中心圖磚，只畫非都市土地；放大超過 17 級會沿用 17 級圖磚。顏色代表的分區請點地圖查詢。","NLSC tiles cover non-urban land only; beyond zoom 17 the level-17 tiles are stretched. Click the map to read the zone at a point.")}</div></div>`);
   lg.innerHTML=parts.join(""); lg.hidden=!parts.length;
 }
