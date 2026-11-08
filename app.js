@@ -721,7 +721,47 @@ const MK_COLORS=["#c0392b","#e67e22","#d4ac0d","#2e8b57","#1f6fb5","#7d3c98","#3
 const MK_SHAPES=[["circle",L2("圓形","Circle")],["square",L2("方形","Square")],["diamond",L2("菱形","Diamond")],["triangle",L2("三角形","Triangle")],
   ["star",L2("星形","Star")],["spring",L2("溫泉符號 ♨","Hot spring ♨")],["flag",L2("旗子","Flag")]];
 // 各形狀的 SVG（24×24 畫布）；標示與選擇按鈕共用同一套圖形
+// 地質／油氣業常用符號：線條式符號，畫法參考業界常見慣例（FGDC-STD-013-2006 第 19.5 節為油氣井符號，細節未逐一比對）
+// 每個函式回傳 SVG 內容：k＝線條色、f＝填色、w＝線寬；外框白邊用同一組圖形畫成白色、加粗墊在底下
+const ray=(n,r1,r2,off=0)=>Array.from({length:n},(_,i)=>{const t=(i*360/n+off)*Math.PI/180;return `M${(12+r1*Math.cos(t)).toFixed(2)} ${(12+r1*Math.sin(t)).toFixed(2)}L${(12+r2*Math.cos(t)).toFixed(2)} ${(12+r2*Math.sin(t)).toFixed(2)}`;}).join("");
+const txt=(t,k,size=9)=>`<text x="12" y="12.2" text-anchor="middle" dominant-baseline="central" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${size}" fill="${k}">${t}</text>`;
+const wisps="M8.5 10c-1.4-1.6 1.4-2.6 0-4.5s0-2.6 0-2.6M12 10c-1.4-1.6 1.4-2.6 0-4.5s0-2.6 0-2.6M15.5 10c-1.4-1.6 1.4-2.6 0-4.5s0-2.6 0-2.6";
+const MK_SYM={
+  w_loc:  (k,f,w)=>`<circle cx="12" cy="12" r="6" fill="#fff" stroke="${k}" stroke-width="${w}"/>`,
+  w_oil:  (k,f,w)=>`<circle cx="12" cy="12" r="6" fill="${f}" stroke="${k}" stroke-width="${w}"/>`,
+  w_gas:  (k,f,w)=>`<path d="${ray(8,6,11)}" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/><circle cx="12" cy="12" r="5" fill="#fff" stroke="${k}" stroke-width="${w}"/>`,
+  w_og:   (k,f,w)=>`<path d="${ray(8,6,11)}" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/><circle cx="12" cy="12" r="5" fill="${f}" stroke="${k}" stroke-width="${w}"/>`,
+  w_dry:  (k,f,w)=>`<path d="${ray(4,5.5,11,45)}" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/><circle cx="12" cy="12" r="5" fill="#fff" stroke="${k}" stroke-width="${w}"/>`,
+  w_aoil: (k,f,w)=>`<path d="${ray(4,5.5,11,45)}" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/><circle cx="12" cy="12" r="5" fill="${f}" stroke="${k}" stroke-width="${w}"/>`,
+  w_inj:  (k,f,w)=>`<circle cx="12" cy="12" r="6" fill="#fff" stroke="${k}" stroke-width="${w}"/><path d="M3 21 16.5 7.5M11 7.5h5.5V13" fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`,
+  w_water:(k,f,w)=>`<circle cx="12" cy="12" r="8" fill="#fff" stroke="${k}" stroke-width="${w}"/>${txt("W",k,9.5)}`,
+  w_geo:  (k,f,w)=>`<circle cx="12" cy="12" r="8" fill="#fff" stroke="${k}" stroke-width="${w}"/>${txt("G",k,9.5)}`,
+  fumarole:(k,f,w)=>`<path d="${wisps}" fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/><path d="M5 21.5 12 13l7 8.5Z" fill="#fff" stroke="${k}" stroke-width="${w}" stroke-linejoin="round"/>`,
+  solfatara:(k,f,w)=>`<path d="${wisps}" fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/><path d="M5 21.5 12 13l7 8.5Z" fill="${f}" stroke="${k}" stroke-width="${w}" stroke-linejoin="round"/>`,
+  mudvolc:(k,f,w)=>`<path d="M2.5 20h19l-6-8h-7Z" fill="#fff" stroke="${k}" stroke-width="${w}" stroke-linejoin="round"/><path d="M10.5 12c0-2 3-2 3 0M8 8.5c1-1.5 2-1.5 2.5-.5M16 8.5c-1-1.5-2-1.5-2.5-.5" fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/>`,
+  bubble: (k,f,w)=>`<circle cx="8" cy="15" r="4.2" fill="#fff" stroke="${k}" stroke-width="${w}"/><circle cx="15.5" cy="13" r="3.2" fill="#fff" stroke="${k}" stroke-width="${w}"/><circle cx="12" cy="6.5" r="2.4" fill="#fff" stroke="${k}" stroke-width="${w}"/>`,
+  s_rock: (k,f,w)=>`<path d="M5 5 19 19M19 5 5 19" stroke="${k}" stroke-width="${w+0.8}" stroke-linecap="round"/>`,
+  s_water:(k,f,w)=>`<path d="M12 2.5C9 7.5 6 11 6 15a6 6 0 0 0 12 0c0-4-3-7.5-6-12.5Z" fill="${f}" stroke="${k}" stroke-width="${w}" stroke-linejoin="round"/>`,
+  outcrop:(k,f,w)=>`<rect x="3.5" y="6" width="17" height="12" fill="#fff" stroke="${k}" stroke-width="${w}"/><path d="M3.5 12 9.5 6M3.5 18l12-12M9.5 18l11-11M15.5 18l5-5" stroke="${k}" stroke-width="${w*0.7}"/>`,
+  fossil: (k,f,w)=>`<path d="M12 12.2c.8-.3 1 .9.2 1.3-1.5.6-2.6-1-2-2.4.8-1.9 3.4-2 4.6-.4 1.6 2 .4 5-2 5.6-3 .8-5.6-1.6-5.4-4.6.3-3.8 4.3-6 7.7-4.8 4.4 1.6 5.6 7 3 10.5" fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round"/>`,
+  survey: (k,f,w)=>`<path d="M12 3.5 21 19.5H3Z" fill="#fff" stroke="${k}" stroke-width="${w}" stroke-linejoin="round"/><circle cx="12" cy="14" r="2.2" fill="${f}"/>`,
+};
+const MK_GROUPS=[
+  [L2("基本形狀","Basic shapes"),["circle","square","diamond","triangle","star","spring","flag"]],
+  [L2("油氣與地熱井","Oil, gas and geothermal wells"),["w_loc","w_oil","w_gas","w_og","w_dry","w_aoil","w_inj","w_water","w_geo"]],
+  [L2("地熱與火山地表徵兆","Geothermal and volcanic features"),["fumarole","solfatara","mudvolc","bubble"]],
+  [L2("採樣與調查點","Sampling and survey points"),["s_rock","s_water","outcrop","fossil","survey"]],
+];
+MK_SHAPES.push(
+  ["w_loc",L2("預定井位","Location / proposed well")],["w_oil",L2("油井","Oil well")],["w_gas",L2("氣井","Gas well")],["w_og",L2("油氣井","Oil and gas well")],
+  ["w_dry",L2("乾井（已廢棄）","Dry hole, abandoned")],["w_aoil",L2("廢棄油井","Abandoned oil well")],["w_inj",L2("注入井","Injection well")],
+  ["w_water",L2("水井","Water well")],["w_geo",L2("地熱井","Geothermal well")],
+  ["fumarole",L2("噴氣孔","Fumarole")],["solfatara",L2("硫氣孔","Solfatara")],["mudvolc",L2("泥火山","Mud volcano")],["bubble",L2("冒泡點","Gas bubbling")],
+  ["s_rock",L2("岩樣採樣點","Rock sample")],["s_water",L2("水樣採樣點","Water sample")],["outcrop",L2("露頭","Outcrop")],["fossil",L2("化石產地","Fossil locality")],["survey",L2("測量點","Survey point")]);
+const mkShapeName=k=>(MK_SHAPES.find(x=>x[0]===k)||[])[1]||k;
 function mkSvg(shape,c,px=24,halo=true){
+  if(MK_SYM[shape]){const sym=MK_SYM[shape];
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true" style="display:block;overflow:visible">${halo?`<g opacity=".95">${sym("#fff","#fff",4.4)}</g>`:""}${sym(c,c,1.9)}</svg>`;}
   const st=halo?`stroke="#fff" stroke-width="2.2" stroke-linejoin="round"`:`stroke="none"`;
   const f=`fill="${c}" ${st}`;
   const g={
@@ -748,6 +788,7 @@ const safeUrl=u=>/^https?:\/\//i.test(u)?u:"";
 function mkView(m){
   const ll=m.layer.getLatLng();
   return `<div class="geopop mkpop"><h4>${hesc(m.name||L2("未命名標示","Untitled marker"))}</h4>
+    <div class="m">${mkShapeName(m.shape||"circle")}</div>
     <div class="m">WGS84 ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}<br>TWD97 ${fmtTM2(ll.lat,ll.lng)}</div>
     ${m.note?`<p style="margin:0 0 6px;white-space:pre-wrap">${hesc(m.note)}</p>`:""}
     ${lines(m.imgs).map(safeUrl).filter(Boolean).map(u=>`<a href="${hesc(u)}" target="_blank" rel="noopener"><img src="${hesc(u)}" alt="" loading="lazy" style="display:block;width:100%;max-height:220px;object-fit:contain;margin:4px 0;border:1px solid var(--rule);background:#fff" onerror="this.parentNode.remove()"></a>`).join("")}
@@ -763,7 +804,8 @@ function mkEdit(m){
     <div class="mkl">${L2("顏色","Colour")}</div>
     <div class="mkchoice">${MK_COLORS.map(c=>`<button type="button" data-c="${c}" aria-label="${c}" aria-pressed="${c===m.color}" style="background:${c}"></button>`).join("")}</div>
     <div class="mkl">${L2("形狀","Shape")}</div>
-    <div class="mkchoice mkshape">${MK_SHAPES.map(([s,n])=>`<button type="button" data-s="${s}" aria-pressed="${s===m.shape}" title="${n}" aria-label="${n}">${mkSvg(s,m.color||MK_COLORS[0],22,false)}</button>`).join("")}</div>
+    ${MK_GROUPS.map(([g,keys])=>`<div class="mkg">${g}</div><div class="mkchoice mkshape">${keys.map(s=>{const n=mkShapeName(s);return `<button type="button" data-s="${s}" aria-pressed="${s===m.shape}" title="${n}" aria-label="${n}">${mkSvg(s,m.color||MK_COLORS[0],22,false)}</button>`;}).join("")}</div>`).join("")}
+    <div class="mkshapename">${mkShapeName(m.shape||"circle")}</div>
     <label>${L2("照片網址（一行一個）","Photo URLs (one per line)")}<textarea name="imgs" rows="2" placeholder="https://…">${hesc(m.imgs)}</textarea></label>
     <label>${L2("連結（一行一個）","Links (one per line)")}<textarea name="links" rows="2" placeholder="https://…">${hesc(m.links)}</textarea></label>
     <div class="mkrow"><button type="submit" class="btn">${L2("完成","Done")}</button><button type="button" class="linkbtn" data-a="del">${L2("刪除這個標示","Delete this marker")}</button></div></form>`;
@@ -778,6 +820,7 @@ function mkOpen(m,edit){
     f.addEventListener("input",sync);
     const pick=(sel,attr,key)=>f.querySelectorAll(sel).forEach(b=>b.onclick=()=>{m[key]=b.dataset[attr];f.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b));m.layer.setIcon(mkIcon(m));m.layer.getPopup()?.update();mkSave();mkList();});
     pick("[data-c]","c","color"); pick("[data-s]","s","shape");
+    f.querySelectorAll("[data-s]").forEach(b=>b.addEventListener("click",()=>{f.querySelector(".mkshapename").textContent=mkShapeName(b.dataset.s);}));
     f.querySelectorAll("[data-c]").forEach(b=>b.addEventListener("click",()=>f.querySelectorAll("[data-s]").forEach(x=>x.innerHTML=mkSvg(x.dataset.s,m.color,22,false))));
     f.onsubmit=e=>{e.preventDefault();sync();mkOpen(m,false);};
     f.querySelector('[data-a="del"]').onclick=()=>{m.layer.closePopup();mkGroup.removeLayer(m.layer);marks=marks.filter(x=>x!==m);mkSave();mkList();};
@@ -823,7 +866,7 @@ document.getElementById("markkml").onclick=()=>{ if(!marks.length) return;
 document.getElementById("markcsv").onclick=()=>{ if(!marks.length) return;
   const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
   const rows=[["名稱","備註","緯度","經度","TWD97_X","TWD97_Y","顏色","形狀","照片","連結"].map(q).join(",")].concat(marks.map(m=>{const [x,y]=toTM2(m.lat,m.lng);
-    return [m.name,m.note,m.lat,m.lng,x.toFixed(2),y.toFixed(2),m.color,m.shape,lines(m.imgs).join(" "),lines(m.links).join(" ")].map(q).join(",");}));
+    return [m.name,m.note,m.lat,m.lng,x.toFixed(2),y.toFixed(2),m.color,mkShapeName(m.shape),lines(m.imgs).join(" "),lines(m.links).join(" ")].map(q).join(",");}));
   mkDownload("﻿"+rows.join("\r\n"),`我的標示_${mkStamp()}.csv`,"text/csv;charset=utf-8");};
 document.getElementById("markclear").onclick=()=>{ if(!marks.length) return;
   if(!confirm(L2(`確定刪除全部 ${marks.length} 個標示？建議先匯出備份。`,`Delete all ${marks.length} markers? Export a backup first.`))) return;
