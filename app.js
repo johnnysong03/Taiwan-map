@@ -844,7 +844,7 @@ function mkList(){
 }
 marks.forEach(mkAddLayer); mkList();
 // 新增模式：按「新增標示」後點地圖放下標示
-let mkAdding=false;
+let mkAdding=false; window._mkAdding=()=>mkAdding;
 const mkBanner=document.createElement("div"); mkBanner.id="mkbanner"; mkBanner.hidden=true;
 mkBanner.innerHTML=`<span>${L2("點地圖放置標示","Tap the map to place a marker")}</span><button type="button" class="linkbtn">${L2("取消","Cancel")}</button>`;
 document.getElementById("mapwrap").appendChild(mkBanner);
@@ -947,84 +947,39 @@ TONES.forEach(t=>{const b=document.createElement("button");b.type="button";b.cla
 let savedTone=""; try{savedTone=localStorage.getItem("tone")||""}catch(e){}
 setTone(TONES.some(t=>t.k===savedTone)?savedTone:"");
 
-if(APP==="arch"){
-// ---------- 地號查詢 ----------
-const LQ = {mode:false, loaded:null, sect:"", pin:null};
-const $ = id => document.getElementById(id);
-// 分頁：B 建築作品、L 地號查詢、C Claude 對話
-function setTab(m){
-  const l=m==="L"; LQ.mode=l;
-  ["B","L","C"].forEach(k=>$("tab"+k)?.setAttribute("aria-selected",m===k));
-  $("paneB").hidden=m!=="B"; $("footB").hidden=m!=="B"; $("paneL").hidden=!l; if($("paneC")) $("paneC").hidden=m!=="C";
-  map.getContainer().style.cursor=l?"crosshair":"";
-  if(l){ loadPub(); const cb=$("o0"); if(!cb.checked) cb.click(); }
-  if(m==="C") sheet("full");
-}
-window._archTab=setTab;
-$("tabB").onclick=()=>setTab("B"); $("tabL").onclick=()=>setTab("L");
+// ---------- 土地使用分區（兩張地圖共用：判斷、卡片、定義） ----------
+// 分區定義（卡片下方的註解）。中文照法條原文，英文為本站翻譯。
+// 非都市：區域計畫法施行細則第 11 條（民國 102 年 10 月 23 日修正）；都市計畫：都市計畫法第 32～38、42 條（民國 110 年 5 月 26 日修正）。
+const NU_DEF={
+  AA:["優良農地或曾經投資建設重大農業改良設施，經會同農業主管機關認為必須加以特別保護而劃定者。","Good farmland, or land with major agricultural improvements, designated with the agriculture authority for special protection.","第 11 條第 1 款"],
+  AB:["特定農業區以外供農業使用之土地。","Agricultural land outside special agricultural zones.","第 11 條第 2 款"],
+  AD:["為促進工業整體發展，會同有關機關劃定者。","Designated with the relevant agencies to promote overall industrial development.","第 11 條第 3 款"],
+  AC:["為調和、改善農村居住與生產環境及配合政府興建住宅社區政策之需要，會同有關機關劃定者。","Designated to improve rural living and production environments and to support government housing-community policy.","第 11 條第 4 款"],
+  AE:["為保育利用森林資源，並維護生態平衡及涵養水源，依森林法等有關法規，會同有關機關劃定者。","Designated under the Forestry Act and related rules to conserve and use forest resources, keep ecological balance and protect water sources.","第 11 條第 5 款"],
+  AF:["為保護自然生態資源、景觀、環境，與防治沖蝕、崩塌、地滑、土石流失等地質災害，及涵養水源等水土保育，依有關法規，會同有關機關劃定者。","Designated to protect natural resources, landscape and environment, prevent erosion, landslides and debris loss, and conserve soil and water.","第 11 條第 6 款"],
+  AG:["為維護自然景觀，改善國民康樂遊憩環境，依有關法規，會同有關機關劃定者。","Designated to preserve natural scenery and improve public recreation.","第 11 條第 7 款"],
+  AJ:["為保護國家特有之自然風景、史蹟、野生物及其棲息地，並供國民育樂及研究，依國家公園法劃定者。","Designated under the National Park Act to protect unique scenery, historic sites, wildlife and habitats, for recreation and research.","第 11 條第 8 款"],
+  AK:["為保護水道、確保河防安全及水流宣洩，依水利法等有關法規，會同有關機關劃定者。","Designated under the Water Act and related rules to protect waterways, flood defences and drainage.","第 11 條第 9 款"],
+  AL:["為促進海域資源與土地之保育及永續合理利用，防治海域災害及環境破壞，依有關法規及實際用海需要劃定者。","Designated to conserve and sustainably use marine resources and prevent marine disasters and damage.","第 11 條第 10 款"],
+  AH:["（其他使用區或特定專用區）為利各目的事業推動業務之實際需要，依有關法規，會同有關機關劃定並註明其用途者。","(Other use or special-use zone) Designated for the practical needs of specific sectors, with the use stated.","第 11 條第 11 款"],
+};
+const NU_DEF_SRC=L2("區域計畫法施行細則","Enforcement Rules of the Regional Plan Act");
+// 都市計畫分區：依分區名稱判斷適用的條文（比對順序有差：專用區先於住宅、用地放在分區之後）
+const URBAN_DEF=[
+  [/河川區/,"依水利法公告之河川治理計畫範圍內之土地。","Land within a river management plan announced under the Water Act.",L2("內政部國土管理署「都市計畫土地使用分區面積編製說明」","NLMA urban zoning statistics notes")],
+  [/專用區/,"特定專用區內土地及建築物，不得違反其特定用途之使用。","Land and buildings in a special-use zone may not be used against its designated purpose.","都市計畫法第 38 條"],
+  [/住宅/,"住宅區為保護居住環境而劃定，其土地及建築物之使用，不得有礙居住之寧靜、安全及衛生。","Designated to protect the living environment; uses may not harm residential quiet, safety or hygiene.","都市計畫法第 34 條"],
+  [/商業/,"商業區為促進商業發展而劃定，其土地及建築物之使用，不得有礙商業之便利。","Designated to promote commerce; uses may not hinder commercial convenience.","都市計畫法第 35 條"],
+  [/工業/,"工業區為促進工業發展而劃定，其土地及建築物，以供工業使用為主；具有危險性及公害之工廠，應特別指定工業區建築之。","Designated to promote industry; mainly for industrial use, with hazardous plants confined to specially designated areas.","都市計畫法第 36 條"],
+  [/行政區|文教區|風景區/,"其他行政、文教、風景等使用區內土地及建築物，以供其規定目的之使用為主。","Administrative, educational, scenic and similar zones are mainly for their designated purpose.","都市計畫法第 37 條"],
+  [/農業區|保護區/,"都市計畫地區，得視地理形勢，使用現況或軍事安全上之需要，保留農業地區或設置保護區，並限制其建築使用。","Agricultural or conservation areas kept for terrain, current use or military security, with building restricted.","都市計畫法第 33 條"],
+  [/用地/,"屬公共設施用地。都市計畫地區範圍內，應視實際情況設置道路、公園、綠地、廣場、學校、市場、機關、上下水道、郵政、電信、變電所等公共設施用地。","Public facility land: roads, parks, green space, plazas, schools, markets, government, utilities and similar, as needed.","都市計畫法第 42 條"],
+  [/./,"都市計畫得劃定住宅、商業、工業等使用區，並得視實際情況，劃定其他使用區域或特定專用區。","Urban plans may designate residential, commercial, industrial and other zones or special-use zones as needed.","都市計畫法第 32 條"],
+];
+const zDefHTML=(zh,en,cite)=>`<div class="zdef"><b>${L2("分區定義","Definition")}</b>　${L2(zh,en)}<span class="cite">（${L2("依據：","Source: ")}${cite}）</span></div>`;
+const nuDefHTML=code=>{const d=NU_DEF[code]; return d?zDefHTML(d[0],d[1],`${NU_DEF_SRC}${L2(d[2],"Art. 11")}`):"";};
+const urbanDefHTML=name=>{const d=URBAN_DEF.find(x=>x[0].test(name)); return d?zDefHTML(d[1],d[2],d[3]):"";};
 
-function loadPub(){
-  if(LQ.loaded) return LQ.loaded;
-  LQ.loaded=new Promise((ok,fail)=>{const s=document.createElement("script");s.src="publand-data.js";s.onload=ok;s.onerror=fail;document.head.appendChild(s);})
-  .then(()=>{
-    const P=window.PUBLAND, sel=$("lsect"); sel.innerHTML=`<option value="">${L2("選擇地段（或點地圖）","Choose a land section (or click the map)")}</option>`;
-    const byD={}; for(const [c,v] of Object.entries(P.sect)) (byD[v[1]]??=[]).push([c,v[0]]);
-    for(const d of Object.keys(byD).sort()){const g=document.createElement("optgroup");g.label=d;
-      byD[d].sort((a,b)=>a[1].localeCompare(b[1],"zh-Hant")).forEach(([c,n])=>g.appendChild(new Option(`${n}（${c}）`,c)));sel.appendChild(g);}
-    $("lupd").textContent=L2(`檔案日期 ${P.updated}，共 ${P.count.toLocaleString()} 筆`,`file dated ${P.updated}, ${P.count.toLocaleString()} parcels`);
-  }).catch(()=>{$("lsect").innerHTML=`<option value="">${L2("公有地資料載入失敗","Public land data failed to load")}</option>`;
-    $("lhint").textContent=L2("找不到 publand-data.js，請確認它和這個網頁放在同一個資料夾。","Cannot find publand-data.js. Keep it in the same folder as this page.");});
-  return LQ.loaded;
-}
-const fmtNo=s=>{const m=+s.slice(0,4),c=+s.slice(4);return c?`${m}-${c}`:`${m}`};
-function parseNo(t){t=t.trim().replace(/[－—–]/g,"-");
-  if(/^\d{8}$/.test(t)) return t;
-  const m=t.match(/^(\d{1,4})(?:-(\d{1,4}))?$/); if(!m) return null;
-  return m[1].padStart(4,"0")+(m[2]||"0").padStart(4,"0");}
-function parcels(code){
-  const v=window.PUBLAND?.sect[code]; if(!v) return [];
-  if(!v._p) v._p=v[2].split(";").map(r=>{const a=r.split(",");return {no:a[0],area:+a[1],type:+a[2],ratio:a[3],mgr:+a[4]}});
-  return v._p;
-}
-function showSect(code){
-  LQ.sect=code; $("lsect").value=code; $("lresult").hidden=true;
-  const P=window.PUBLAND, list=$("plist"), head=$("lhead"); list.innerHTML="";
-  if(!code){head.hidden=true;return;}
-  const ps=parcels(code), cnt={};
-  ps.forEach(p=>cnt[p.type]=(cnt[p.type]||0)+1);
-  head.innerHTML=ps.length?`<span>${L2(`本段公有地號 ${ps.length} 筆`,`${ps.length} public parcels in this section`)}</span>`+Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`<span>${P.types[t]} ${n}</span>`).join("")
-    :`<span>${L2("本段在清冊中沒有公有地號","No public parcels listed in this section")}</span>`;
-  head.hidden=false;
-  const MAX=400;
-  ps.slice(0,MAX).forEach(p=>{const li=document.createElement("li");li.dataset.no=p.no;
-    li.innerHTML=`<span class="no">${fmtNo(p.no)}</span><span class="ty">${p.ratio||P.types[p.type]}</span><span class="ar">${p.area.toLocaleString()} m²</span>`;
-    li.onclick=()=>{$("lno").value=fmtNo(p.no);lookup();};list.appendChild(li);});
-  if(ps.length>MAX){const li=document.createElement("li");li.innerHTML=`<span class="more">${L2(`另有 ${ps.length-MAX} 筆，請直接輸入地號查詢`,`${ps.length-MAX} more. Type a parcel number to look it up.`)}</span>`;list.appendChild(li);}
-}
-$("lsect").onchange=e=>{showSect(e.target.value);};
-function lookup(){
-  const P=window.PUBLAND, out=$("lresult"); if(!P) return;
-  const code=$("lsect").value, no=parseNo($("lno").value);
-  out.hidden=false; out.className="";
-  if(!code){out.innerHTML=L2("請先選擇地段，或在地圖上點一下。","Choose a land section first, or click the map.");return;}
-  if(!no){out.innerHTML=L2("地號格式看不懂。請輸入像「6」「6-1」或 8 碼的「00060001」。","Parcel number not recognized. Use a format like 6, 6-1 or 00060001.");return;}
-  const v=P.sect[code], p=parcels(code).find(x=>x.no===no);
-  document.querySelectorAll("#plist li.on").forEach(li=>li.classList.remove("on"));
-  if(p){
-    out.className="pub";
-    out.innerHTML=`<div class="m">${v[1]}・${v[0]}</div><div class="t">${L2(`${fmtNo(no)} 地號・公有`,`Parcel ${fmtNo(no)} · Public`)}</div>
-      <dl><dt>${L2("權屬","Ownership")}</dt><dd>${P.types[p.type]}</dd><dt>${L2("比例","Share")}</dt><dd>${p.ratio||P.types[p.type]+"(100%)"}</dd>
-      <dt>${L2("面積","Area")}</dt><dd>${p.area.toLocaleString()} m²${L2(`（約 ${(p.area*0.3025).toFixed(1)} 坪）`,"")}</dd><dt>${L2("管理機關","Managing agency")}</dt><dd>${P.mgr[p.mgr]}</dd></dl>`;
-    const li=document.querySelector(`#plist li[data-no="${no}"]`); if(li){li.classList.add("on");li.scrollIntoView({block:"nearest"});}
-  } else {
-    out.className="pri";
-    out.innerHTML=`<div class="m">${v[1]}・${v[0]}</div><div class="t">${L2(`${fmtNo(no)} 地號・非公有`,`Parcel ${fmtNo(no)} · Not public`)}</div>
-      <div>${L2("不在公有土地清冊中，應為私有地，或是地號不存在、尚未登記。要知道是自然人或法人持有，需申請第二類謄本。","Not in the public land register, so it is private land, unregistered, or the number does not exist. A land register transcript shows whether an individual or a company owns it.")}</div>`;
-  }
-}
-$("lform").onsubmit=e=>{e.preventDefault();lookup();};
-
-// ---------- 土地使用分區 ----------
 // 資料都放在 zoning/ 資料夾，點到哪個縣市才載入該縣市的檔案：
 //   tpe.js   臺北市都市計畫使用分區（細部計畫，臺北市政府都市發展局）
 //   ntpc.js  新北市都市計畫土地使用分區（新北市政府城鄉發展局）
@@ -1143,13 +1098,13 @@ async function zoneHTML(cc,lat,lng){
   const urbanKey=cc==="A"?"tpe":cc==="F"?"ntpc":null;
   if(urbanKey){
     const z=await zoneAt(urbanKey,lat,lng);
-    if(z) return `<dl class="zone"><dt>${L2("都市計畫使用分區","Urban plan zoning")}</dt><dd>${swc(zColor(urbanKey,z.code,z.name))}${z.name}${urbanKey==="tpe"?`（${z.code}）`:""}</dd></dl>`+srcLine(urbanKey,z.date)+zNote();
+    if(z) return `<dl class="zone"><dt>${L2("都市計畫使用分區","Urban plan zoning")}</dt><dd>${swc(zColor(urbanKey,z.code,z.name))}${z.name}${urbanKey==="tpe"?`（${z.code}）`:""}</dd></dl>`+urbanDefHTML(z.name)+srcLine(urbanKey,z.date)+zNote();
     if(cc==="A") return `<dl class="zone"><dt>${L2("都市計畫使用分區","Urban plan zoning")}</dt><dd>${L2("這個點不在任何分區面內，多半是道路。","This point is not inside any zone polygon. It is most likely a road.")}</dd></dl>`+srcLine("tpe",ZN.data.tpe.date)+zNote();
   }
   // 2. 非都市土地：使用分區用內政部向量檔，使用地類別讀圖磚
   if(NU_CTY.has(cc)){
     const [z,c2]=await Promise.all([zoneAt("nu-"+cc,lat,lng),pixelAt("nURBAN2",lat,lng).catch(()=>null)]);
-    if(z) return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}<dt>${L2("使用分區","Zone")}</dt><dd>${swc(zColor(z.key,z.code))}${nuZoneText(z.code)}</dd>${useTypeRow(c2)}</dl>`+
+    if(z) return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}<dt>${L2("使用分區","Zone")}</dt><dd>${swc(zColor(z.key,z.code))}${nuZoneText(z.code)}</dd>${useTypeRow(c2)}</dl>`+nuDefHTML(z.code)+
       srcLine("nu",z.date)+`<div class="src">${L2(`使用地類別：${ZSRC.tile.zh}，依圖磚顏色判讀，圖磚未標示更新日期。`,`Land-use type: ${ZSRC.tile.en}, read from the tile colour; the tiles carry no update date.`)}</div>`+zNote();
     return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，多半位在都市計畫區或國家公園。本站目前只有臺北市、新北市的都市計畫分區，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is most likely inside an urban plan area or a national park. This site only has urban plan zoning for Taipei and New Taipei; check the local government's urban planning service elsewhere.")}</dd></dl>`+
       srcLine(cc==="F"?"ntpc":"nu",cc==="F"?ZN.data.ntpc.date:ZN.data["nu-"+cc].date);
@@ -1160,7 +1115,7 @@ async function zoneHTML(cc,lat,lng){
     `<div class="src">${L2(`資料：${ZSRC.tile.zh}。`,`Data: ${ZSRC.tile.en}.`)}</div>`;
   const c1code=c1&&nuMatch(c1,NU1_KEY);
   const row1=!c1?`<dt>${L2("使用分區","Zone")}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`:`<dt>${L2("使用分區","Zone")}</dt><dd>${sw(c1)}${c1code?nuZoneText(c1code):L2("圖例未列的顏色","Colour not in the legend")}</dd>`;
-  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row1}${useTypeRow(c2)}</dl>`+
+  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row1}${useTypeRow(c2)}</dl>`+(c1code?nuDefHTML(c1code):"")+
     `<div class="src">${L2(`資料：${ZSRC.tile.zh}，依圖磚顏色對照圖例判讀，圖磚未標示更新日期。`,`Data: ${ZSRC.tile.en}, read from the tile colour against the legend; the tiles carry no update date.`)}</div>${zNote()}`;
 }
 async function appendZone(info,cc,lat,lng){
@@ -1168,6 +1123,83 @@ async function appendZone(info,cc,lat,lng){
   try{ box.innerHTML=await zoneHTML(cc,lat,lng); }
   catch(err){ box.innerHTML=`<div class="m">${L2("土地使用分區查詢失敗，請確認網路連線後再點一次。","Zoning lookup failed. Check your connection and click again.")}</div>`; }
 }
+if(APP==="arch"){
+// ---------- 地號查詢 ----------
+const LQ = {mode:false, loaded:null, sect:"", pin:null};
+const $ = id => document.getElementById(id);
+// 分頁：B 建築作品、L 地號查詢、C Claude 對話
+function setTab(m){
+  const l=m==="L"; LQ.mode=l;
+  ["B","L","C"].forEach(k=>$("tab"+k)?.setAttribute("aria-selected",m===k));
+  $("paneB").hidden=m!=="B"; $("footB").hidden=m!=="B"; $("paneL").hidden=!l; if($("paneC")) $("paneC").hidden=m!=="C";
+  map.getContainer().style.cursor=l?"crosshair":"";
+  if(l){ loadPub(); const cb=$("o0"); if(!cb.checked) cb.click(); }
+  if(m==="C") sheet("full");
+}
+window._archTab=setTab;
+$("tabB").onclick=()=>setTab("B"); $("tabL").onclick=()=>setTab("L");
+
+function loadPub(){
+  if(LQ.loaded) return LQ.loaded;
+  LQ.loaded=new Promise((ok,fail)=>{const s=document.createElement("script");s.src="publand-data.js";s.onload=ok;s.onerror=fail;document.head.appendChild(s);})
+  .then(()=>{
+    const P=window.PUBLAND, sel=$("lsect"); sel.innerHTML=`<option value="">${L2("選擇地段（或點地圖）","Choose a land section (or click the map)")}</option>`;
+    const byD={}; for(const [c,v] of Object.entries(P.sect)) (byD[v[1]]??=[]).push([c,v[0]]);
+    for(const d of Object.keys(byD).sort()){const g=document.createElement("optgroup");g.label=d;
+      byD[d].sort((a,b)=>a[1].localeCompare(b[1],"zh-Hant")).forEach(([c,n])=>g.appendChild(new Option(`${n}（${c}）`,c)));sel.appendChild(g);}
+    $("lupd").textContent=L2(`檔案日期 ${P.updated}，共 ${P.count.toLocaleString()} 筆`,`file dated ${P.updated}, ${P.count.toLocaleString()} parcels`);
+  }).catch(()=>{$("lsect").innerHTML=`<option value="">${L2("公有地資料載入失敗","Public land data failed to load")}</option>`;
+    $("lhint").textContent=L2("找不到 publand-data.js，請確認它和這個網頁放在同一個資料夾。","Cannot find publand-data.js. Keep it in the same folder as this page.");});
+  return LQ.loaded;
+}
+const fmtNo=s=>{const m=+s.slice(0,4),c=+s.slice(4);return c?`${m}-${c}`:`${m}`};
+function parseNo(t){t=t.trim().replace(/[－—–]/g,"-");
+  if(/^\d{8}$/.test(t)) return t;
+  const m=t.match(/^(\d{1,4})(?:-(\d{1,4}))?$/); if(!m) return null;
+  return m[1].padStart(4,"0")+(m[2]||"0").padStart(4,"0");}
+function parcels(code){
+  const v=window.PUBLAND?.sect[code]; if(!v) return [];
+  if(!v._p) v._p=v[2].split(";").map(r=>{const a=r.split(",");return {no:a[0],area:+a[1],type:+a[2],ratio:a[3],mgr:+a[4]}});
+  return v._p;
+}
+function showSect(code){
+  LQ.sect=code; $("lsect").value=code; $("lresult").hidden=true;
+  const P=window.PUBLAND, list=$("plist"), head=$("lhead"); list.innerHTML="";
+  if(!code){head.hidden=true;return;}
+  const ps=parcels(code), cnt={};
+  ps.forEach(p=>cnt[p.type]=(cnt[p.type]||0)+1);
+  head.innerHTML=ps.length?`<span>${L2(`本段公有地號 ${ps.length} 筆`,`${ps.length} public parcels in this section`)}</span>`+Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`<span>${P.types[t]} ${n}</span>`).join("")
+    :`<span>${L2("本段在清冊中沒有公有地號","No public parcels listed in this section")}</span>`;
+  head.hidden=false;
+  const MAX=400;
+  ps.slice(0,MAX).forEach(p=>{const li=document.createElement("li");li.dataset.no=p.no;
+    li.innerHTML=`<span class="no">${fmtNo(p.no)}</span><span class="ty">${p.ratio||P.types[p.type]}</span><span class="ar">${p.area.toLocaleString()} m²</span>`;
+    li.onclick=()=>{$("lno").value=fmtNo(p.no);lookup();};list.appendChild(li);});
+  if(ps.length>MAX){const li=document.createElement("li");li.innerHTML=`<span class="more">${L2(`另有 ${ps.length-MAX} 筆，請直接輸入地號查詢`,`${ps.length-MAX} more. Type a parcel number to look it up.`)}</span>`;list.appendChild(li);}
+}
+$("lsect").onchange=e=>{showSect(e.target.value);};
+function lookup(){
+  const P=window.PUBLAND, out=$("lresult"); if(!P) return;
+  const code=$("lsect").value, no=parseNo($("lno").value);
+  out.hidden=false; out.className="";
+  if(!code){out.innerHTML=L2("請先選擇地段，或在地圖上點一下。","Choose a land section first, or click the map.");return;}
+  if(!no){out.innerHTML=L2("地號格式看不懂。請輸入像「6」「6-1」或 8 碼的「00060001」。","Parcel number not recognized. Use a format like 6, 6-1 or 00060001.");return;}
+  const v=P.sect[code], p=parcels(code).find(x=>x.no===no);
+  document.querySelectorAll("#plist li.on").forEach(li=>li.classList.remove("on"));
+  if(p){
+    out.className="pub";
+    out.innerHTML=`<div class="m">${v[1]}・${v[0]}</div><div class="t">${L2(`${fmtNo(no)} 地號・公有`,`Parcel ${fmtNo(no)} · Public`)}</div>
+      <dl><dt>${L2("權屬","Ownership")}</dt><dd>${P.types[p.type]}</dd><dt>${L2("比例","Share")}</dt><dd>${p.ratio||P.types[p.type]+"(100%)"}</dd>
+      <dt>${L2("面積","Area")}</dt><dd>${p.area.toLocaleString()} m²${L2(`（約 ${(p.area*0.3025).toFixed(1)} 坪）`,"")}</dd><dt>${L2("管理機關","Managing agency")}</dt><dd>${P.mgr[p.mgr]}</dd></dl>`;
+    const li=document.querySelector(`#plist li[data-no="${no}"]`); if(li){li.classList.add("on");li.scrollIntoView({block:"nearest"});}
+  } else {
+    out.className="pri";
+    out.innerHTML=`<div class="m">${v[1]}・${v[0]}</div><div class="t">${L2(`${fmtNo(no)} 地號・非公有`,`Parcel ${fmtNo(no)} · Not public`)}</div>
+      <div>${L2("不在公有土地清冊中，應為私有地，或是地號不存在、尚未登記。要知道是自然人或法人持有，需申請第二類謄本。","Not in the public land register, so it is private land, unregistered, or the number does not exist. A land register transcript shows whether an individual or a company owns it.")}</div>`;
+  }
+}
+$("lform").onsubmit=e=>{e.preventDefault();lookup();};
+
 // 分區疊圖與圖例
 function zoneLegend(){
   const lg=$("zonelegend"), parts=[];
@@ -1376,7 +1408,23 @@ async function ecoLayer(){
     .bindPopup(()=>epop(sp,`<i>${eesc(sn)}</i>`,erow([[L2("地點","Place"),eesc(de)],[L2("資料來源","Source"),eesc(so)]])+eEarth(lat,lng,3000),src)).addTo(g));
   return g;
 }
+// 土地使用分區：疊非都市分區圖磚；勾選時點地圖（不是點在其他圖層上）跳出該點的地段、分區與定義
+const zonLayer=async()=>ZN.n1;
+map.on("click",async e=>{
+  if(!$e("envZon").checked||e.propagatedFrom||(window._mkAdding&&window._mkAdding())) return;
+  const {lat,lng}=e.latlng, pop=L.popup({maxWidth:320,minWidth:260}).setLatLng(e.latlng)
+    .setContent(`<div class="geopop zonepop"><div class="m">${L2("查詢地段與土地使用分區中…","Looking up the land section and zoning…")}</div></div>`).openOn(map);
+  try{
+    const xml=await fetch(`https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lng.toFixed(6)}/${lat.toFixed(6)}`).then(r=>r.text());
+    const d=new DOMParser().parseFromString(xml,"text/xml"), g=t=>d.querySelector(t)?.textContent||"";
+    const head=g("sectName")?`<h4>${eesc(g("sectName"))}</h4><div class="m">${eesc(g("ctyName")+g("townName"))}・${L2("段代碼","Section")} ${eesc(g("sectCode"))}</div>`
+      :`<h4>${L2("查不到地段","No land section")}</h4><div class="m">${eesc(g("ctyName")+g("townName"))||L2("可能在海上或河川","Possibly at sea or in a river")}</div>`;
+    const body=g("ctyCode")?await zoneHTML(g("ctyCode"),lat,lng):`<div class="src">${L2("這個位置不在任何縣市範圍內。","This point is outside all counties.")}</div>`;
+    if(map.hasLayer(pop)) pop.setContent(`<div class="geopop zonepop">${head}<div class="zonebox">${body}</div></div>`);
+  }catch(err){ if(map.hasLayer(pop)) pop.setContent(`<div class="geopop zonepop"><div class="m">${L2("查詢失敗，請確認網路連線後再點一次。","Lookup failed. Check your connection and click again.")}</div></div>`); }
+});
 const ENV_DEF={
+  envZon:{make:zonLayer},
   envEqS:{cwa:1,make:()=>eqLayer("E-A0015-001",L2("顯著有感地震","Notable felt earthquake"))},
   envEqL:{cwa:1,make:()=>eqLayer("E-A0016-001",L2("小區域有感地震","Local felt earthquake"))},
   envWst:{cwa:1,make:stationLayer},
@@ -1387,6 +1435,8 @@ const ENV_DEF={
 };
 function envLegend(msg){
   const on=id=>$e(id).checked, parts=[];
+  if(on("envZon")) parts.push(`<div class="zl"><b>${L2("非都市土地使用分區","Non-urban land zoning")}</b>`+NU_CLASS.map(x=>`<span><i style="background:rgb(${x.c.join(",")})"></i>${L2(x.zh,x.en)}</span>`).join("")+
+    `<div class="src">${L2("點地圖查該點的分區與定義；臺北市、新北市都市計畫區也查得到。分類依「圖3-1-1 非都市土地使用分區類別圖」。","Click the map for the zone and its definition; urban plan areas in Taipei and New Taipei are covered too.")}</div></div>`);
   if(on("envEqS")||on("envEqL")) parts.push(`<div class="zl"><b>${L2("有感地震（最近各 16 筆）","Felt earthquakes (latest 16 each)")}</b>`+
     [["#c0392b",L2("深度 &lt; 30 km","Depth &lt; 30 km")],["#e67e22","30–70 km"],["#2e6da4","&gt; 70 km"]].map(([c,t])=>`<span><i style="background:${c};border-radius:50%"></i>${t}</span>`).join("")+
     `<div class="src">${L2("圓越大規模越大。","Larger circles mean larger magnitude.")}</div></div>`);
