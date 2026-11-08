@@ -1041,18 +1041,23 @@ const NU2_KEY=[]; // 使用地類別：官方圖例尚待補上
 const nuName=c=>EN?NU_EN[c]:NU_NAMES[c];
 // 取最接近的圖例色（容許圖磚邊緣的混色），差太多就當作圖例未列
 const nuMatch=(rgb,key)=>{let best=null,bd=1e9;for(const [c,code] of key){const d=Math.hypot(rgb[0]-c[0],rgb[1]-c[1],rgb[2]-c[2]);if(d<bd){bd=d;best=code;}}return bd<=40?best:null;};
-// 臺北市分區依代碼分組上色（本站自訂配色，不是都發局圖例）
+// 臺北市分區依代碼上色：顏色採內政部「都市計畫書圖製作要點」第七點附件三「都市計畫圖例」的 R.G.B 值；
+// 附件三把好幾種分區用同一色，這裡合併成一列。附件三未訂定的類別（特定專用區、道路交通、水利設施等）用中性色；郵電、醫療、自來水依附件三併入機關用地色。
+// 比對順序有差：例如廣場 PED 要排在公園 PE 之前。
 const ZG=[
-  {k:"park",re:/^PE/,c:"#79b866",zh:"公園、綠地、廣場",en:"Parks, green space, plazas"},
-  {k:"water",re:/^(PW|W$|PF)/,c:"#5b9bd5",zh:"河川、水利設施",en:"Rivers, water facilities"},
-  {k:"tran",re:/^PT/,c:"#a59d92",zh:"交通設施",en:"Transport"},
-  {k:"pub",re:/^P/,c:"#7f93b5",zh:"其他公共設施（學校、機關等）",en:"Other public facilities"},
-  {k:"res",re:/^R/,c:"#f0cf62",zh:"住宅區",en:"Residential"},
-  {k:"com",re:/^B/,c:"#e0675a",zh:"商業區",en:"Commercial"},
-  {k:"ind",re:/^I/,c:"#9b7bc4",zh:"工業區",en:"Industrial"},
-  {k:"edu",re:/^C/,c:"#6cc0c8",zh:"文教區",en:"Education"},
-  {k:"cons",re:/^(T|A|L)$/,c:"#bcd99b",zh:"保護區、農業區、風景區",en:"Conservation, agriculture, scenic"},
-  {k:"other",re:/./,c:"#e8a87c",zh:"特定專用區、保存區等",en:"Special-use, preservation, etc."},
+  {k:"mag",re:/^(PED|PTA3|PUG)/,c:"rgb(255,0,255)",zh:"廣場、高速公路、加油站",en:"Plazas, freeways, gas stations"},
+  {k:"water",re:/^(PW|W$|PFA)/,c:"rgb(127,255,255)",zh:"河川區、河道",en:"Rivers, river channels"},
+  {k:"util",re:/^(PUB|PUA|PUD|PTB|PPA|PPB|PPC|PFD2)/,c:"rgb(183,183,183)",zh:"電力、鐵路、垃圾、污水、煤氣設施",en:"Power, railway, refuse, sewage, gas"},
+  {k:"fun",re:/^PDA/,c:"rgb(255,255,127)",zh:"殯葬設施",en:"Funeral facilities"},
+  {k:"green",re:/^(L$|PE|PDB)/,c:"rgb(0,255,0)",zh:"風景區、公園綠地、體育場、墳墓",en:"Scenic, parks & green space, sports, cemeteries"},
+  {k:"mkt",re:/^(PM|PTD)/,c:"rgb(255,63,0)",zh:"市場、停車場",en:"Markets, parking"},
+  {k:"edu",re:/^(C|PS|PGA0)/,c:"rgb(191,127,255)",zh:"文教區、學校、社教",en:"Education, schools"},
+  {k:"gov",re:/^(G|PG|PTE$|PUF|PUC|PH|PUE)/,c:"rgb(0,127,255)",zh:"行政區、機關（含郵電、醫療、自來水）、航空站",en:"Administrative, government (incl. post, telecom, medical, water works), airport"},
+  {k:"res",re:/^R/,c:"rgb(255,255,0)",zh:"住宅區",en:"Residential"},
+  {k:"com",re:/^B/,c:"rgb(255,0,63)",zh:"商業區",en:"Commercial"},
+  {k:"ind",re:/^I/,c:"rgb(127,63,0)",zh:"工業區",en:"Industrial"},
+  {k:"cons",re:/^(A$|T$|K)/,c:"rgb(127,255,0)",zh:"農業區、保護區、保存區、宗教專用區",en:"Agriculture, conservation, preservation, religious"},
+  {k:"other",re:/./,c:"#cfc6b4",zh:"附件三未訂定（特定專用區、道路交通、水利設施等）",en:"Not defined in the standard legend (special-use, transport, drainage, etc.)"},
 ];
 const zGroup=code=>ZG.find(g=>g.re.test(code));
 const ZN={tpe:null, tpeLoad:null, tpeLayer:null, n1:nlsc("nURBAN1",Object.assign({maxNativeZoom:17,opacity:.7},OP)), n2:nlsc("nURBAN2",Object.assign({maxNativeZoom:17,opacity:.7},OP))};
@@ -1124,7 +1129,7 @@ async function appendZone(info,cty,lat,lng){
 function zoneLegend(){
   const lg=$("zonelegend"), parts=[];
   if($("zTpe").checked) parts.push(`<div class="zl"><b>${L2("臺北市都市計畫使用分區","Taipei urban plan zoning")}</b>`+ZG.map(g=>`<span><i style="background:${g.c}"></i>${L2(g.zh,g.en)}</span>`).join("")+
-    `<div class="src">${L2("本站自訂分組配色，不是都發局圖例。","Grouped colours chosen by this site, not the official legend.")}</div></div>`);
+    `<div class="src">${L2("顏色依內政部「都市計畫書圖製作要點」第七點附件三「都市計畫圖例」；最後一類附件三未訂定，為本站自訂。","Colours follow the standard urban plan legend (Ministry of the Interior, Urban Plan Documents and Maps Production Directions, Point 7, Annex 3); the last group is not defined there and was chosen by this site.")}</div></div>`);
   if($("zN1").checked) parts.push(`<div class="zl"><b>${L2("非都市土地使用分區","Non-urban land zoning")}</b>`+NU1_KEY.map(([c,code])=>`<span><i style="background:rgb(${c.join(",")})"></i>${nuName(code)}</span>`).join("")+`</div>`);
   if($("zN1").checked||$("zN2").checked) parts.push(`<div class="zl"><b>${L2("非都市土地","Non-urban land")}</b><div class="src">${L2("國土測繪中心圖磚，只畫非都市土地；放大超過 17 級會沿用 17 級圖磚。顏色代表的分區請點地圖查詢。","NLSC tiles cover non-urban land only; beyond zoom 17 the level-17 tiles are stretched. Click the map to read the zone at a point.")}</div></div>`);
   lg.innerHTML=parts.join(""); lg.hidden=!parts.length;
