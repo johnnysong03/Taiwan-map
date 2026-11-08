@@ -951,13 +951,17 @@ if(APP==="arch"){
 // ---------- 地號查詢 ----------
 const LQ = {mode:false, loaded:null, sect:"", pin:null};
 const $ = id => document.getElementById(id);
-function setTab(l){
-  LQ.mode=l; $("tabB").setAttribute("aria-selected",!l); $("tabL").setAttribute("aria-selected",l);
-  $("paneB").hidden=l; $("footB").hidden=l; $("paneL").hidden=!l;
+// 分頁：B 建築作品、L 地號查詢、C Claude 對話
+function setTab(m){
+  const l=m==="L"; LQ.mode=l;
+  ["B","L","C"].forEach(k=>$("tab"+k)?.setAttribute("aria-selected",m===k));
+  $("paneB").hidden=m!=="B"; $("footB").hidden=m!=="B"; $("paneL").hidden=!l; if($("paneC")) $("paneC").hidden=m!=="C";
   map.getContainer().style.cursor=l?"crosshair":"";
   if(l){ loadPub(); const cb=$("o0"); if(!cb.checked) cb.click(); }
+  if(m==="C") sheet("full");
 }
-$("tabB").onclick=()=>setTab(false); $("tabL").onclick=()=>setTab(true);
+window._archTab=setTab;
+$("tabB").onclick=()=>setTab("B"); $("tabL").onclick=()=>setTab("L");
 
 function loadPub(){
   if(LQ.loaded) return LQ.loaded;
@@ -1207,6 +1211,144 @@ map.on("click", async e=>{
 });
 
 }
+
+// ---------- Claude 對話欄 ----------
+// 使用者自備 Anthropic API 金鑰：金鑰只存在這個瀏覽器的 localStorage，由瀏覽器直接送到 Anthropic API，不經過本站。
+// 本站是公開的靜態網頁，程式碼裡不能放金鑰，所以不提供共用金鑰。
+// SDK 第一次開啟對話時才從 jsDelivr 載入（官方 @anthropic-ai/sdk 的 ESM 版本）。
+const CHAT={sdk:null, client:null, key:"", history:[], busy:false};
+const CHAT_MODEL="claude-opus-5-5";
+const CHAT_SDK_URL="https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.3.0/+esm";
+const CHAT_KEY_STORE="anthropicKey";
+try{ CHAT.key=localStorage.getItem(CHAT_KEY_STORE)||""; }catch(e){}
+const chatSystem=()=>[
+  APP==="arch"
+    ? "你是「臺灣建築地圖」網站裡的助理。這個網站用 Leaflet 顯示臺灣的建築作品、古蹟與歷史建築、地號查詢（地段、臺北市公有地、土地使用分區），底圖與圖資來自內政部國土測繪中心。"
+    : "你是「臺灣地熱地圖」網站裡的助理。這個網站用 Leaflet 顯示經濟部地質調查及礦業管理中心地熱探勘資訊平臺的開放資料（調查區、鑽井、地溫計、水質、地質圖等），底圖與圖資來自內政部國土測繪中心。",
+  "每則使用者訊息前面會附上〔目前地圖狀態〕，那是網頁自動帶入的畫面資訊，請拿來理解使用者在問哪裡，不要整段複述。",
+  "回答時：法規、數據、網址、人名沒有把握就直接說不確定，不要編造；土地使用分區、權屬等以主管機關文件為準時要提醒。",
+  EN ? "Reply in English unless the user writes in Chinese." : "用台灣繁體中文回答，口語但專業，簡潔就好。",
+].join("\n");
+// 收集目前地圖畫面的資訊，附在每則訊息前
+function mapContext(){
+  const c=map.getCenter(), lines=[];
+  lines.push(`中心 WGS84 ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}（TWD97 ${fmtTM2(c.lat,c.lng)}），縮放 ${map.getZoom()}`);
+  const base=document.querySelector('input[name="base"]:checked')?.closest("label")?.textContent.trim();
+  if(base) lines.push("底圖："+base);
+  const on=[...document.querySelectorAll('#layers input[type="checkbox"]:checked')].map(b=>b.closest("label")?.textContent.trim()).filter(Boolean);
+  if(on.length) lines.push("已開啟圖層："+on.join("、"));
+  const vis=id=>{const el=document.getElementById(id); return el&&!el.hidden&&el.innerText.trim()?el.innerText.trim().replace(/\n+/g," / ").slice(0,1200):"";};
+  const sect=vis("sectinfo"); if(sect) lines.push("地號查詢結果："+sect);
+  const card=vis("card"); if(card) lines.push("目前選取的建築："+card);
+  const geo=[...document.querySelectorAll('#geochecks input:checked')].map(b=>b.closest("label")?.textContent.trim()).filter(Boolean);
+  if(geo.length) lines.push("地熱資料勾選："+geo.join("、"));
+  return "〔目前地圖狀態〕\n"+lines.join("\n");
+}
+function chatEsc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function chatAdd(role,text){
+  const li=document.createElement("li"); li.className="cm "+role; li.textContent=text;
+  document.getElementById("chatlog").appendChild(li); li.scrollIntoView({block:"end"}); return li;
+}
+function chatRenderKey(){
+  const has=!!CHAT.key;
+  document.getElementById("chatkeybox").hidden=has;
+  document.getElementById("chatform").hidden=!has;
+  document.getElementById("chatkeyinfo").hidden=!has;
+}
+async function chatClient(){
+  if(CHAT.client) return CHAT.client;
+  if(!CHAT.sdk) CHAT.sdk=(await import(CHAT_SDK_URL)).default;
+  // dangerouslyAllowBrowser：金鑰是使用者自己的、只存在使用者自己的瀏覽器，才開啟這個選項
+  CHAT.client=new CHAT.sdk({apiKey:CHAT.key, dangerouslyAllowBrowser:true});
+  return CHAT.client;
+}
+function chatErr(err){
+  const A=CHAT.sdk;
+  if(A&&err instanceof A.AuthenticationError) return L2("API 金鑰無效，請按「更換金鑰」重新輸入。","The API key was rejected. Use “Change key” to enter it again.");
+  if(A&&err instanceof A.PermissionDeniedError) return L2("這把金鑰沒有使用這個模型的權限。","This key is not allowed to use this model.");
+  if(A&&err instanceof A.RateLimitError) return L2("請求太頻繁或額度不足，稍等一下再試。","Rate limited or out of credit. Wait a moment and try again.");
+  if(A&&err instanceof A.APIConnectionError) return L2("連不上 Anthropic API，請確認網路連線。","Could not reach the Anthropic API. Check your connection.");
+  if(A&&err instanceof A.APIError) return L2(`API 錯誤（${err.status??"?"}）：`,`API error (${err.status??"?"}): `)+(err.message||"");
+  return L2("對話載入失敗：","Chat failed: ")+(err?.message||err);
+}
+async function chatSend(text){
+  if(CHAT.busy||!text.trim()) return;
+  CHAT.busy=true; document.getElementById("chatsend").disabled=true;
+  chatAdd("user",text);
+  const out=chatAdd("assistant",L2("思考中…","Thinking…")); out.classList.add("pending");
+  // 地圖狀態附在使用者訊息前；對話紀錄只往後加，不改舊訊息（前綴快取與 thinking 區塊都需要）
+  const userMsg={role:"user",content:mapContext()+"\n\n"+text};
+  const messages=[...CHAT.history,userMsg];
+  try{
+    const client=await chatClient();
+    const stream=client.beta.messages.stream({
+      model:CHAT_MODEL, max_tokens:16000,
+      system:[{type:"text",text:chatSystem(),cache_control:{type:"ephemeral"}}],
+      output_config:{effort:"low"},
+      betas:["server-side-fallback-2026-07-01"], fallbacks:"default", // 被安全機制拒絕時由伺服器改用適合的模型
+      messages,
+    });
+    let got="";
+    stream.on("text",d=>{ if(!got){out.textContent="";out.classList.remove("pending");} got+=d; out.textContent=got; out.scrollIntoView({block:"end"}); });
+    const msg=await stream.finalMessage();
+    out.classList.remove("pending");
+    if(msg.stop_reason==="refusal"){ out.textContent=got||L2("這個問題被 Claude 的安全機制拒絕回答，換個問法試試。","Claude declined to answer this. Try rephrasing."); }
+    else if(!got) out.textContent=L2("（沒有文字回覆）","(no text reply)");
+    if(msg.stop_reason==="max_tokens") out.textContent+=L2("\n（回覆太長被截斷）","\n(reply cut off: too long)");
+    CHAT.history.push(userMsg,{role:"assistant",content:msg.content});
+  }catch(err){
+    out.classList.remove("pending"); out.classList.add("err"); out.textContent=chatErr(err);
+    if(CHAT.sdk&&err instanceof CHAT.sdk.AuthenticationError){ CHAT.client=null; }
+  }finally{ CHAT.busy=false; document.getElementById("chatsend").disabled=false; }
+}
+function buildChatPane(){
+  const side=document.getElementById("side");
+  const pane=document.createElement("div"); pane.id="paneC"; pane.className="pane"; pane.hidden=true;
+  pane.innerHTML=`<div class="controls chatpane">
+    <div class="hint">${L2("問 Claude 跟地圖有關的問題。每次提問會自動附上目前的地圖位置、開啟的圖層和查詢結果。","Ask Claude about the map. Each question automatically includes the current map position, open layers and lookup results.")}</div>
+    <div id="chatkeybox">
+      <label for="chatkey" class="label">${L2("你的 Anthropic API 金鑰","Your Anthropic API key")}</label>
+      <form id="chatkeyform" class="row"><input id="chatkey" type="password" autocomplete="off" placeholder="sk-ant-…" aria-label="API key"><button class="btn" type="submit">${L2("儲存","Save")}</button></form>
+      <div class="src">${L2("金鑰只存在這個瀏覽器，由瀏覽器直接送到 Anthropic，不會經過本站；費用由你的 Anthropic 帳號支付。共用電腦用完請按「清除金鑰」。","The key stays in this browser and goes straight to Anthropic, never through this site. Usage is billed to your Anthropic account. On a shared computer, clear the key when you are done.")}</div>
+    </div>
+    <div id="chatkeyinfo" class="src" hidden>${L2(`模型 ${CHAT_MODEL}・金鑰已存在這個瀏覽器`,`Model ${CHAT_MODEL} · key saved in this browser`)}
+      <button type="button" class="linkbtn" id="chatkeychg">${L2("更換金鑰","Change key")}</button>
+      <button type="button" class="linkbtn" id="chatkeydel">${L2("清除金鑰","Clear key")}</button>
+      <button type="button" class="linkbtn" id="chatclear">${L2("清除對話","Clear chat")}</button></div>
+    <ol id="chatlog"></ol>
+    <form id="chatform" hidden>
+      <textarea id="chatin" rows="3" placeholder="${L2("例如：這個地號的分區可以蓋什麼？","e.g. What can be built in this zone?")}" aria-label="${L2("訊息","Message")}"></textarea>
+      <button class="btn" id="chatsend" type="submit">${L2("送出","Send")}</button>
+    </form>
+    <div class="src">${L2("Claude 可能會出錯，重要資訊請以官方資料為準。","Claude can make mistakes. Check important facts against official sources.")}</div>
+  </div>`;
+  side.insertBefore(pane, side.querySelector(":scope > .foot"));
+  const $c=id=>document.getElementById(id);
+  $c("chatkeyform").onsubmit=e=>{e.preventDefault(); const v=$c("chatkey").value.trim(); if(!v) return;
+    CHAT.key=v; CHAT.client=null; try{localStorage.setItem(CHAT_KEY_STORE,v);}catch(err){} $c("chatkey").value=""; chatRenderKey(); $c("chatin").focus();};
+  $c("chatkeychg").onclick=()=>{ $c("chatkeybox").hidden=false; $c("chatkey").focus(); };
+  $c("chatkeydel").onclick=()=>{ CHAT.key=""; CHAT.client=null; try{localStorage.removeItem(CHAT_KEY_STORE);}catch(err){} chatRenderKey(); };
+  $c("chatclear").onclick=()=>{ CHAT.history=[]; $c("chatlog").innerHTML=""; };
+  $c("chatform").onsubmit=e=>{e.preventDefault(); const t=$c("chatin").value; $c("chatin").value=""; chatSend(t);};
+  $c("chatin").onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); $c("chatform").requestSubmit(); } };
+  chatRenderKey();
+  return pane;
+}
+(()=>{
+  const pane=buildChatPane(), $c=id=>document.getElementById(id);
+  if(APP==="arch"){
+    const tc=document.createElement("button"); tc.type="button"; tc.setAttribute("role","tab"); tc.id="tabC"; tc.setAttribute("aria-selected","false"); tc.textContent="Claude";
+    document.querySelector("#side .tabs").appendChild(tc);
+    tc.onclick=()=>window._archTab("C");
+  } else {
+    // 地熱地圖原本沒有分頁：加一列「地熱資料／Claude」
+    const tabs=document.createElement("div"); tabs.className="tabs"; tabs.setAttribute("role","tablist");
+    tabs.innerHTML=`<button type="button" role="tab" id="tabG" aria-selected="true">${L2("地熱資料","Geothermal data")}</button><button type="button" role="tab" id="tabC" aria-selected="false">Claude</button>`;
+    const gp=document.querySelector("#side .geopane"); gp.parentNode.insertBefore(tabs,gp);
+    const set=c=>{ $c("tabG").setAttribute("aria-selected",!c); $c("tabC").setAttribute("aria-selected",c); gp.hidden=c; pane.hidden=!c; if(c) sheet("full"); };
+    $c("tabG").onclick=()=>set(false); $c("tabC").onclick=()=>set(true);
+  }
+})();
 
 // ---------- 手機版底部拉板：拖曳或點把手切換 收合／半開／全開 ----------
 (()=>{
