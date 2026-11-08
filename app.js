@@ -1212,6 +1212,118 @@ map.on("click", async e=>{
 
 }
 
+if(APP==="geo"){
+// ---------- 地震與環境資料 ----------
+// 氣象署（地震報告、氣象測站）：瀏覽器直接呼叫開放資料 API，需要使用者自己的授權碼，只存在 localStorage。
+// 溫泉露頭、土石流潛勢溪流、西南海域地熱流：已轉成 env/*.js 放在版本庫，勾選時才載入。
+const $e=id=>document.getElementById(id);
+const eesc=s=>String(s??"").replace(/[<>&"]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[ch]));
+const epop=(t,m,body,src)=>`<div class="geopop"><h4>${eesc(t)}</h4>${m?`<div class="m">${m}</div>`:""}${body}<div class="src">${src}</div></div>`;
+const erow=rows=>`<table>${rows.filter(r=>r[1]!==""&&r[1]!=null).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`;
+const eEarth=(lat,lng,d)=>`<div style="margin-top:6px"><a href="${earthUrl(lat,lng,d)}" target="_blank" rel="noopener">${L2("在 Google Earth 開啟這裡","Open here in Google Earth")}</a></div>`;
+map.createPane("env"); map.getPane("env").style.zIndex=640;
+const envRd=L.canvas({pane:"env",padding:.3});
+const ENV={cwaKey:"", layers:{}, data:{}};
+try{ ENV.cwaKey=localStorage.getItem("cwaKey")||""; }catch(e){}
+const CWA="https://opendata.cwa.gov.tw/api/v1/rest/datastore/";
+const SRC_CWA=L2("資料：交通部中央氣象署開放資料平臺（即時查詢）","Data: Central Weather Administration open data (live)");
+function cwaUI(){ const need=["envEqS","envEqL","envWst"].some(id=>$e(id).checked);
+  $e("cwabox").hidden=!need||!!ENV.cwaKey; $e("cwainfo").hidden=!ENV.cwaKey; }
+async function cwaGet(ds){
+  const r=await fetch(`${CWA}${ds}?Authorization=${encodeURIComponent(ENV.cwaKey)}`);
+  if(r.status===401) throw new Error("key");
+  if(!r.ok) throw new Error("http "+r.status);
+  return r.json();
+}
+// 地震：圓的大小看規模，顏色看深度（淺層紅、中層橘、深層藍）
+const eqColor=d=>d<30?"#c0392b":d<70?"#e67e22":"#2e6da4";
+async function eqLayer(ds,label){
+  const j=await cwaGet(ds), list=j.records?.Earthquake||[];
+  return L.layerGroup(list.map(e=>{const i=e.EarthquakeInfo, ep=i.Epicenter, m=i.EarthquakeMagnitude?.MagnitudeValue, d=i.FocalDepth;
+    const ll=[ep.EpicenterLatitude,ep.EpicenterLongitude];
+    return L.circleMarker(ll,{renderer:envRd,radius:Math.max(4,(m||3)*2.6-4),color:"#fff",weight:1.2,fillColor:eqColor(d),fillOpacity:.8})
+      .bindTooltip(`M${m} ${i.OriginTime.slice(0,16).replace("T"," ")}`,{direction:"top"})
+      .bindPopup(()=>epop(`${L2("規模","M")} ${m}・${i.OriginTime.slice(0,16).replace("T"," ")}`,`${label}・${L2("編號","No.")} ${e.EarthquakeNo}`,
+        erow([[L2("位置","Location"),eesc(ep.Location)],[L2("深度","Depth"),`${d} km`],[L2("規模","Magnitude"),`${eesc(i.EarthquakeMagnitude?.MagnitudeType)} ${m}`],
+          [L2("內容","Report"),eesc(e.ReportContent)]])+
+        (e.Web?`<div style="margin-top:6px"><a href="${eesc(e.Web)}" target="_blank" rel="noopener">${L2("氣象署地震報告","CWA earthquake report")}</a></div>`:"")+eEarth(ll[0],ll[1],60000),SRC_CWA));}));
+}
+async function stationLayer(){
+  const [a,b]=await Promise.all([cwaGet("C-B0074-001"),cwaGet("C-B0074-002")]);
+  const pick=(j,kind)=>(j.records?.data?.stationStatus?.station||j.records?.data?.station||[]).filter(s=>s.status==="現存測站").map(s=>[s,kind]);
+  const all=[...pick(a,L2("有人站","Staffed")),...pick(b,L2("無人站","Automatic"))];
+  return L.layerGroup(all.map(([s,kind])=>{const ll=[+s.StationLatitude,+s.StationLongitude];
+    return L.circleMarker(ll,{renderer:envRd,radius:kind===L2("有人站","Staffed")?5.5:3.5,color:"#fff",weight:1,fillColor:kind===L2("有人站","Staffed")?"#1b6f8a":"#5fa8c4",fillOpacity:.9})
+      .bindTooltip(eesc(s.StationName),{direction:"top"})
+      .bindPopup(()=>epop(s.StationName,`${kind}・${s.StationID}`,erow([[L2("縣市","County"),eesc(s.CountyName)],[L2("地址","Address"),eesc(s.Location)],
+        [L2("海拔","Altitude"),`${s.StationAltitude} m`],[L2("啟用日期","Since"),eesc(s.StationStartDate)]])+eEarth(ll[0],ll[1],3000),SRC_CWA));}));
+}
+// 靜態資料：env/<key>.js
+const envLoad={};
+function loadEnv(key){ return envLoad[key]??=new Promise((ok,fail)=>{const s=document.createElement("script");s.src=`env/${key}.js`;
+  s.onload=()=>window.ENVDATA?.[key]?ok(window.ENVDATA[key]):fail(new Error("empty"));s.onerror=()=>{delete envLoad[key];fail(new Error("load"));};document.head.appendChild(s);}); }
+const SRC_HSP=L2("資料：經濟部地質調查及礦業管理中心「溫泉露頭調查資料」（2025-06-20 更新）","Data: GSMMA hot spring outcrop survey (updated 2025-06-20)");
+const SRC_HFL=L2("資料：經濟部地質調查及礦業管理中心「西南海域地熱流探測調查」93～104 年度（2025-06-20 更新）","Data: GSMMA SW offshore heat-flow surveys 2004–2015 (updated 2025-06-20)");
+const SRC_DEB=L2("資料：農業部農村發展及水土保持署「115年度土石流潛勢溪流」（2026-08-24 更新）","Data: ARDSWC debris-flow potential streams, 2026 edition (updated 2026-08-24)");
+const DEB_COL={"高":"#c0392b","中":"#e67e22","低":"#d4ac0d","持續觀察":"#7f8c8d"};
+async function hspLayer(){ const D=await loadEnv("hotspring");
+  return L.layerGroup(D.rows.map(([lat,lng,n,c,t,q])=>L.circleMarker([lat,lng],{renderer:envRd,radius:5.5,color:"#fff",weight:1.2,fillColor:"#d35400",fillOpacity:.95})
+    .bindTooltip(eesc(n),{direction:"top"}).bindPopup(()=>epop(n,`${eesc(c)}${eesc(t)}`,erow([[L2("泉質","Spring type"),eesc(q)]])+eEarth(lat,lng,3000),SRC_HSP)))); }
+async function hflLayer(){ const D=await loadEnv("heatflow");
+  return L.layerGroup(D.rows.map(([lat,lng,no,yr,dep,probe,ty,period])=>L.circleMarker([lat,lng],{renderer:envRd,radius:4.5,color:"#fff",weight:1,fillColor:"#16a085",fillOpacity:.95})
+    .bindTooltip(`${L2("站位","Station")} ${eesc(no)}`,{direction:"top"})
+    .bindPopup(()=>epop(`${L2("站位","Station")} ${no}`,`${eesc(period)}・${yr}`,erow([[L2("水深","Water depth"),`${dep} m`],[L2("探針深度","Probe depth"),`${probe} cm`],[L2("探針類型","Probe type"),eesc(ty)]])+eEarth(lat,lng,60000),SRC_HFL)))); }
+async function debLayer(){ const D=await loadEnv("debris"), F=D.fields, ix=k=>F.indexOf(k);
+  return L.layerGroup(D.f.map(([a,parts])=>{const lls=parts.map(fl=>{const pts=[];let x=0,y=0;for(let i=0;i<fl.length;i+=2){x+=fl[i];y+=fl[i+1];pts.push([y/1e5,x/1e5]);}return pts;});
+    const risk=a[ix("Risk")];
+    return L.polyline(lls,{renderer:envRd,color:DEB_COL[risk]||"#7f8c8d",weight:3,opacity:.9})
+      .bindTooltip(`${eesc(a[ix("Debrisno")])} ${eesc(a[ix("Name")])}`,{sticky:true})
+      .bindPopup(e=>epop(`${a[ix("Debrisno")]} ${a[ix("Name")]}`,eesc(a[ix("Full")]),erow([[L2("風險潛勢","Risk"),eesc(risk)],[L2("保全住戶","Households at risk"),eesc(a[ix("TRes_Class")])],
+        [L2("類型","Type"),eesc(a[ix("Type")])],[L2("流域","Basin"),eesc(a[ix("Basin")])],[L2("長度","Length"),`${a[ix("Length")]} km`],[L2("地層","Geology"),eesc(a[ix("Stra_1")])],[L2("地標","Landmark"),eesc(a[ix("Mark")])]])+
+        eEarth(e.latlng.lat,e.latlng.lng,4000),SRC_DEB));}));
+}
+const ENV_DEF={
+  envEqS:{cwa:1,make:()=>eqLayer("E-A0015-001",L2("顯著有感地震","Notable felt earthquake"))},
+  envEqL:{cwa:1,make:()=>eqLayer("E-A0016-001",L2("小區域有感地震","Local felt earthquake"))},
+  envWst:{cwa:1,make:stationLayer},
+  envHsp:{make:hspLayer}, envDeb:{make:debLayer}, envHfl:{make:hflLayer},
+};
+function envLegend(msg){
+  const on=id=>$e(id).checked, parts=[];
+  if(on("envEqS")||on("envEqL")) parts.push(`<div class="zl"><b>${L2("有感地震（最近各 16 筆）","Felt earthquakes (latest 16 each)")}</b>`+
+    [["#c0392b",L2("深度 &lt; 30 km","Depth &lt; 30 km")],["#e67e22","30–70 km"],["#2e6da4","&gt; 70 km"]].map(([c,t])=>`<span><i style="background:${c};border-radius:50%"></i>${t}</span>`).join("")+
+    `<div class="src">${L2("圓越大規模越大。","Larger circles mean larger magnitude.")}</div></div>`);
+  if(on("envWst")) parts.push(`<div class="zl"><b>${L2("氣象測站（現存）","Weather stations (active)")}</b><span><i style="background:#1b6f8a;border-radius:50%"></i>${L2("有人站","Staffed")}</span><span><i style="background:#5fa8c4;border-radius:50%"></i>${L2("無人站","Automatic")}</span></div>`);
+  if(on("envDeb")) parts.push(`<div class="zl"><b>${L2("土石流潛勢溪流","Debris-flow potential streams")}</b>`+Object.entries(DEB_COL).map(([k,c])=>`<span><i style="background:${c}"></i>${L2(k==="持續觀察"?"持續觀察":k+"潛勢",k==="持續觀察"?"Under observation":({"高":"High","中":"Medium","低":"Low"})[k])}</span>`).join("")+`</div>`);
+  if(on("envHsp")) parts.push(`<div class="zl"><span><i style="background:#d35400;border-radius:50%"></i>${L2("溫泉露頭","Hot spring outcrop")}</span></div>`);
+  if(on("envHfl")) parts.push(`<div class="zl"><span><i style="background:#16a085;border-radius:50%"></i>${L2("西南海域地熱流探測站","SW offshore heat-flow station")}</span></div>`);
+  if(msg) parts.push(`<div class="src">${msg}</div>`);
+  $e("envlegend").innerHTML=parts.join(""); $e("envlegend").hidden=!parts.length;
+}
+async function envToggle(id){
+  const box=$e(id), def=ENV_DEF[id]; cwaUI();
+  if(!box.checked){ if(ENV.layers[id]) map.removeLayer(ENV.layers[id]); envLegend(); return; }
+  if(def.cwa&&!ENV.cwaKey){ envLegend(L2("請先輸入氣象署授權碼。","Enter your CWA key first.")); $e("cwakey").focus(); return; }
+  box.disabled=true;
+  try{
+    ENV.layers[id]??=await def.make();
+    if(box.checked) ENV.layers[id].addTo(map);
+    envLegend();
+  }catch(err){
+    box.checked=false;
+    envLegend(err.message==="key"?L2("氣象署授權碼無效，請清除後重新輸入。","The CWA key was rejected. Clear it and enter it again.")
+      :L2("資料載入失敗，請確認網路連線後再試一次。","Data failed to load. Check your connection and try again."));
+  }finally{ box.disabled=false; cwaUI(); }
+}
+Object.keys(ENV_DEF).forEach(id=>$e(id).onchange=()=>envToggle(id));
+$e("cwaform").onsubmit=e=>{e.preventDefault(); const v=$e("cwakey").value.trim(); if(!v) return;
+  ENV.cwaKey=v; try{localStorage.setItem("cwaKey",v);}catch(err){} $e("cwakey").value="";
+  ["envEqS","envEqL","envWst"].forEach(id=>{ delete ENV.layers[id]; if($e(id).checked) envToggle(id); }); cwaUI(); };
+$e("cwadel").onclick=()=>{ ENV.cwaKey=""; try{localStorage.removeItem("cwaKey");}catch(err){}
+  ["envEqS","envEqL","envWst"].forEach(id=>{ if(ENV.layers[id]) map.removeLayer(ENV.layers[id]); delete ENV.layers[id]; $e(id).checked=false; }); cwaUI(); envLegend(); };
+cwaUI();
+}
+
 // ---------- Claude 對話欄 ----------
 // 使用者自備 Anthropic API 金鑰：金鑰只存在這個瀏覽器的 localStorage，由瀏覽器直接送到 Anthropic API，不經過本站。
 // 本站是公開的靜態網頁，程式碼裡不能放金鑰，所以不提供共用金鑰。

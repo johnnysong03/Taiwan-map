@@ -65,6 +65,20 @@
       <input id="roadop" type="range" min="0" max="1" step="0.05" value="0.3">
     </fieldset>
     <fieldset id="overs"><legend class="label" data-en="Overlays">疊加圖資</legend></fieldset>
+    <fieldset id="envset"><legend class="label" data-en="Earthquakes &amp; environment">地震與環境資料</legend>
+      <label><input type="checkbox" id="envEqS"> <span data-en="Felt earthquakes (CWA, notable)">有感地震・顯著（氣象署）</span></label>
+      <label><input type="checkbox" id="envEqL"> <span data-en="Felt earthquakes (CWA, local)">有感地震・小區域（氣象署）</span></label>
+      <label><input type="checkbox" id="envWst"> <span data-en="Weather stations (CWA)">氣象測站（氣象署）</span></label>
+      <div id="cwabox" hidden>
+        <form id="cwaform" class="row"><input id="cwakey" type="password" autocomplete="off" placeholder="CWA-…" aria-label="CWA key"><button class="btn" type="submit" data-en="Save">儲存</button></form>
+        <div class="src" data-en="Earthquake and station layers need your own free authorization key from the CWA open data platform (opendata.cwa.gov.tw). It is stored only in this browser.">地震與測站圖層需要你自己的氣象署開放資料授權碼（免費，到 opendata.cwa.gov.tw 註冊後取得）。授權碼只存在這個瀏覽器。</div>
+      </div>
+      <div id="cwainfo" class="src" hidden><span data-en="CWA key saved in this browser">氣象署授權碼已存在這個瀏覽器</span> <button type="button" class="linkbtn" id="cwadel" data-en="Clear">清除</button></div>
+      <label><input type="checkbox" id="envHsp"> <span data-en="Hot spring outcrops (GSMMA)">溫泉露頭（地調中心）</span></label>
+      <label><input type="checkbox" id="envDeb"> <span data-en="Debris-flow potential streams (ARDSWC)">土石流潛勢溪流（農村水保署）</span></label>
+      <label><input type="checkbox" id="envHfl"> <span data-en="SW offshore heat-flow stations (GSMMA)">西南海域地熱流探測站（地調中心）</span></label>
+      <div id="envlegend" hidden></div>
+    </fieldset>
     <div class="op">
       <label for="opacity" class="label" style="display:block;margin-bottom:2px" data-en="Overlay opacity">疊加透明度</label>
       <input id="opacity" type="range" min="0.2" max="1" step="0.05" value="0.85">

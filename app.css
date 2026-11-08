@@ -85,7 +85,7 @@ select{padding:7px 10px;border:1px solid var(--rule);border-radius:4px;backgroun
 #paneC{overflow-y:auto}
 .chatpane{display:flex;flex-direction:column;gap:8px}
 #chatkeybox{display:flex;flex-direction:column;gap:6px}
-#chatkey{flex:1;padding:8px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
+#chatkey,#cwakey{flex:1;padding:8px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
 #chatkeyinfo{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
 #chatlog{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .cm{padding:8px 11px;border-radius:6px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-width:92%}
@@ -103,10 +103,10 @@ select{padding:7px 10px;border:1px solid var(--rule);border-radius:4px;backgroun
 .zonebox dt.h{grid-column:1/-1;color:var(--ink);font-weight:700}
 .zonebox dd{margin:0;font-weight:500}
 .zsw{display:inline-block;width:11px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px;margin-right:6px;vertical-align:-1px}
-#zonelegend{margin-top:6px}
-#zonelegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:4px}
-#zonelegend .zl b{font-size:12px}
-#zonelegend .zl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
+#zonelegend,#envlegend{margin-top:6px}
+#zonelegend .zl,#envlegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:4px}
+#zonelegend .zl b,#envlegend .zl b{font-size:12px}
+#zonelegend .zl i,#envlegend .zl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
 #ownlegend{margin-top:6px}
 #ownlegend .ramp{height:10px;border-radius:2px;border:1px solid var(--rule)}
 #ownlegend .ticks{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
