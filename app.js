@@ -1336,6 +1336,10 @@ async function welLayer(){
   if(!n) throw new Error("empty");
   return g;
 }
+// 地調中心工程地質探勘資料庫：鑽孔點位分布（圖台的 WMS 代理，只畫點、點不出屬性；正式 API 需申請）
+const GEOTECH="https://geotech.gsmma.gov.tw/imoeagis";
+const borLayer=async()=>L.tileLayer.wms(`${GEOTECH}/api/MapsProxy/DrillHoles`,{layers:"geocore2020:GeoServiceDrCoord",format:"image/png",transparent:true,version:"1.3.0",
+  pane:"envtiles",maxZoom:20,attribution:"© 經濟部地質調查及礦業管理中心 工程地質探勘資料庫"});
 // 地調中心順向坡目錄圖磚（只到第 15 級）
 const dipLayer=async()=>L.tileLayer("https://landslide.geologycloud.tw/jlwmts/jetlink/Dislope/GoogleMapsCompatible/{z}/{x}/{y}.png",{pane:"envtiles",maxZoom:20,maxNativeZoom:15,opacity:.85,attribution:"© 經濟部地質調查及礦業管理中心"});
 // 林業保育署國土生態綠網：下拉選單切換 8 種圖資
@@ -1367,7 +1371,7 @@ const ENV_DEF={
   envHsp:{make:hspLayer}, envDeb:{make:debLayer}, envHfl:{make:hflLayer},
   envFlt:{make:async()=>gsmmaWms("WMS/25K_Geomap_fault_2021")}, envFsa:{make:async()=>gsmmaWms("WMS/Sensitive_area_fault")},
   envLsl:{make:lslLayer}, envVol:{make:volLayer},
-  envWel:{make:welLayer}, envDip:{make:dipLayer}, envEco:{make:ecoLayer},
+  envWel:{make:welLayer}, envDip:{make:dipLayer}, envEco:{make:ecoLayer}, envBor:{make:borLayer},
 };
 function envLegend(msg){
   const on=id=>$e(id).checked, parts=[];
@@ -1385,6 +1389,7 @@ function envLegend(msg){
     `<span><i style="background:${VOL_COL[s]}"></i>${L2("影響範圍","Affected area")}${s.startsWith("火山灰")?L2("（虛線為等厚線）"," (dashed: isopachs)"):""}</span><span><i style="background:#b03a2e;border-radius:50%"></i>${L2("火山口位置","Crater")}</span>`+
     `<div class="src">${L2("磺嘴山火山灰（冬季）官方檔案內容不符且損毀，未收錄；另有兩個損毀的子檔略過。","The official file for Huangzuishan winter ash fall is mislabelled and corrupt, so it is not shown; two other corrupt sub-files were skipped.")}</div></div>`); }
   if(on("envWel")) parts.push(`<div class="zl"><b>${L2("水文地質觀測井","Hydrogeological wells")}</b>`+WEL_SET.map(([k,c,lab])=>`<span><i style="background:${c};border-radius:50%"></i>${lab}</span>`).join("")+`</div>`);
+  if(on("envBor")) parts.push(`<div class="zl"><b>${L2("工程鑽孔分布","Engineering boreholes")}</b><div class="src">${L2("地調中心工程地質探勘資料庫（約 7.3 萬孔），只顯示位置。孔號、深度與柱狀圖請到","GSMMA engineering geology database (about 73,000 holes), locations only. For hole numbers, depths and logs, open the")} <a href="${GEOTECH}/Home/Map" target="_blank" rel="noopener">${L2("工程地質探勘資料庫圖台","official map")}</a>${L2("查詢。","." )}</div></div>`);
   if(on("envDip")) parts.push(`<div class="zl"><b>${L2("順向坡","Dip slopes")}</b><div class="src">${L2("地調中心圖磚，顏色依原圖；放大超過 15 級會沿用 15 級圖磚。","GSMMA tiles drawn as published; level-15 tiles are stretched beyond zoom 15.")}</div></div>`);
   if(on("envEco")){ const k=$e("ecosel").value; parts.push(`<div class="zl"><b>${L2("國土生態綠網","National ecological network")}・${$e("ecosel").selectedOptions[0].textContent}</b>`+
     (k==="hotspot"?Object.entries(HOT_COL).map(([v,c])=>`<span><i style="background:${c}"></i>${L2(v+(v==4?" 類以上":" 類")+"動物類群",`${v}${v==4?"+":""} animal groups`)}</span>`).join(""):"")+
