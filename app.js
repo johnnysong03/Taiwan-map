@@ -1282,11 +1282,50 @@ async function debLayer(){ const D=await loadEnv("debris"), F=D.fields, ix=k=>F.
         [L2("類型","Type"),eesc(a[ix("Type")])],[L2("流域","Basin"),eesc(a[ix("Basin")])],[L2("長度","Length"),`${a[ix("Length")]} km`],[L2("地層","Geology"),eesc(a[ix("Stra_1")])],[L2("地標","Landmark"),eesc(a[ix("Mark")])]])+
         eEarth(e.latlng.lat,e.latlng.lng,4000),SRC_DEB));}));
 }
+// 地調中心 WMS（只支援 EPSG:4326，用 Leaflet 的 WMS 圖層以 4326 範圍請求）
+const GSMMA_WMS="https://geomap.gsmma.gov.tw/mapguide/mapagent/mapagent.fcgi";
+map.createPane("envtiles"); map.getPane("envtiles").style.zIndex=630;
+const gsmmaWms=layer=>L.tileLayer.wms(GSMMA_WMS,{layers:layer,format:"image/png",transparent:true,version:"1.3.0",crs:L.CRS.EPSG4326,pane:"envtiles",
+  maxZoom:20,attribution:"© 經濟部地質調查及礦業管理中心"});
+const SRC_LSL=L2("資料：農業部農村發展及水土保持署「115年度94處大規模崩塌潛勢區」與影響範圍（2026-01-14 更新）","Data: ARDSWC 94 large-scale landslide potential areas and impact zones, 2026 edition (updated 2026-01-14)");
+const SRC_VOL=L2("資料：經濟部地質調查及礦業管理中心「火山災害潛勢圖」（大屯火山群各亞群、龜山島）","Data: GSMMA volcanic hazard potential maps (Tatun volcano group, Guishan Island)");
+const RISK_COL={"高":"#c0392b","中":"#e67e22","低":"#d4ac0d"};
+const dec5=fl=>{const pts=[];let x=0,y=0;for(let i=0;i<fl.length;i+=2){x+=fl[i];y+=fl[i+1];pts.push([y/1e5,x/1e5]);}return pts;};
+async function lslLayer(){ const D=await loadEnv("landslide"), A=D.area.fields, B=D.impact.fields, ia=k=>A.indexOf(k), ib=k=>B.indexOf(k), g=L.layerGroup();
+  D.impact.f.forEach(([a,ps])=>ps.forEach(rings=>L.polygon(rings.map(dec5),{renderer:envRd,color:"#8e44ad",weight:1,dashArray:"4 3",fillColor:"#8e44ad",fillOpacity:.12})
+    .bindPopup(()=>epop(`${a[ib("Islno")]} ${L2("影響範圍","impact zone")}`,eesc(a[ib("County")]+a[ib("Town")]+a[ib("Vill")]),erow([[L2("風險潛勢","Risk"),eesc(a[ib("Risk")])],
+      [L2("保全住戶","Households at risk"),`${eesc(a[ib("Total_Res")])}（${eesc(a[ib("TRes_Class")])}）`]]),SRC_LSL)).addTo(g)));
+  D.area.f.forEach(([a,ps])=>ps.forEach(rings=>{const c=RISK_COL[a[ia("Risk")]]||"#7f8c8d";
+    L.polygon(rings.map(dec5),{renderer:envRd,color:c,weight:2,fillColor:c,fillOpacity:.35}).bindTooltip(`${eesc(a[ia("lslno")])} ${eesc(a[ia("Name")])}`,{sticky:true})
+      .bindPopup(e=>epop(`${a[ia("lslno")]} ${a[ia("Name")]}`,eesc(a[ia("Full")]),erow([[L2("風險潛勢","Risk"),eesc(a[ia("Risk")])],[L2("類型","Type"),eesc(a[ia("Type")])],
+        [L2("保全住戶","Households at risk"),`${eesc(a[ia("Dw_count")])}（${eesc(a[ia("TRes_Class")])}）`],[L2("面積","Area"),`${eesc(a[ia("P_area")])} ha`],
+        [L2("流域","Basin"),eesc(a[ia("Basin")])],[L2("地層","Geology"),eesc(a[ia("Stra_1")])],[L2("地標","Landmark"),eesc(a[ia("Mark")])]])+eEarth(e.latlng.lat,e.latlng.lng,5000),SRC_LSL)).addTo(g);}));
+  return g; }
+// 火山災害潛勢：下拉選單選災害類型，火山口位置一直顯示
+const VOL_COL={"熔岩流":"#c0392b","火山碎屑流":"#8e44ad","火山泥流":"#795548","火山灰(夏季)":"#7f8c8d","火山灰(冬季)":"#34495e","海嘯":"#2e86c1"};
+const volHazOf=l=>l.hazard==="火山灰"?"火山灰(夏季)":l.hazard; // 龜山島的火山灰不分季節，兩個季節都顯示
+async function volLayer(){ const D=await loadEnv("volcano"), sel=$e("volhaz").value, g=L.layerGroup(), c=VOL_COL[sel];
+  D.layers.forEach(l=>{
+    const show=l.hazard==="火山口位置"||volHazOf(l)===sel||(l.hazard==="火山灰"&&sel==="火山灰(冬季)");
+    if(!show) return;
+    const head=()=>epop(`${l.vent}・${L2(l.hazard,l.hazard)}`,`${l.group}${l.group==="龜山島"?"":L2("火山亞群","volcano subgroup")}`,"",SRC_VOL);
+    l.f.forEach(f=>{
+      if(f[0]==="pt") L.circleMarker([f[1],f[2]],{renderer:envRd,radius:7,color:"#fff",weight:2,fillColor:"#b03a2e",fillOpacity:1})
+        .bindTooltip(`${l.vent}${L2("火山口","crater")}`,{direction:"top"}).bindPopup(head).addTo(g);
+      else if(f[0]==="ln") L.polyline(f[2].map(dec5),{renderer:envRd,color:c,weight:2.5,dashArray:"6 4"})
+        .bindTooltip(`${l.vent} ${L2("火山灰等厚線","ash isopach")} ${eesc(f[1])}`,{sticky:true}).bindPopup(head).addTo(g);
+      else L.polygon(f[2].map(dec5),{renderer:envRd,color:c,weight:1.2,fillColor:c,fillOpacity:l.hazard==="海嘯"?({"<0.3公尺":.2,"0.3~3公尺":.4,">3公尺":.65})[f[1]]??.35:.3})
+        .bindTooltip(`${l.vent} ${eesc(L2(l.hazard,l.hazard))}${f[1]?" "+eesc(f[1]):""}`,{sticky:true}).bindPopup(head).addTo(g);
+    });
+  });
+  return g; }
 const ENV_DEF={
   envEqS:{cwa:1,make:()=>eqLayer("E-A0015-001",L2("顯著有感地震","Notable felt earthquake"))},
   envEqL:{cwa:1,make:()=>eqLayer("E-A0016-001",L2("小區域有感地震","Local felt earthquake"))},
   envWst:{cwa:1,make:stationLayer},
   envHsp:{make:hspLayer}, envDeb:{make:debLayer}, envHfl:{make:hflLayer},
+  envFlt:{make:async()=>gsmmaWms("WMS/25K_Geomap_fault_2021")}, envFsa:{make:async()=>gsmmaWms("WMS/Sensitive_area_fault")},
+  envLsl:{make:lslLayer}, envVol:{make:volLayer},
 };
 function envLegend(msg){
   const on=id=>$e(id).checked, parts=[];
@@ -1297,6 +1336,12 @@ function envLegend(msg){
   if(on("envDeb")) parts.push(`<div class="zl"><b>${L2("土石流潛勢溪流","Debris-flow potential streams")}</b>`+Object.entries(DEB_COL).map(([k,c])=>`<span><i style="background:${c}"></i>${L2(k==="持續觀察"?"持續觀察":k+"潛勢",k==="持續觀察"?"Under observation":({"高":"High","中":"Medium","低":"Low"})[k])}</span>`).join("")+`</div>`);
   if(on("envHsp")) parts.push(`<div class="zl"><span><i style="background:#d35400;border-radius:50%"></i>${L2("溫泉露頭","Hot spring outcrop")}</span></div>`);
   if(on("envHfl")) parts.push(`<div class="zl"><span><i style="background:#16a085;border-radius:50%"></i>${L2("西南海域地熱流探測站","SW offshore heat-flow station")}</span></div>`);
+  if(on("envFlt")||on("envFsa")) parts.push(`<div class="zl"><b>${L2("活動斷層","Active faults")}</b><div class="src">${L2("地調中心 WMS 圖層，線型與顏色依原圖；點不出屬性。","GSMMA WMS layer drawn as published; not clickable.")}</div></div>`);
+  if(on("envLsl")) parts.push(`<div class="zl"><b>${L2("大規模崩塌潛勢區","Large-scale landslide potential")}</b>`+Object.entries(RISK_COL).map(([k,c])=>`<span><i style="background:${c}"></i>${L2(k+"潛勢",({"高":"High","中":"Medium","低":"Low"})[k])}</span>`).join("")+
+    `<span><i style="background:transparent;border:1px dashed #8e44ad"></i>${L2("影響範圍","Impact zone")}</span></div>`);
+  if(on("envVol")){ const s=$e("volhaz").value; parts.push(`<div class="zl"><b>${L2("火山災害潛勢","Volcanic hazard potential")}・${$e("volhaz").selectedOptions[0].textContent}</b>`+
+    `<span><i style="background:${VOL_COL[s]}"></i>${L2("影響範圍","Affected area")}${s.startsWith("火山灰")?L2("（虛線為等厚線）"," (dashed: isopachs)"):""}</span><span><i style="background:#b03a2e;border-radius:50%"></i>${L2("火山口位置","Crater")}</span>`+
+    `<div class="src">${L2("磺嘴山火山灰（冬季）官方檔案內容不符且損毀，未收錄；另有兩個損毀的子檔略過。","The official file for Huangzuishan winter ash fall is mislabelled and corrupt, so it is not shown; two other corrupt sub-files were skipped.")}</div></div>`); }
   if(msg) parts.push(`<div class="src">${msg}</div>`);
   $e("envlegend").innerHTML=parts.join(""); $e("envlegend").hidden=!parts.length;
 }
@@ -1316,6 +1361,11 @@ async function envToggle(id){
   }finally{ box.disabled=false; cwaUI(); }
 }
 Object.keys(ENV_DEF).forEach(id=>$e(id).onchange=()=>envToggle(id));
+// 火山：顯示災害類型選單；換類型時重畫
+const volSync=()=>{ $e("volhaz").hidden=!$e("envVol").checked; };
+$e("envVol").addEventListener("change",volSync);
+$e("volhaz").onchange=()=>{ if(ENV.layers.envVol) map.removeLayer(ENV.layers.envVol); delete ENV.layers.envVol; if($e("envVol").checked) envToggle("envVol"); };
+$e("envVol").addEventListener("change",()=>{ if($e("envVol").checked&&map.getZoom()<10) map.flyTo([25.12,121.62],11,{duration:.6}); });
 $e("cwaform").onsubmit=e=>{e.preventDefault(); const v=$e("cwakey").value.trim(); if(!v) return;
   ENV.cwaKey=v; try{localStorage.setItem("cwaKey",v);}catch(err){} $e("cwakey").value="";
   ["envEqS","envEqL","envWst"].forEach(id=>{ delete ENV.layers[id]; if($e(id).checked) envToggle(id); }); cwaUI(); };
