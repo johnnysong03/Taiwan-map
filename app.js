@@ -687,23 +687,35 @@ function geoKind(key,geom){
 const KIND={kwell:["井位（KMZ）","#c2255c"],gm:["地質圖","#d98c5f"],section:["地質剖面線","#2c3e50"],line:["線型構造","#7b3f9e"],drill:["鑽井","#34495e"],mt:["大地電磁測點","#7f8c8d"],
   fissure:["裂隙調查","#b03a2e"],dating:["定年","#8e5a2b"],iso:["同位素","#8e44ad"],gas:["氣體分析","#16a085"],temp:["地溫計","#e67e22"],water:["水質","#2e86c1"],pt:["資料點","#555"],
   wexp:["地熱探勘井","#c92a2a"],wsvy:["地質調查井","#5f3dc4"],wwat:["水井","#2b8a3e"],
-  sexp:["探勘許可","#e8590c"],sdev:["開發許可","#a61e4d"],sdemo:["示範獎勵","#1971c2"]};
-// 現有地熱案場（能源署）：探勘許可＝橘色三角形、開發許可＝酒紅色六角形、示範獎勵＝藍色星形；申請中用空心
-const SITE_SHAPE={sexp:"12,2 22,20 2,20",sdev:"12,1.5 21.5,7 21.5,17 12,22.5 2.5,17 2.5,7",sdemo:"12,1.5 14.9,8.6 22.5,9.2 16.7,14.1 18.5,21.6 12,17.6 5.5,21.6 7.3,14.1 1.5,9.2 9.1,8.6"};
-const siteIcon=(k,s,hollow)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="display:block;overflow:visible;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.45))"><polygon points="${SITE_SHAPE[k]}" fill="${hollow?"#fff":KIND[k][1]}" stroke="${hollow?KIND[k][1]:"#fff"}" stroke-width="${hollow?3:2}" stroke-linejoin="round"/></svg>`;
-const SITE_TR={"探勘許可":"Exploration permit","開發許可":"Development permit","示範獎勵":"Demonstration incentive","已通過":"Approved","申請中":"Under review"};
+  sexp:["探勘許可","#e8590c"],sdev:["開發許可","#a61e4d"],sdemo:["示範獎勵","#1971c2"],splant:["電廠","#087f5b"]};
+// 現有地熱案場（能源署）：探勘許可＝橘色三角形、開發許可＝酒紅色六角形、示範獎勵＝藍色星形、電廠＝綠色房形
+// 實心＝已通過／營運中，空心＝申請中／規劃中；外圍虛線圈＝約略位置（沒有座標，用鄉鎮或縣市代表點）
+const SITE_SHAPE={sexp:"12,2 22,20 2,20",sdev:"12,1.5 21.5,7 21.5,17 12,22.5 2.5,17 2.5,7",sdemo:"12,1.5 14.9,8.6 22.5,9.2 16.7,14.1 18.5,21.6 12,17.6 5.5,21.6 7.3,14.1 1.5,9.2 9.1,8.6",
+  splant:"12,2 22,10 22,22 2,22 2,10"};
+const siteIcon=(k,s,hollow,approx)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="display:block;overflow:visible;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.45))">${approx?'<circle cx="12" cy="13" r="15" fill="rgba(255,255,255,.55)" stroke="#222" stroke-width="1.6" stroke-dasharray="3.5 2.5"/>':""}<polygon points="${SITE_SHAPE[k]}" fill="${hollow?"#fff":KIND[k][1]}" stroke="${hollow?KIND[k][1]:"#fff"}" stroke-width="${hollow?3:2}" stroke-linejoin="round"/></svg>`;
+const SITE_TR={"探勘許可":"Exploration permit","開發許可":"Development permit","示範獎勵":"Demonstration incentive","電廠":"Power plant","已通過":"Approved","申請中":"Under review","營運中":"Operating","規劃中":"Planned"};
 const st=s=>EN?(SITE_TR[s]||s):s;
-const SITE_SRC=L2('資料：經濟部能源署「地熱發電單一服務窗口」<a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">國內地熱案場</a>（2026-11-09 下載，網站更新日期 2026/10/27）',
-  'Data: Energy Administration, MOEA, Geothermal Single Service Window, <a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">domestic geothermal sites</a> (downloaded 2026-11-09; site updated 2026-10-27)');
+const isHollow=s=>s==="申請中"||s==="規劃中";
+const SITE_SRC=L2('資料：經濟部能源署「地熱發電單一服務窗口」<a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">國內地熱案場</a>（2026-11-09 下載，網站更新日期 2026/10/27）；部分座標與電廠資訊由使用者提供，電廠資訊已逐條上網查證',
+  'Data: Energy Administration, MOEA, Geothermal Single Service Window, <a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">domestic geothermal sites</a> (downloaded 2026-11-09; site updated 2026-10-27); some coordinates and plant details supplied by the user, plant details checked against published sources');
+// 電廠資訊每一條：文字＋來源（使用者提供或報導連結）；「未能確認」加底色提醒
+const srcLinks=ks=>ks.map(k=>{const s=window.EA_SRC?.[k]; if(!s) return ""; return k==="user"?L2("使用者提供","user-supplied"):`<a href="${hesc(s[2])}" target="_blank" rel="noopener">${hesc(L2(s[0],s[1]))}</a>`;}).filter(Boolean).join(L2("、",", "));
+const factHTML=items=>(items||[]).map(([zh,en,ks])=>{const t=hesc(L2(zh,en)).replace(/(未能確認|unconfirmed)/,'<mark class="unc">$1</mark>');
+  return `<div class="fact">${t}<span class="fsrc">${L2("來源：","Source: ")}${srcLinks(ks)}</span></div>`;}).join("");
 function siteBody(p){
-  const where=p.precision==="town"?L2(`${p.county}${p.town}`,p.placeEn):L2(p.county,p.placeEn);
-  const rows=[[L2("公司名稱","Company"),hesc(p.company)],p.project?[L2("案名","Project"),hesc(p.project)]:null,
-    [L2("地點（能源署原文）","Location (as listed)"),hesc(p.loc)+(p.part?L2(`（第 ${p.part.split("/")[0]} 處，共 ${p.part.split("/")[1]} 處）`,` (site ${p.part})`):"")],
+  const place=(p.town?L2(`${p.county}${p.town}`,p.placeEn):L2(p.county,p.placeEn))+(p.sect?L2(`・${p.sect}`,` (${p.sect})`):"");
+  const nm=p.info?.name?L2(p.info.name[0],p.info.name[1])+(p.project&&p.project!==p.info.name[0]?L2(`（能源署案名：${p.project}）`,` (listed as ${p.project})`):""):p.project;
+  const coord=p.approx?L2(`約略位置：沒有座標，放在${p.precision==="town"?"鄉鎮":"縣市"}代表點${p.spread?"附近（同區多筆時稍微錯開）":""}，不是案場實際位置`,
+      `Approximate location: no coordinates, placed at the ${p.precision==="town"?"township":"county"} representative point${p.spread?" (offset where several sites share an area)":""}; not the actual site`)
+    :L2(`使用者提供（${p.coordSrc}），已用國土測繪中心反查確認在上列行政區`,`User-supplied (${/Google/.test(p.coordSrc)?"Google Maps link":"lat/long"}), checked with NLSC reverse lookup`);
+  const rows=[[L2("公司名稱","Company"),hesc(p.company)],nm?[L2("案名","Project"),hesc(nm)]:null,
     [L2("類別","Category"),st(p.cat)],[L2("狀態","Status"),st(p.status)],
+    [L2("地點（能源署原文）","Location (as listed)"),p.loc?hesc(p.loc)+(p.part?L2(`（第 ${p.part.split("/")[0]} 處，共 ${p.part.split("/")[1]} 處）`,` (site ${p.part})`):""):L2("能源署頁面未列（使用者提供）","Not on the Energy Administration list (user-supplied)")],
+    [L2("行政區","Area"),hesc(place)],[L2("座標","Coordinates"),coord],
+    p.info?.cap?[L2("裝置容量","Capacity"),factHTML(p.info.cap)]:null,p.info?.unit?[L2("發電機組","Generating unit"),factHTML(p.info.unit)]:null,
+    p.info?.cod?[L2("商轉／啟用","Operation start"),factHTML(p.info.cod)]:null,p.info?.note?[L2("其他","Notes"),factHTML(p.info.note)]:null,
     p.history?.length?[L2("較早階段（歷程）","Earlier stages (history)"),p.history.map(([c,s,l])=>EN?`${st(c)} (${st(s)}): ${hesc(l)}`:`${c}（${s}）：${hesc(l)}`).join("<br>")]:null].filter(Boolean);
-  return `<table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`+
-    `<div class="m" style="margin-top:6px">${L2(`約略位置：能源署頁面沒有座標，這個點放在${where}的代表點${p.spread?"附近（同區多筆時稍微錯開）":""}，不是案場實際位置。`,
-      `Approximate location: the source has no coordinates, so this point sits at a representative point of ${where}${p.spread?" (offset slightly where several sites share an area)":""}. It is not the actual site.`)}</div>`;
+  return `<table class="sitetab">${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`;
 }
 // 井的符號：探勘井＝紅色菱形、地質調查井＝紫色方形、水井＝綠色圓形（s 為邊長 px）
 const WICON={wexp:s=>`<div style="width:${s}px;height:${s}px;background:#c92a2a;border:2px solid #fff;transform:rotate(45deg) scale(.85);box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`,
@@ -722,7 +734,7 @@ const GEO_CAT=(window.GEOTEX_CATALOG||[]).map(([key,s,n,geom,kb])=>{
 // 井：從各地區清單抽出，依用途分成四類，每類一次列出全臺的井。結元公司的 KMZ 依點的顏色拆成探勘井、地質調查井、水井。
 const JY=window.GEOTEX_D?.kmz_jieyuan?.features||[];
 const WSUB={exp:["wexp","地熱探勘井","exploration wells"],svy:["wsvy","地質調查井","geological survey wells"],wat:["wwat","水井","water wells"],spr:["water"],
-  sexp:["sexp"],sdev:["sdev"],sdemo:["sdemo"]};
+  sexp:["sexp"],sdev:["sdev"],sdemo:["sdemo"],splant:["splant"]};
 const WELL_GROUPS=[
   {id:"geo",zh:"地熱井",en:"Geothermal wells",items:[["geo_geothermaldrill","exp"],["kmz_sihuangziping","exp"],["kmz_matsao","exp"],["kmz_jieyuan","exp","#1c7ed6"],
     ["kmz_jieyuan","svy","#c2255c"],["geo_hualien_drill","svy"],["geo_taitung_drill","svy"],["geo_ttwulu_drill","svy"],["geo_tcguguan_drill","svy"]]},
@@ -731,9 +743,9 @@ const WELL_GROUPS=[
   {id:"eng",zh:"工程井",en:"Engineering boreholes",items:[["env","envBor"]]},
   // 現有地熱案場：放在「現有地熱案場」區塊（box），三類各一個勾選
   {id:"site",box:"sitechecks",zh:"現有地熱案場",en:"Existing geothermal projects",
-    note:["能源署頁面沒有座標，點位是鄉鎮（只寫縣市的用縣市）代表點，屬約略位置。同一公司列在好幾類時，只放在最新階段（示範獎勵 → 探勘許可 → 開發許可），較早階段寫在彈窗歷程。",
-      "The source lists no coordinates; points sit at township (or county) representative points and are approximate locations. A company listed in several categories appears only at its latest stage (demonstration incentive → exploration permit → development permit); earlier stages are listed in the popup."],
-    items:[["ea_explore","sexp"],["ea_develop","sdev"],["ea_demo","sdemo"]]},
+    note:["同公司＋同鄉鎮視為同一案場，只放在最新階段（示範獎勵 → 探勘許可 → 開發許可 → 電廠），較早階段寫在彈窗歷程。有虛線圈的點是約略位置。",
+      "A company's sites in the same township count as one site and appear only at the latest stage (demonstration incentive → exploration → development → power plant); earlier stages are listed in the popup. Dashed rings mark approximate locations."],
+    items:[["ea_demo","sdemo"],["ea_explore","sexp"],["ea_develop","sdev"],["ea_plant","splant"]]},
 ];
 const WELL_ITEMS=[];
 WELL_GROUPS.forEach(g=>{g.items=g.items.map(([key,sub,pick])=>{
@@ -758,7 +770,7 @@ function makeGeoLayer(c,fc){
   if(k==="line"||k==="section") return L.geoJSON(fc,{pane:"geo",style:k==="line"?{color:"#7b3f9e",weight:1.5,opacity:.85}:{color:"#2c3e50",weight:2.5,dashArray:"8 4"},onEachFeature:bind});
   return L.geoJSON(fc,{
     pointToLayer:(f,ll)=>{const p=f.properties;
-      if(SITE_SHAPE[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[18,18],html:siteIcon(k,18,p.status==="申請中")})})
+      if(SITE_SHAPE[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[18,18],html:siteIcon(k,18,isHollow(p.status),p.approx)})})
         .bindTooltip(hesc(p.company)+(p.project?`（${hesc(p.project)}）`:""),{direction:"top",offset:[0,-9]});
       if(WICON[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:WICON[k](k==="wexp"?14:12)})}).bindTooltip(hesc(title(f)),{direction:"top",offset:[0,-8]});
       if(k==="kwell") return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:`<div style="width:14px;height:14px;background:${p.color||KIND.kwell[1]};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`})}).bindTooltip(hesc(p.name),{direction:"top",offset:[0,-8]});
@@ -797,8 +809,8 @@ function siteLegend(){
   if(!on.length){lg.hidden=true;lg.innerHTML="";return;}
   const k0=on[0].kind;
   lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${siteIcon(c.kind,12)}${L2(KIND[c.kind][0],st(KIND[c.kind][0]))}</span>`).join("")}</div>`+
-    `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過","Approved")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中","Under review")}</span></div>`+
-    `<div class="src">${L2("全部點位都是約略位置：能源署頁面沒有座標，以鄉鎮或縣市代表點定位（taiwan-atlas 界線算代表點，經國土測繪中心反查確認在該行政區內）。空心只代表申請中，不代表定位精度。","All points are approximate locations: the source has no coordinates, so each sits at a township or county representative point (computed from taiwan-atlas boundaries and checked with NLSC reverse lookup). Hollow marks under review only, not location accuracy.")} ${SITE_SRC}</div>`;
+    `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過／營運中","Approved / operating")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中／規劃中","Under review / planned")}</span><span class="wl">${siteIcon(k0,12,false,true)}${L2("約略位置","Approximate location")}</span></div>`+
+    `<div class="src">${L2("沒有虛線圈的點用使用者提供的座標（經緯度或 Google 地圖連結），都經國土測繪中心反查確認在能源署寫的鄉鎮內；有虛線圈的是約略位置，用鄉鎮或縣市代表點定位。空心代表申請中或規劃中，跟定位精度無關。","Points without a dashed ring use user-supplied coordinates (lat/long or Google Maps links), each checked with NLSC reverse lookup; dashed rings mark approximate locations at township or county representative points. Hollow means under review or planned, not location accuracy.")} ${SITE_SRC}</div>`;
   lg.hidden=false;
 }
 const syncWells=()=>WELL_GROUPS.forEach(g=>g.sync?.());
@@ -885,9 +897,9 @@ function exportKML(){
     const pms=fc.features.map(f=>{const p=f.properties||{};
       const nm=isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
       const desc=isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
-      return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&p.status==="申請中"?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
+      return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&isHollow(p.status)?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
     return `<Folder><name>${xesc(isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
-  const srcs=[on.some(c=>!SITE_SHAPE[c.kind])?GEO_SRC:"",on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；點位為鄉鎮或縣市代表點，屬約略位置","; points are approximate township or county representative points"):""].filter(Boolean).join("\n");
+  const srcs=[on.some(c=>!SITE_SHAPE[c.kind])?GEO_SRC:"",on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；有虛線圈（approx）的點為鄉鎮或縣市代表點，屬約略位置","; approximate points sit at township or county representative points"):""].filter(Boolean).join("\n");
   const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>臺灣地熱地圖匯出</name><description>${xesc(srcs)}</description>\n${folders}\n</Document></kml>`;
   const url=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"}));
   const a=document.createElement("a"); a.href=url; a.download=`臺灣地熱地圖_${on.length}個圖層.kml`; document.body.appendChild(a); a.click(); a.remove();

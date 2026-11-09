@@ -462,3 +462,10 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 @media (max-width:760px){ :is(#wellchecks,#sitechecks) label{padding:7px 0} }
 .hsopt{margin-top:4px;padding-top:6px;border-top:1px dotted var(--rule)}
 .hsopt.off{opacity:.45;cursor:default}
+/* 地熱地圖：現有地熱案場彈窗（欄位統一、值靠左、來源小字） */
+.geopop table.sitetab td{vertical-align:top}
+.geopop table.sitetab td:first-child{white-space:nowrap;color:var(--muted);padding-right:8px}
+.geopop table.sitetab td+td{text-align:left;font-family:var(--body);font-size:12.5px;padding-left:0}
+.geopop .fact{margin:0 0 3px}
+.geopop .fact .fsrc{display:block;font-size:11px;color:var(--muted)}
+.geopop mark.unc{background:#fff3bf;color:inherit;padding:0 2px}
