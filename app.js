@@ -700,7 +700,7 @@ function siteBody(p){
   const rows=[[L2("公司名稱","Company"),hesc(p.company)],p.project?[L2("案名","Project"),hesc(p.project)]:null,
     [L2("地點（能源署原文）","Location (as listed)"),hesc(p.loc)+(p.part?L2(`（第 ${p.part.split("/")[0]} 處，共 ${p.part.split("/")[1]} 處）`,` (site ${p.part})`):"")],
     [L2("類別","Category"),st(p.cat)],[L2("狀態","Status"),st(p.status)],
-    p.also?.length?[L2("同公司也列在","Same company also in"),p.also.map(([c,s])=>EN?`${st(c)} (${st(s)})`:`${c}（${s}）`).join(L2("、","; "))]:null].filter(Boolean);
+    p.history?.length?[L2("較早階段（歷程）","Earlier stages (history)"),p.history.map(([c,s,l])=>EN?`${st(c)} (${st(s)}): ${hesc(l)}`:`${c}（${s}）：${hesc(l)}`).join("<br>")]:null].filter(Boolean);
   return `<table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`+
     `<div class="m" style="margin-top:6px">${L2(`約略位置：能源署頁面沒有座標，這個點放在${where}的代表點${p.spread?"附近（同區多筆時稍微錯開）":""}，不是案場實際位置。`,
       `Approximate location: the source has no coordinates, so this point sits at a representative point of ${where}${p.spread?" (offset slightly where several sites share an area)":""}. It is not the actual site.`)}</div>`;
@@ -731,8 +731,8 @@ const WELL_GROUPS=[
   {id:"eng",zh:"工程井",en:"Engineering boreholes",items:[["env","envBor"]]},
   // 現有地熱案場：放在「現有地熱案場」區塊（box），三類各一個勾選
   {id:"site",box:"sitechecks",zh:"現有地熱案場",en:"Existing geothermal projects",
-    note:["能源署頁面沒有座標，點位是鄉鎮（只寫縣市的用縣市）代表點，屬約略位置。同一公司可能同時列在好幾類，各類各畫一點。",
-      "The source lists no coordinates; points sit at township (or county) representative points and are approximate. A company listed in several categories gets one point per category."],
+    note:["能源署頁面沒有座標，點位是鄉鎮（只寫縣市的用縣市）代表點，屬約略位置。同一公司列在好幾類時，只放在最新階段（示範獎勵 → 探勘許可 → 開發許可），較早階段寫在彈窗歷程。",
+      "The source lists no coordinates; points sit at township (or county) representative points and are approximate locations. A company listed in several categories appears only at its latest stage (demonstration incentive → exploration permit → development permit); earlier stages are listed in the popup."],
     items:[["ea_explore","sexp"],["ea_develop","sdev"],["ea_demo","sdemo"]]},
 ];
 const WELL_ITEMS=[];
@@ -798,7 +798,7 @@ function siteLegend(){
   const k0=on[0].kind;
   lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${siteIcon(c.kind,12)}${L2(KIND[c.kind][0],st(KIND[c.kind][0]))}</span>`).join("")}</div>`+
     `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過","Approved")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中","Under review")}</span></div>`+
-    `<div class="src">${L2("點位為鄉鎮或縣市代表點，屬約略位置。","Points are township or county representative points (approximate).")} ${SITE_SRC}</div>`;
+    `<div class="src">${L2("全部點位都是約略位置：能源署頁面沒有座標，以鄉鎮或縣市代表點定位（taiwan-atlas 界線算代表點，經國土測繪中心反查確認在該行政區內）。空心只代表申請中，不代表定位精度。","All points are approximate locations: the source has no coordinates, so each sits at a township or county representative point (computed from taiwan-atlas boundaries and checked with NLSC reverse lookup). Hollow marks under review only, not location accuracy.")} ${SITE_SRC}</div>`;
   lg.hidden=false;
 }
 const syncWells=()=>WELL_GROUPS.forEach(g=>g.sync?.());
