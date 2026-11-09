@@ -302,7 +302,9 @@ map.on("mousemove",e=>{
   document.getElementById("ct").textContent=fmtTM2(e.latlng.lat,e.latlng.lng);
 });
 
-Object.assign(L.Popup.prototype.options,{maxHeight:300,minWidth:270,maxWidth:360,autoPanPaddingTopLeft:L.point(30,30),autoPanPaddingBottomRight:L.point(innerWidth>760?280:20,40)});
+// 手機（760px 以下）彈窗寬度不超過螢幕寬減 90px，否則 iPhone 13（390px）上會被切掉右半邊
+const POPW=innerWidth>760?360:Math.max(200,Math.min(360,innerWidth-90));
+Object.assign(L.Popup.prototype.options,{maxHeight:300,minWidth:Math.min(270,POPW),maxWidth:POPW,autoPanPaddingTopLeft:L.point(30,30),autoPanPaddingBottomRight:L.point(innerWidth>760?280:20,40)});
 // ---------- 匯入點位：Excel／CSV ----------
 // TWD97 TM2（121°）轉 WGS84 經緯度
 function fromTM2(x,y){
@@ -684,7 +686,25 @@ function geoKind(key,geom){
 }
 const KIND={kwell:["井位（KMZ）","#c2255c"],gm:["地質圖","#d98c5f"],section:["地質剖面線","#2c3e50"],line:["線型構造","#7b3f9e"],drill:["鑽井","#34495e"],mt:["大地電磁測點","#7f8c8d"],
   fissure:["裂隙調查","#b03a2e"],dating:["定年","#8e5a2b"],iso:["同位素","#8e44ad"],gas:["氣體分析","#16a085"],temp:["地溫計","#e67e22"],water:["水質","#2e86c1"],pt:["資料點","#555"],
-  wexp:["地熱探勘井","#c92a2a"],wsvy:["地質調查井","#5f3dc4"],wwat:["水井","#2b8a3e"]};
+  wexp:["地熱探勘井","#c92a2a"],wsvy:["地質調查井","#5f3dc4"],wwat:["水井","#2b8a3e"],
+  sexp:["探勘許可","#e8590c"],sdev:["開發許可","#a61e4d"],sdemo:["示範獎勵","#1971c2"]};
+// 現有地熱案場（能源署）：探勘許可＝橘色三角形、開發許可＝酒紅色六角形、示範獎勵＝藍色星形；申請中用空心
+const SITE_SHAPE={sexp:"12,2 22,20 2,20",sdev:"12,1.5 21.5,7 21.5,17 12,22.5 2.5,17 2.5,7",sdemo:"12,1.5 14.9,8.6 22.5,9.2 16.7,14.1 18.5,21.6 12,17.6 5.5,21.6 7.3,14.1 1.5,9.2 9.1,8.6"};
+const siteIcon=(k,s,hollow)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="display:block;overflow:visible;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.45))"><polygon points="${SITE_SHAPE[k]}" fill="${hollow?"#fff":KIND[k][1]}" stroke="${hollow?KIND[k][1]:"#fff"}" stroke-width="${hollow?3:2}" stroke-linejoin="round"/></svg>`;
+const SITE_TR={"探勘許可":"Exploration permit","開發許可":"Development permit","示範獎勵":"Demonstration incentive","已通過":"Approved","申請中":"Under review"};
+const st=s=>EN?(SITE_TR[s]||s):s;
+const SITE_SRC=L2('資料：經濟部能源署「地熱發電單一服務窗口」<a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">國內地熱案場</a>（2026-11-09 下載，網站更新日期 2026/10/27）',
+  'Data: Energy Administration, MOEA, Geothermal Single Service Window, <a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">domestic geothermal sites</a> (downloaded 2026-11-09; site updated 2026-10-27)');
+function siteBody(p){
+  const where=p.precision==="town"?L2(`${p.county}${p.town}`,p.placeEn):L2(p.county,p.placeEn);
+  const rows=[[L2("公司名稱","Company"),hesc(p.company)],p.project?[L2("案名","Project"),hesc(p.project)]:null,
+    [L2("地點（能源署原文）","Location (as listed)"),hesc(p.loc)+(p.part?L2(`（第 ${p.part.split("/")[0]} 處，共 ${p.part.split("/")[1]} 處）`,` (site ${p.part})`):"")],
+    [L2("類別","Category"),st(p.cat)],[L2("狀態","Status"),st(p.status)],
+    p.also?.length?[L2("同公司也列在","Same company also in"),p.also.map(([c,s])=>EN?`${st(c)} (${st(s)})`:`${c}（${s}）`).join(L2("、","; "))]:null].filter(Boolean);
+  return `<table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`+
+    `<div class="m" style="margin-top:6px">${L2(`約略位置：能源署頁面沒有座標，這個點放在${where}的代表點${p.spread?"附近（同區多筆時稍微錯開）":""}，不是案場實際位置。`,
+      `Approximate location: the source has no coordinates, so this point sits at a representative point of ${where}${p.spread?" (offset slightly where several sites share an area)":""}. It is not the actual site.`)}</div>`;
+}
 // 井的符號：探勘井＝紅色菱形、地質調查井＝紫色方形、水井＝綠色圓形（s 為邊長 px）
 const WICON={wexp:s=>`<div style="width:${s}px;height:${s}px;background:#c92a2a;border:2px solid #fff;transform:rotate(45deg) scale(.85);box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`,
   wsvy:s=>`<div style="width:${s}px;height:${s}px;background:#5f3dc4;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`,
@@ -701,13 +721,19 @@ const GEO_CAT=(window.GEOTEX_CATALOG||[]).map(([key,s,n,geom,kb])=>{
 });
 // 井：從各地區清單抽出，依用途分成四類，每類一次列出全臺的井。結元公司的 KMZ 依點的顏色拆成探勘井、地質調查井、水井。
 const JY=window.GEOTEX_D?.kmz_jieyuan?.features||[];
-const WSUB={exp:["wexp","地熱探勘井","exploration wells"],svy:["wsvy","地質調查井","geological survey wells"],wat:["wwat","水井","water wells"],spr:["water"]};
+const WSUB={exp:["wexp","地熱探勘井","exploration wells"],svy:["wsvy","地質調查井","geological survey wells"],wat:["wwat","水井","water wells"],spr:["water"],
+  sexp:["sexp"],sdev:["sdev"],sdemo:["sdemo"]};
 const WELL_GROUPS=[
   {id:"geo",zh:"地熱井",en:"Geothermal wells",items:[["geo_geothermaldrill","exp"],["kmz_sihuangziping","exp"],["kmz_matsao","exp"],["kmz_jieyuan","exp","#1c7ed6"],
     ["kmz_jieyuan","svy","#c2255c"],["geo_hualien_drill","svy"],["geo_taitung_drill","svy"],["geo_ttwulu_drill","svy"],["geo_tcguguan_drill","svy"]]},
   {id:"water",zh:"水井",en:"Water wells",items:[["kmz_jieyuan","wat","#2b8a3e"],["env","envWel"]]},
   {id:"spring",zh:"溫泉井",en:"Hot spring wells",note:["這組原名「井體水化學」，是井內水樣的化學分析；歸為溫泉井是暫定，分類未能確認。","Originally named well-water chemistry; filing it as hot spring wells is provisional and unconfirmed."],items:[["chemistry_cmwell","spr"]]},
   {id:"eng",zh:"工程井",en:"Engineering boreholes",items:[["env","envBor"]]},
+  // 現有地熱案場：放在「現有地熱案場」區塊（box），三類各一個勾選
+  {id:"site",box:"sitechecks",zh:"現有地熱案場",en:"Existing geothermal projects",
+    note:["能源署頁面沒有座標，點位是鄉鎮（只寫縣市的用縣市）代表點，屬約略位置。同一公司可能同時列在好幾類，各類各畫一點。",
+      "The source lists no coordinates; points sit at township (or county) representative points and are approximate. A company listed in several categories gets one point per category."],
+    items:[["ea_explore","sexp"],["ea_develop","sdev"],["ea_demo","sdemo"]]},
 ];
 const WELL_ITEMS=[];
 WELL_GROUPS.forEach(g=>{g.items=g.items.map(([key,sub,pick])=>{
@@ -723,6 +749,7 @@ function makeGeoLayer(c,fc){
   const k=c.kind, title=f=>{const p=f.properties;return p.Site||p.sitename||p.name||p.Survey_Place||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;};
   const meta=c.well?c.name:`${T(c.region)}・${c.name}`, isK=/^kmz_/.test(c.src||c.key);
   const bind=(f,l)=>l.bindPopup(()=>{const ll=l.getLatLng?l.getLatLng():l.getBounds().getCenter();
+    if(SITE_SHAPE[k]) return pop(hesc(f.properties.company),L2(`現有地熱案場・${f.properties.cat}・${f.properties.status}`,`Existing project · ${st(f.properties.cat)} · ${st(f.properties.status)}`),siteBody(f.properties),SITE_SRC);
     if(isK) return pop(hesc(title(f)),meta,kwellBody(f.properties)+
       `<div style="margin-top:6px"><a href="${earthUrl(ll.lat,ll.lng,1500)}" target="_blank" rel="noopener">${L2("在 Google Earth 開啟這裡","Open here in Google Earth")}</a></div>`,KMZ_SRC);
     return pop(k==="gm"?(f.properties.rockname||c.name):title(f),meta,propTable(f.properties,c.key)+
@@ -731,6 +758,8 @@ function makeGeoLayer(c,fc){
   if(k==="line"||k==="section") return L.geoJSON(fc,{pane:"geo",style:k==="line"?{color:"#7b3f9e",weight:1.5,opacity:.85}:{color:"#2c3e50",weight:2.5,dashArray:"8 4"},onEachFeature:bind});
   return L.geoJSON(fc,{
     pointToLayer:(f,ll)=>{const p=f.properties;
+      if(SITE_SHAPE[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[18,18],html:siteIcon(k,18,p.status==="申請中")})})
+        .bindTooltip(hesc(p.company)+(p.project?`（${hesc(p.project)}）`:""),{direction:"top",offset:[0,-9]});
       if(WICON[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:WICON[k](k==="wexp"?14:12)})}).bindTooltip(hesc(title(f)),{direction:"top",offset:[0,-8]});
       if(k==="kwell") return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:`<div style="width:14px;height:14px;background:${p.color||KIND.kwell[1]};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`})}).bindTooltip(hesc(p.name),{direction:"top",offset:[0,-8]});
       if(k==="drill") return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[13,13],html:'<div style="width:13px;height:13px;background:#34495e;border:2px solid #fff;transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>'})});
@@ -759,7 +788,18 @@ function wellLegend(){
   if(sym.length) parts.push(`<div class="row">${sym.map(k=>`<span class="wl">${WICON[k](9)}${L2(KIND[k][0],WSUB[{wexp:"exp",wsvy:"svy",wwat:"wat"}[k]][2].replace(/^./,ch=>ch.toUpperCase()))}</span>`).join("")}</div>`);
   if(kinds.has("water")) parts.push(`<div class="row">${L2("溫泉井水質 pH：","Hot spring well pH: ")}${[["<3","#c0392b"],["3–5","#e67e22"],["5–7","#d4ac0d"],["≥7","#2e86c1"]].map(([t,c])=>`<span><span class="k" style="background:${c};border-radius:50%"></span>${t}</span>`).join("")}</div>`);
   const env=window._wellEnvLegend?.()||""; if(env) parts.push(env);
-  lg.innerHTML=parts.join(""); lg.hidden=!parts.length; syncWells();
+  lg.innerHTML=parts.join(""); lg.hidden=!parts.length; syncWells(); siteLegend();
+}
+// 現有地熱案場圖例：開啟的類別符號，加上實心＝已通過、空心＝申請中
+function siteLegend(){
+  const lg=document.getElementById("sitelegend"); if(!lg) return;
+  const on=WELL_ITEMS.filter(c=>geoOn[c.key]&&SITE_SHAPE[c.kind]);
+  if(!on.length){lg.hidden=true;lg.innerHTML="";return;}
+  const k0=on[0].kind;
+  lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${siteIcon(c.kind,12)}${L2(KIND[c.kind][0],st(KIND[c.kind][0]))}</span>`).join("")}</div>`+
+    `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過","Approved")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中","Under review")}</span></div>`+
+    `<div class="src">${L2("點位為鄉鎮或縣市代表點，屬約略位置。","Points are township or county representative points (approximate).")} ${SITE_SRC}</div>`;
+  lg.hidden=false;
 }
 const syncWells=()=>WELL_GROUPS.forEach(g=>g.sync?.());
 window._wellLegend=wellLegend;
@@ -796,8 +836,9 @@ function renderGeoChecks(){
 const ENV_WELL={envWel:[L2("水文地質觀測井（地調中心，即時）","Hydrogeological observation wells (GSMMA, live)"),L2("即時","live"),"#1e88e5"],
   envBor:[L2("工程鑽孔分布（地調中心）","Engineering boreholes (GSMMA)"),L2("約 7.3 萬","~73k"),"#444"]};
 function renderWellChecks(){
-  const box=document.getElementById("wellchecks"); if(!box) return;
+  if(!document.getElementById("wellchecks")) return;
   WELL_GROUPS.forEach(g=>{
+    const box=document.getElementById(g.box||"wellchecks"); if(!box) return;
     const wrap=document.createElement("div"); wrap.className="wgroup";
     const head=document.createElement("label"); head.className="whead";
     head.innerHTML=`<input type="checkbox"> <b>${L2(g.zh,g.en)}</b><span class="count">${L2(`${g.items.length} 組`,`${g.items.length} set${g.items.length>1?"s":""}`)}</span>`;
@@ -806,7 +847,7 @@ function renderWellChecks(){
       const lab=document.createElement("label");
       if(it.env){ const [nm,cnt,col]=ENV_WELL[it.env];
         lab.innerHTML=`<input type="checkbox" id="${it.env}"> <span class="sw" style="background:${col}${it.env==="envBor"?";border-radius:1px":""}"></span>${nm}<span class="count">${cnt}</span>`; }
-      else{ lab.innerHTML=`<input type="checkbox" id="gx_${it.key}"> <span class="wsym">${WICON[it.kind]?WICON[it.kind](8):`<span class="sw" style="background:${KIND.water[1]}"></span>`}</span>${it.name}<span class="count">${it.n}</span>`;
+      else{ lab.innerHTML=`<input type="checkbox" id="gx_${it.key}"> <span class="wsym">${SITE_SHAPE[it.kind]?siteIcon(it.kind,12):WICON[it.kind]?WICON[it.kind](8):`<span class="sw" style="background:${KIND.water[1]}"></span>`}</span>${it.name}<span class="count">${it.n}</span>`;
         const cb=lab.querySelector("input"); cb.onchange=()=>toggleGeo(it,cb.checked,cb); }
       const cb=lab.querySelector("input"); cb.addEventListener("change",()=>g.sync()); subs.push(cb); list.appendChild(lab);
     });
@@ -839,13 +880,15 @@ const kcolor=hex=>{const h=hex.replace("#","");return "ff"+h.slice(4,6)+h.slice(
 function exportKML(){
   const on=GEO_CAT.filter(c=>geoOn[c.key]); if(!on.length) return;
   const folders=on.map(c=>{const fc=c.fc||window.GEOTEX_D[c.src||c.key], col=kcolor(KIND[c.kind][1]);
-    const style=`<Style id="s_${c.key}"><IconStyle><color>${col}</color><scale>0.8</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LineStyle><color>${col}</color><width>2</width></LineStyle><PolyStyle><color>66${col.slice(2)}</color></PolyStyle></Style>`;
+    const isS=!!SITE_SHAPE[c.kind], icon=n=>`<Style id="s_${c.key}${n?"_p":""}"><IconStyle><color>${n?"88"+col.slice(2):col}</color><scale>${isS?1:0.8}</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LineStyle><color>${col}</color><width>2</width></LineStyle><PolyStyle><color>66${col.slice(2)}</color></PolyStyle></Style>`;
+    const style=icon(false)+(isS?icon(true):"");
     const pms=fc.features.map(f=>{const p=f.properties||{};
-      const nm=p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
-      const desc=/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
-      return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
-    return `<Folder><name>${xesc(c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
-  const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>臺灣地熱地圖匯出</name><description>${xesc(GEO_SRC)}</description>\n${folders}\n</Document></kml>`;
+      const nm=isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
+      const desc=isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
+      return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&p.status==="申請中"?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
+    return `<Folder><name>${xesc(isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
+  const srcs=[on.some(c=>!SITE_SHAPE[c.kind])?GEO_SRC:"",on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；點位為鄉鎮或縣市代表點，屬約略位置","; points are approximate township or county representative points"):""].filter(Boolean).join("\n");
+  const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>臺灣地熱地圖匯出</name><description>${xesc(srcs)}</description>\n${folders}\n</Document></kml>`;
   const url=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"}));
   const a=document.createElement("a"); a.href=url; a.download=`臺灣地熱地圖_${on.length}個圖層.kml`; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),5000);
