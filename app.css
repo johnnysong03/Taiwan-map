@@ -460,3 +460,5 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 #welllegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px}
 #welllegend .zl i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
 @media (max-width:760px){ #wellchecks label{padding:7px 0} }
+.hsopt{margin-top:4px;padding-top:6px;border-top:1px dotted var(--rule)}
+.hsopt.off{opacity:.45;cursor:default}

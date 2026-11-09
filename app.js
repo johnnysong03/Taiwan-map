@@ -263,6 +263,27 @@ Object.keys(BASES).concat([VEC_KEY]).forEach((k,i)=>{
   };
   basesEl.appendChild(lab);
 });
+// 向量底圖的地形陰影：用 AWS Terrain Tiles 高程畫山體明暗，墊在水域與道路底下
+let vecHS=false; try{vecHS=localStorage.getItem("vecHS")==="1";}catch(e){}
+const hsLab=document.createElement("label"); hsLab.className="hsopt";
+hsLab.innerHTML=`<input type="checkbox" id="vechs" ${vecHS?"checked":""}> ${L2("加上地形陰影（向量底圖）","Add hillshade (vector map)")}`;
+basesEl.appendChild(hsLab);
+const hsBox=hsLab.querySelector("input");
+function vecHillshade(){
+  const g=vec?.getMaplibreMap?.(); if(!g) return;
+  if(!g.style?._loaded){ g.once("styledata",vecHillshade); return; } // 樣式檔讀完就能加圖層，不必等所有圖磚
+  const has=!!g.getLayer("hs");
+  if(vecHS&&!has){
+    if(!g.getSource("dem")) g.addSource("dem",{type:"raster-dem",encoding:"terrarium",tileSize:256,maxzoom:12,
+      tiles:["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+      attribution:L2('地形陰影高程：<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>','Hillshade elevation: <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>')});
+    g.addLayer({id:"hs",type:"hillshade",source:"dem",paint:{"hillshade-exaggeration":.38,"hillshade-illumination-direction":315,
+      "hillshade-shadow-color":"#1e2a38","hillshade-highlight-color":"#ffffff","hillshade-accent-color":"#3b4a5c"}},g.getLayer("water")?"water":undefined);
+  } else if(!vecHS&&has) g.removeLayer("hs");
+}
+const syncHsBox=()=>{ const on=!!(vec&&map.hasLayer(vec)); hsBox.disabled=!on; hsLab.title=on?"":L2("先選「向量底圖」才能使用","Choose the vector base map first"); hsLab.classList.toggle("off",!on); };
+hsBox.onchange=()=>{ vecHS=hsBox.checked; try{localStorage.setItem("vecHS",vecHS?"1":"0");}catch(e){} vecHillshade(); };
+basesEl.addEventListener("change",e=>{ if(e.target.name==="base") setTimeout(syncHsBox,0); });
 Object.keys(OVERS).forEach((k,i)=>{
   const id="o"+i, lab=document.createElement("label"), lyr=OVERS[k];
   lyr.setOpacity(0.85);
@@ -1044,8 +1065,9 @@ function setVector(on){
       vec=L.maplibreGL({style:NAVY_STYLE,pane:"vec",localIdeographFontFamily:"'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif",
         attribution:'© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'});
     }
-    map.removeLayer(base); if(!map.hasLayer(vec)) vec.addTo(map);
+    map.removeLayer(base); if(!map.hasLayer(vec)) vec.addTo(map); setTimeout(()=>{vecHillshade();syncHsBox();},0);
   } else if(vec&&map.hasLayer(vec)) map.removeLayer(vec);
+  setTimeout(syncHsBox,0);
   return true;
 }
 let curTone=null;
@@ -1064,7 +1086,7 @@ TONES.forEach(t=>{const b=document.createElement("button");b.type="button";b.cla
   b.title=T(t.name);b.setAttribute("aria-label",T(t.name));b.style.setProperty("--a",t.a);b.style.setProperty("--b",t.b);
   b.onclick=()=>setTone(t.k);document.getElementById("tones").appendChild(b);});
 let savedTone=""; try{savedTone=localStorage.getItem("tone")||""}catch(e){}
-setTone(TONES.some(t=>t.k===savedTone)?savedTone:"natural"); // 舊的色調（泛黃古地圖等）已移除，改回原色
+setTone(TONES.some(t=>t.k===savedTone)?savedTone:"natural"); syncHsBox(); // 舊的色調（泛黃古地圖等）已移除，改回原色
 
 // ---------- 土地使用分區（兩張地圖共用：判斷、卡片、定義） ----------
 // 分區定義（卡片下方的註解）。中文照法條原文，英文為本站翻譯。
