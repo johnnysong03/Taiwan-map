@@ -535,7 +535,7 @@ const GLAB={PH:"pH",pH:"pH",EC:"導電度",electrical:"導電度",TDS:"總溶解
   Age:"年代（百萬年）",Method:"方法",Source:"文獻",source:"來源",SampleNo:"樣本編號",Site:"地點",sitename:"地點",SiteNo:"站號",siteid:"站號",No:"編號",Type:"類型",cType:"類型",
   SamplingDate:"採樣日期",samplingDate:"採樣日期",year:"採樣年",altitude:"海拔（m）",
   Dip:"傾角（°）",Strike:"走向（°）",Dilation_T:"擴張傾向",L:"剖面下限（m）",U:"剖面上限（m）",sectionName:"剖面名稱",
-  name:"名稱",elevation:"井口高程（m）",total_depth:"鑽探深度（m）",vertical_depth:"垂直深度（m）",start_date:"開鑽日期",end_date:"完鑽日期",note:"備註",
+  name:"名稱",elevation:"井口高程（m）",total_depth:"鑽探深度（m）",vertical_depth:"垂直深度（m）",bottom_dx:"井底水平位移（m）",bottom_dir:"井底方位",start_date:"開鑽日期",end_date:"完鑽日期",note:"備註",
   Hole_No:"孔號",Proj_No:"計畫編號",Proj_Name:"計畫名稱",Well_Depth:"井深（m）",STATION_ADDR:"地址",CUR_ELEVATION:"高程（m）",Date_drill_begin:"開鑽日期",Date_drill_end:"完鑽日期",
   Z:"高程（m）",theDate:"量測日期",Operator:"操作人員",Auditor:"審核人員",dievceNo:"儀器",Loaction:"地區",
   Lithology:"岩性",SLine_ID:"測線編號",SLine_Length:"測線長度（m）",SLine_Strike:"測線走向",SLine_Dip:"測線傾角",SPlane_Attitude:"裂面位態",SPlane_Desc:"裂面描述",SPlane_Dir:"量測方向",Remark:"備註",
@@ -557,7 +557,7 @@ const GLAB_EN={PH:"pH",pH:"pH",EC:"Conductivity",electrical:"Conductivity",TDS:"
   Age:"Age (Ma)",Method:"Method",Source:"Reference",source:"Source",SampleNo:"Sample no.",Site:"Site",sitename:"Site",SiteNo:"Site no.",siteid:"Site no.",No:"No.",Type:"Type",cType:"Type",
   SamplingDate:"Sampling date",samplingDate:"Sampling date",year:"Sampling year",altitude:"Altitude (m)",
   Dip:"Dip (°)",Strike:"Strike (°)",Dilation_T:"Dilation tendency",L:"Section bottom (m)",U:"Section top (m)",sectionName:"Section name",
-  name:"Name",elevation:"Wellhead elevation (m)",total_depth:"Drilled depth (m)",vertical_depth:"Vertical depth (m)",start_date:"Spud date",end_date:"Completion date",note:"Note",
+  name:"Name",elevation:"Wellhead elevation (m)",total_depth:"Drilled depth (m)",vertical_depth:"Vertical depth (m)",bottom_dx:"Bottom-hole displacement (m)",bottom_dir:"Bottom-hole bearing",start_date:"Spud date",end_date:"Completion date",note:"Note",
   Hole_No:"Hole no.",Proj_No:"Project no.",Proj_Name:"Project",Well_Depth:"Well depth (m)",STATION_ADDR:"Address",CUR_ELEVATION:"Elevation (m)",Date_drill_begin:"Spud date",Date_drill_end:"Completion date",
   Z:"Elevation (m)",theDate:"Survey date",Operator:"Operator",Auditor:"Reviewer",dievceNo:"Instrument",Loaction:"Area",
   Lithology:"Lithology",SLine_ID:"Scanline ID",SLine_Length:"Scanline length (m)",SLine_Strike:"Scanline strike",SLine_Dip:"Scanline dip",SPlane_Attitude:"Fracture attitude",SPlane_Desc:"Fracture description",SPlane_Dir:"Measurement direction",Remark:"Remark",
@@ -571,11 +571,17 @@ const SKIP=new Set(["id","OBJECTID","lat","lng","coorx","coory","x97","y97","pro
 const isWaterSet=key=>/chemistry_(hotspring|cmwell)$|_wq$|hotsprint_analysis$|_geotemperature$/.test(key);
 const fmtV=v=>{if(typeof v==="string"){if(/^b\.?d\.?l\.?$/i.test(v.trim()))return L2("低於偵測極限","below detection limit");const n=+v;if(v.trim()!==""&&!isNaN(n))v=n;else return v;}
   return typeof v==="number"?(Math.abs(v)<0.001&&v!==0?v.toExponential(2):v.toLocaleString(undefined,{maximumFractionDigits:4})):v;};
+// 民國日期（例如 711114、1050302）轉成「民國 71 年 11 月 14 日（1982-11-14）」，避免被當成數字加千分位
+function rocDate(k,v){
+  if(!/date/i.test(k)) return null; const m=String(v??"").trim().match(/^(\d{2,3})(\d{2})(\d{2})$/); if(!m) return null;
+  const y=+m[1],mo=+m[2],d=+m[3]; if(mo<1||mo>12||d<1||d>31) return null;
+  const iso=`${y+1911}-${m[2]}-${m[3]}`; return L2(`民國 ${y} 年 ${mo} 月 ${d} 日（${iso}）`,iso);
+}
 function propTable(p,key){
   const water=isWaterSet(key);
   const rows=Object.keys(p).filter(k=>!SKIP.has(k)&&p[k]!==null&&p[k]!==""&&p[k]!==undefined).map(k=>{
     const unit=water&&MGL.has(k)?" mg/L":DEGC.has(k)?" °C":"";
-    const v=fmtV(p[k]), num=typeof v==="number"||!isNaN(+String(v).replace(/,/g,""));return `<tr><td>${(EN?GLAB_EN[k]:GLAB[k])||k}</td><td${num?" class=\"n\"":""}>${v}${num?unit:""}</td></tr>`;});
+    const v=rocDate(k,p[k])??fmtV(p[k]), num=typeof v==="number"||!isNaN(+String(v).replace(/,/g,""));return `<tr><td>${(EN?GLAB_EN[k]:GLAB[k])||k}</td><td${num?" class=\"n\"":""}>${v}${num?unit:""}</td></tr>`;});
   return rows.length?`<table>${rows.join("")}</table>`:"";
 }
 const KMZ_SRC=L2("資料：使用者提供的井位資料（井位.kmz）；圖片與報告連結為原始網址","Data: user-supplied well locations (井位.kmz); images and report links point to their original hosts");
