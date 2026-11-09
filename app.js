@@ -26,7 +26,7 @@ const TR={
   "電子地圖（大字）":"e-Map (large labels)","通用電子地圖":"Taiwan e-Map","電子地圖（無文字）":"e-Map (no labels)","等高線地形圖":"Topographic (contours)","地形暈渲＋路名":"Shaded relief + roads",
   "正射影像（衛星）":"Orthophoto (aerial)","正射影像＋路名":"Orthophoto + roads","向量底圖（OpenStreetMap）":"Vector map (OpenStreetMap)",
   "公有土地地籍圖":"Public land cadastre","地段外圍圖（段籍圖）":"Land section boundaries","分棟建物框":"Building footprints","國土利用現況調查":"Land use survey","村里界":"Village boundaries",
-  "地形陰影":"Hillshade","等高線":"Contours","地質敏感區（山崩與地滑）":"Geologically sensitive (landslide)","土壤液化潛勢":"Soil liquefaction potential","鄉鎮區界":"Township boundaries",
+  "地形陰影":"Hillshade","等高線":"Contours","等高線（國土測繪中心圖磚）":"Contours (NLSC tiles)","地質敏感區（山崩與地滑）":"Geologically sensitive (landslide)","土壤液化潛勢":"Soil liquefaction potential","鄉鎮區界":"Township boundaries",
   // 色調
   "泛黃古地圖":"Antique map","朱墨官圖":"Cinnabar survey","青花藍曬":"Blueprint","水墨素描":"Ink sketch","夜燈":"Night","海軍藍":"Navy","原色":"Natural","淡灰":"Light gray","暖白":"Warm white","深色":"Dark","高對比":"High contrast",
   // 地熱
@@ -163,6 +163,48 @@ const BASES = {
   "正射影像（衛星）": nlsc("PHOTO2",BP),
   "正射影像＋路名": L.layerGroup([nlsc("PHOTO2",BP), nlsc("EMAP2",BP)]),
 };
+// ---------- 向量等高線：用 AWS Terrain Tiles（terrarium 編碼高程）在瀏覽器即時畫線，計曲線加粗並標高程 ----------
+map.createPane("contour"); map.getPane("contour").style.zIndex=255; map.getPane("contour").style.pointerEvents="none";
+// 各縮放層級的 [首曲線, 計曲線] 間距（公尺）
+const CONTOUR_TH={9:[200,1000],10:[100,500],11:[100,500],12:[50,250],13:[20,100],14:[10,50],15:[10,50]};
+let mlcLoad=null, demSrc=null;
+const loadMlc=()=>mlcLoad??=new Promise((ok,fail)=>{ if(window.mlcontour) return ok();
+  const s=document.createElement("script"); s.src="https://unpkg.com/maplibre-contour@0.1.0/dist/index.min.js"; s.onload=ok; s.onerror=()=>{mlcLoad=null;fail();}; document.head.appendChild(s); });
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ContourLayer=L.Layer.extend({
+  options:{opacity:.85},
+  onAdd(m){ this._active=true;
+    loadMlc().then(()=>{ if(!this._active||!window.maplibregl||!L.maplibreGL) return;
+      if(!demSrc){ demSrc=new mlcontour.DemSource({url:"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",encoding:"terrarium",maxzoom:12,worker:true,cacheSize:120}); demSrc.setupMaplibre(maplibregl); }
+      this._gl=L.maplibreGL({pane:"contour",interactive:false,style:this._style(),
+        attribution:L2('等高線高程：<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>','Contour elevation: <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>')}).addTo(m);
+      this._applyOpacity();
+      this._obs=new MutationObserver(()=>this._restyle()); this._obs.observe(document.documentElement,{attributes:true,attributeFilter:["data-tone"]});
+    }).catch(()=>{});
+  },
+  onRemove(m){ this._active=false; if(this._gl){ m.removeLayer(this._gl); this._gl=null; } this._obs?.disconnect(); },
+  setOpacity(o){ this.options.opacity=o; this._applyOpacity(); return this; },
+  _applyOpacity(){ const c=this._gl?.getContainer?.(); if(c) c.style.opacity=this.options.opacity; },
+  _colors(){ return {line:cssVar("--contour")||"#8a5a2b", halo:cssVar("--sheet")||"#ffffff"}; },
+  _style(){ const {line,halo}=this._colors(), src="c", sl="contours";
+    return {version:8, glyphs:"https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+      // 線和標籤分成兩個來源：字型檔載不到時只會少標籤，線條照樣顯示
+      sources:(()=>{const t=[demSrc.contourProtocolUrl({thresholds:CONTOUR_TH,contourLayer:"contours",elevationKey:"ele",levelKey:"level",buffer:1})];
+        return {c:{type:"vector",tiles:t,maxzoom:15},cl:{type:"vector",tiles:t,maxzoom:15}};})(),
+      layers:[
+        {id:"c-minor",type:"line",source:src,"source-layer":sl,filter:["all",["==",["get","level"],0],[">",["get","ele"],0]],
+          layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":line,"line-opacity":.55,"line-width":["interpolate",["linear"],["zoom"],9,.35,13,.6,16,.9]}},
+        {id:"c-major",type:"line",source:src,"source-layer":sl,filter:["all",[">",["get","level"],0],[">",["get","ele"],0]],
+          layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":line,"line-opacity":.9,"line-width":["interpolate",["linear"],["zoom"],9,.8,13,1.3,16,1.9]}},
+        {id:"c-label",type:"symbol",source:"cl","source-layer":sl,minzoom:11,filter:["all",[">",["get","level"],0],[">",["get","ele"],0]],
+          layout:{"symbol-placement":"line","symbol-spacing":320,"text-max-angle":25,"text-padding":4,"text-size":["interpolate",["linear"],["zoom"],11,10,15,12],
+            "text-field":["concat",["number-format",["get","ele"],{}]," m"],"text-font":["Noto Sans Regular"]},
+          paint:{"text-color":line,"text-halo-color":halo,"text-halo-width":1.6}}]};
+  },
+  _restyle(){ const g=this._gl?.getMaplibreMap?.(); if(!g||!g.getLayer("c-minor")) return; const {line,halo}=this._colors();
+    ["c-minor","c-major"].forEach(id=>g.setPaintProperty(id,"line-color",line));
+    g.setPaintProperty("c-label","text-color",line); g.setPaintProperty("c-label","text-halo-color",halo); },
+});
 const OVERS = APP==="arch" ? {
   "公有土地地籍圖": nlsc("LAND_OPENDATA",OP),
   "地段外圍圖（段籍圖）": nlsc("LANDSECT",OP),
@@ -171,7 +213,8 @@ const OVERS = APP==="arch" ? {
   "村里界": nlsc("Village",OP),
 } : {
   "地形陰影": nlsc("MOI_HILLSHADE",Object.assign({maxNativeZoom:16},OP)),
-  "等高線": nlsc("MOI_CONTOUR_2",OP),
+  "等高線": new ContourLayer(),
+  "等高線（國土測繪中心圖磚）": nlsc("MOI_CONTOUR_2",OP),
   "地質敏感區（山崩與地滑）": nlsc("GeoSensitive2",OP),
   "土壤液化潛勢": nlsc("SoilLiquefaction",OP),
   "國土利用現況調查": nlsc("LUIMAP",OP),
