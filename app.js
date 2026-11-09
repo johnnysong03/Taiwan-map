@@ -28,7 +28,7 @@ const TR={
   "公有土地地籍圖":"Public land cadastre","地段外圍圖（段籍圖）":"Land section boundaries","分棟建物框":"Building footprints","國土利用現況調查":"Land use survey","村里界":"Village boundaries",
   "地形陰影":"Hillshade","等高線":"Contours","地質敏感區（山崩與地滑）":"Geologically sensitive (landslide)","土壤液化潛勢":"Soil liquefaction potential","鄉鎮區界":"Township boundaries",
   // 色調
-  "泛黃古地圖":"Antique map","朱墨官圖":"Cinnabar survey","青花藍曬":"Blueprint","水墨素描":"Ink sketch","夜燈":"Night","海軍藍":"Navy",
+  "泛黃古地圖":"Antique map","朱墨官圖":"Cinnabar survey","青花藍曬":"Blueprint","水墨素描":"Ink sketch","夜燈":"Night","海軍藍":"Navy","原色":"Natural","淡灰":"Light gray","暖白":"Warm white","深色":"Dark","高對比":"High contrast",
   // 地熱
   "全臺":"All Taiwan","大屯山區":"Tatun","宜蘭":"Yilan","花蓮":"Hualien","臺東":"Taitung","臺東霧鹿":"Taitung Wulu","臺中谷關":"Taichung Guguan","南投廬山":"Nantou Lushan",
   "南投東埔":"Nantou Dongpu","臺南關子嶺":"Tainan Guanziling","高雄寶來":"Kaohsiung Baolai",
@@ -985,11 +985,11 @@ if(!GEO_CAT.length){document.getElementById("geochecks").innerHTML='<div class="
 
 // ---------- 色調 ----------
 const TONES=[
-  {k:"",name:"泛黃古地圖",a:"#ead9b4",b:"#5a3d20"},
-  {k:"cinnabar",name:"朱墨官圖",a:"#efe3c8",b:"#c0392b"},
-  {k:"indigo",name:"青花藍曬",a:"#dfe4e6",b:"#1f4e8c"},
-  {k:"ink",name:"水墨素描",a:"#ecebe4",b:"#2a2a28"},
-  {k:"night",name:"夜燈",a:"#1b1914",b:"#e0a650"},
+  {k:"natural",name:"原色",a:"#ffffff",b:"#6aa84f"},
+  {k:"gray",name:"淡灰",a:"#f2f3f4",b:"#8a939b"},
+  {k:"warm",name:"暖白",a:"#fbf6ec",b:"#c47a45"},
+  {k:"dark",name:"深色",a:"#1d232a",b:"#f0a35e"},
+  {k:"contrast",name:"高對比",a:"#ffffff",b:"#000000"},
   {k:"navy",name:"海軍藍",a:"#2e3d4f",b:"#e8836a"},
 ];
 let vec=null;
@@ -1021,7 +1021,7 @@ TONES.forEach(t=>{const b=document.createElement("button");b.type="button";b.cla
   b.title=T(t.name);b.setAttribute("aria-label",T(t.name));b.style.setProperty("--a",t.a);b.style.setProperty("--b",t.b);
   b.onclick=()=>setTone(t.k);document.getElementById("tones").appendChild(b);});
 let savedTone=""; try{savedTone=localStorage.getItem("tone")||""}catch(e){}
-setTone(TONES.some(t=>t.k===savedTone)?savedTone:"");
+setTone(TONES.some(t=>t.k===savedTone)?savedTone:"natural"); // 舊的色調（泛黃古地圖等）已移除，改回原色
 
 // ---------- 土地使用分區（兩張地圖共用：判斷、卡片、定義） ----------
 // 分區定義（卡片下方的註解）。中文照法條原文，英文為本站翻譯。
