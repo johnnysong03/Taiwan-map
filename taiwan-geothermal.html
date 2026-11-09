@@ -23,8 +23,11 @@
       <div class="label" data-en="Survey area">調查地區</div>
       <div id="geochecks"></div>
       <div id="geolegend" hidden></div>
+      <div class="label wlabel" data-en="Wells (all Taiwan)">井（全臺）</div>
+      <div id="wellchecks"></div>
+      <div id="welllegend" hidden></div>
       <button type="button" class="btn" id="kmlbtn" disabled data-en="Export KML (select layers first)">匯出 KML（先勾選圖層）</button>
-      <div class="ghint" data-en="Choose an area and tick the datasets to show. Click a point, line or area to see its values and open the spot in Google Earth. Exported KML files open in Google Earth on the web or desktop.">選一個地區，勾選要看的資料。點地圖上的點、線或區塊可以看數值，也能在 Google Earth 開啟該位置。匯出的 KML 檔可以用 Google Earth 網頁版或桌面版開啟。</div>
+      <div class="ghint" data-en="Choose an area (grouped into north, central, south and east) and tick the datasets to show. Wells are listed separately by type; ticking a type shows all of its wells across Taiwan. Click a point, line or area to see its values and open the spot in Google Earth. Exported KML files open in Google Earth on the web or desktop.">選一個地區（依北、中、南、東分組），勾選要看的資料。井另外依用途分四類，勾一類就會顯示全臺這類的井。點地圖上的點、線或區塊可以看數值，也能在 Google Earth 開啟該位置。匯出的 KML 檔可以用 Google Earth 網頁版或桌面版開啟。</div>
     </div>
   </div>
   <div class="foot" data-en="Data: Geological Survey and Mining Management Agency, MOEA, &lt;a href=&quot;https://geotex.geologycloud.tw/main/openapi&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Geothermal Exploration Information Platform&lt;/a&gt; open data (downloaded 2026-11-07). Water chemistry in mg/L; geothermometers and water temperature in °C. Site names are shown in Chinese. Base maps: National Land Surveying and Mapping Center.">資料：經濟部地質調查及礦業管理中心「<a href="https://geotex.geologycloud.tw/main/openapi" target="_blank" rel="noopener">地熱探勘資訊平臺</a>」第一類開放資料（2026-11-07 下載）。水化學濃度單位為 mg/L，地溫計與水溫為 °C。底圖與圖資：內政部國土測繪中心。</div>
@@ -66,7 +69,9 @@
     </fieldset>
     <fieldset id="overs"><legend class="label" data-en="Overlays">疊加圖資</legend></fieldset>
     <fieldset id="envset"><legend class="label" data-en="Earthquakes &amp; environment">地震與環境資料</legend>
+      <div class="esub" data-en="Land use">土地使用</div>
       <label><input type="checkbox" id="envZon"> <span data-en="Land-use zoning (click the map)">土地使用分區（點地圖查詢）</span></label>
+      <div class="esub" data-en="Earthquakes &amp; weather">地震與氣象</div>
       <label><input type="checkbox" id="envEqS"> <span data-en="Felt earthquakes (CWA, notable)">有感地震・顯著（氣象署）</span></label>
       <label><input type="checkbox" id="envEqL"> <span data-en="Felt earthquakes (CWA, local)">有感地震・小區域（氣象署）</span></label>
       <label><input type="checkbox" id="envWst"> <span data-en="Weather stations (CWA)">氣象測站（氣象署）</span></label>
@@ -75,9 +80,11 @@
         <div class="src" data-en="Earthquake and station layers need your own free authorization key from the CWA open data platform (opendata.cwa.gov.tw). It is stored only in this browser.">地震與測站圖層需要你自己的氣象署開放資料授權碼（免費，到 opendata.cwa.gov.tw 註冊後取得）。授權碼只存在這個瀏覽器。</div>
       </div>
       <div id="cwainfo" class="src" hidden><span data-en="CWA key saved in this browser">氣象署授權碼已存在這個瀏覽器</span> <button type="button" class="linkbtn" id="cwadel" data-en="Clear">清除</button></div>
+      <div class="esub" data-en="Hot springs &amp; heat flow">溫泉與地熱流</div>
       <label><input type="checkbox" id="envHsp"> <span data-en="Hot spring outcrops (GSMMA)">溫泉露頭（地調中心）</span></label>
-      <label><input type="checkbox" id="envDeb"> <span data-en="Debris-flow potential streams (ARDSWC)">土石流潛勢溪流（農村水保署）</span></label>
       <label><input type="checkbox" id="envHfl"> <span data-en="SW offshore heat-flow stations (GSMMA)">西南海域地熱流探測站（地調中心）</span></label>
+      <div class="esub" data-en="Geological hazards">地質災害</div>
+      <label><input type="checkbox" id="envDeb"> <span data-en="Debris-flow potential streams (ARDSWC)">土石流潛勢溪流（農村水保署）</span></label>
       <label><input type="checkbox" id="envFlt"> <span data-en="Active faults 1:25,000 (GSMMA)">活動斷層 1/25,000（地調中心）</span></label>
       <label><input type="checkbox" id="envFsa"> <span data-en="Active fault geologically sensitive areas (GSMMA)">活動斷層地質敏感區（地調中心）</span></label>
       <label><input type="checkbox" id="envLsl"> <span data-en="Large-scale landslide potential areas (ARDSWC)">大規模崩塌潛勢區（農村水保署）</span></label>
@@ -90,9 +97,8 @@
         <option value="火山灰(冬季)" data-en="Ash fall (winter)">火山灰（冬季）</option>
         <option value="海嘯" data-en="Tsunami (Guishan Island)">海嘯（龜山島）</option>
       </select>
-      <label><input type="checkbox" id="envWel"> <span data-en="Hydrogeological observation wells (GSMMA, live)">水文地質觀測井（地調中心，即時）</span></label>
-      <label><input type="checkbox" id="envBor"> <span data-en="Engineering boreholes (GSMMA)">工程鑽孔分布（地調中心）</span></label>
       <label><input type="checkbox" id="envDip"> <span data-en="Dip slopes (GSMMA)">順向坡（地調中心）</span></label>
+      <div class="esub" data-en="Ecology">生態</div>
       <label><input type="checkbox" id="envEco"> <span data-en="National ecological network (Forestry Agency)">國土生態綠網（林業保育署）</span></label>
       <select id="ecosel" aria-label="國土生態綠網圖資" hidden>
         <option value="zone" data-en="Network zones">綠網分區圖</option>
