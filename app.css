@@ -442,24 +442,24 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 #envset .esub{font-size:11.5px;color:var(--muted);letter-spacing:.06em;margin:8px 0 2px;padding-top:6px;border-top:1px dotted var(--rule)}
 #envset .esub:first-of-type{border-top:0;padding-top:0;margin-top:2px}
 .geopane .wlabel{margin-top:16px;margin-bottom:6px}
-:is(#wellchecks,#sitechecks){display:flex;flex-direction:column;gap:8px}
-:is(#wellchecks,#sitechecks) .wgroup{border:1px solid var(--rule);padding:6px 8px 4px}
-:is(#wellchecks,#sitechecks) label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px;padding:3px 0}
-:is(#wellchecks,#sitechecks) .whead{font-size:14.5px;border-bottom:1px solid var(--rule);padding-bottom:5px}
-:is(#wellchecks,#sitechecks) .witems{display:flex;flex-direction:column;padding-left:22px}
-:is(#wellchecks,#sitechecks) .witems label{font-size:13.5px;border-bottom:1px dotted var(--rule)}
-:is(#wellchecks,#sitechecks) .witems label:last-child{border-bottom:0}
-:is(#wellchecks,#sitechecks) .count{margin-left:auto;padding-left:6px;flex:none}
-:is(#wellchecks,#sitechecks) .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
-:is(#wellchecks,#sitechecks) .wsym{display:inline-flex;width:12px;height:12px;align-items:center;justify-content:center;flex:none}
-:is(#wellchecks,#sitechecks) .wgroup>.src{font-size:12px;margin:4px 0 2px}
-:is(#welllegend,#sitelegend){margin-top:6px;display:flex;flex-direction:column;gap:6px}
-:is(#welllegend,#sitelegend) .row{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
-:is(#welllegend,#sitelegend) .k{display:inline-block;width:12px;height:12px;border:1px solid var(--ink);margin-right:4px;vertical-align:-2px}
-:is(#welllegend,#sitelegend) .wl{display:inline-flex;gap:6px;align-items:center}
-:is(#welllegend,#sitelegend) .zl{display:flex;flex-direction:column;gap:2px;font-size:12px}
-:is(#welllegend,#sitelegend) .zl i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
-@media (max-width:760px){ :is(#wellchecks,#sitechecks) label{padding:7px 0} }
+:is(#wellchecks,#sitechecks,#landchecks){display:flex;flex-direction:column;gap:8px}
+:is(#wellchecks,#sitechecks,#landchecks) .wgroup{border:1px solid var(--rule);padding:6px 8px 4px}
+:is(#wellchecks,#sitechecks,#landchecks) label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px;padding:3px 0}
+:is(#wellchecks,#sitechecks,#landchecks) .whead{font-size:14.5px;border-bottom:1px solid var(--rule);padding-bottom:5px}
+:is(#wellchecks,#sitechecks,#landchecks) .witems{display:flex;flex-direction:column;padding-left:22px}
+:is(#wellchecks,#sitechecks,#landchecks) .witems label{font-size:13.5px;border-bottom:1px dotted var(--rule)}
+:is(#wellchecks,#sitechecks,#landchecks) .witems label:last-child{border-bottom:0}
+:is(#wellchecks,#sitechecks,#landchecks) .count{margin-left:auto;padding-left:6px;flex:none}
+:is(#wellchecks,#sitechecks,#landchecks) .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+:is(#wellchecks,#sitechecks,#landchecks) .wsym{display:inline-flex;width:12px;height:12px;align-items:center;justify-content:center;flex:none}
+:is(#wellchecks,#sitechecks,#landchecks) .wgroup>.src{font-size:12px;margin:4px 0 2px}
+:is(#welllegend,#sitelegend,#landlegend){margin-top:6px;display:flex;flex-direction:column;gap:6px}
+:is(#welllegend,#sitelegend,#landlegend) .row{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
+:is(#welllegend,#sitelegend,#landlegend) .k{display:inline-block;width:12px;height:12px;border:1px solid var(--ink);margin-right:4px;vertical-align:-2px}
+:is(#welllegend,#sitelegend,#landlegend) .wl{display:inline-flex;gap:6px;align-items:center}
+:is(#welllegend,#sitelegend,#landlegend) .zl{display:flex;flex-direction:column;gap:2px;font-size:12px}
+:is(#welllegend,#sitelegend,#landlegend) .zl i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
+@media (max-width:760px){ :is(#wellchecks,#sitechecks,#landchecks) label{padding:7px 0} }
 .hsopt{margin-top:4px;padding-top:6px;border-top:1px dotted var(--rule)}
 .hsopt.off{opacity:.45;cursor:default}
 /* 地熱地圖：現有地熱案場彈窗（欄位統一、值靠左、來源小字） */
@@ -469,3 +469,4 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 .geopop .fact{margin:0 0 3px}
 .geopop .fact .fsrc{display:block;font-size:11px;color:var(--muted)}
 .geopop mark.unc{background:#fff3bf;color:inherit;padding:0 2px}
+#landlegend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}

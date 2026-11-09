@@ -687,7 +687,8 @@ function geoKind(key,geom){
 const KIND={kwell:["井位（KMZ）","#c2255c"],gm:["地質圖","#d98c5f"],section:["地質剖面線","#2c3e50"],line:["線型構造","#7b3f9e"],drill:["鑽井","#34495e"],mt:["大地電磁測點","#7f8c8d"],
   fissure:["裂隙調查","#b03a2e"],dating:["定年","#8e5a2b"],iso:["同位素","#8e44ad"],gas:["氣體分析","#16a085"],temp:["地溫計","#e67e22"],water:["水質","#2e86c1"],pt:["資料點","#555"],
   wexp:["地熱探勘井","#c92a2a"],wsvy:["地質調查井","#5f3dc4"],wwat:["水井","#2b8a3e"],
-  sexp:["探勘許可","#e8590c"],sdev:["開發許可","#a61e4d"],sdemo:["示範獎勵","#1971c2"],splant:["電廠","#087f5b"]};
+  sexp:["探勘許可","#e8590c"],sdev:["開發許可","#a61e4d"],sdemo:["示範獎勵","#1971c2"],splant:["電廠","#087f5b"],
+  lnp:["國家公園範圍","#2f9e44"],lres:["原住民保留地","#d9480f"],ltrad:["傳統領域調查範圍","#7048e8"],lname:["傳統地名","#7048e8"]};
 // 現有地熱案場（能源署）：探勘許可＝橘色三角形、開發許可＝酒紅色六角形、示範獎勵＝藍色星形、電廠＝綠色房形
 // 實心＝已通過／營運中，空心＝申請中／規劃中；外圍虛線圈＝約略位置（沒有座標，用鄉鎮或縣市代表點）
 const SITE_SHAPE={sexp:"12,2 22,20 2,20",sdev:"12,1.5 21.5,7 21.5,17 12,22.5 2.5,17 2.5,7",sdemo:"12,1.5 14.9,8.6 22.5,9.2 16.7,14.1 18.5,21.6 12,17.6 5.5,21.6 7.3,14.1 1.5,9.2 9.1,8.6",
@@ -721,6 +722,34 @@ function siteBody(p){
 const WICON={wexp:s=>`<div style="width:${s}px;height:${s}px;background:#c92a2a;border:2px solid #fff;transform:rotate(45deg) scale(.85);box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`,
   wsvy:s=>`<div style="width:${s}px;height:${s}px;background:#5f3dc4;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`,
   wwat:s=>`<div style="width:${s}px;height:${s}px;background:#2b8a3e;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`};
+// ---------- 土地與保護區：國家公園範圍、原住民保留地、傳統領域調查成果 ----------
+const LAND_EN={lnp:"National park boundary",lres:"Indigenous reserved land",ltrad:"Traditional territory (2002–2009 survey)",lname:"Traditional place name"};
+const LAND_STYLE={lnp:{color:"#2f9e44",weight:2.2,fillColor:"#2f9e44",fillOpacity:.08},
+  lres:{color:"#d9480f",weight:1,fillColor:"#d9480f",fillOpacity:.22},
+  ltrad:{color:"#7048e8",weight:1.6,dashArray:"6 4",fillColor:"#7048e8",fillOpacity:.1}};
+const LAND_SRC={
+  lnp:L2('資料：農業部林業及自然保育署「國土生態綠網」圖台的國家公園圖層（109 年 1 月彙整版，2026-11-09 下載）；最新公告版本依內政部國家公園署<a href="https://data.gov.tw/dataset/174421" target="_blank" rel="noopener">國家公園地理資訊圖層彙整</a>',
+    'Data: Forestry and Nature Conservation Agency ecological-network map, national park layer (Jan 2020 compilation, downloaded 2026-11-09); latest versions from the National Park Service <a href="https://data.gov.tw/dataset/174421" target="_blank" rel="noopener">GIS layer index</a>'),
+  lres:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">原住民保留地範圍資訊</a>（SHP，2022-08-22 上架，2026-11-09 下載；簡化約 5 公尺）',
+    'Data: Council of Indigenous Peoples, <a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">indigenous reserved land extent</a> (SHP listed 2022-08-22, downloaded 2026-11-09; simplified ~5 m)'),
+  ltrad:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">歷年原住民族傳統領域調查成果範圍（91–98 年）</a>（2026-11-09 下載）。這是調查成果，不是依法公告的傳統領域範圍',
+    'Data: Council of Indigenous Peoples, <a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">traditional territory survey results 2002–2009</a> (downloaded 2026-11-09). Survey results, not legally designated territory')};
+LAND_SRC.lname=LAND_SRC.ltrad;
+const landSw=k=>k==="lname"?`<span class="sw" style="background:${KIND[k][1]};width:7px;height:7px"></span>`
+  :`<span class="sw" style="border-radius:2px;background:${LAND_STYLE[k].fillColor}33;border:${k==="ltrad"?"1.5px dashed":"1.5px solid"} ${LAND_STYLE[k].color}"></span>`;
+const landTitle=(p,k)=>k==="lnp"?L2(p.name,p.nameEn):k==="lres"?`${p.sect}`:(p.name||p.attrs?.族群||L2(KIND[k][0],LAND_EN[k]));
+function landBody(p,k){
+  const tab=rows=>`<table class="sitetab">${rows.filter(Boolean).map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table>`;
+  if(k==="lnp") return tab([[L2("管理機關","Agency"),hesc(p.agency)],[L2("圖資版本","Data version"),hesc(p.srcPlan)+(p.srcDate?L2(`（圖層記載實施日 ${p.srcDate}）`,` (layer date ${p.srcDate})`):"")],
+    [L2("最新公告","Latest version"),hesc(L2(p.latest[0],p.latest[1]))]])+`<div class="m" style="margin-top:6px">${L2("範圍取自 109 年彙整的圖層，若最新公告版本較新，邊界可能已有調整。","Boundary from a 2020 compilation; it may have changed in later reviews.")}</div>`;
+  if(k==="lres") return tab([[L2("縣市","County"),hesc(p.county)],[L2("鄉鎮","Township"),hesc(p.town)],[L2("地段","Land section"),hesc(p.sect)],[L2("段代碼","Section code"),hesc(p.code)]])+
+    `<div class="m" style="margin-top:6px">${L2("原民會範圍圖以地段為單位；個別土地是否為原住民保留地，以地政機關的土地登記為準。","The extent is grouped by land section; whether a given parcel is reserved land is determined by the land register.")}</div>`;
+  const a=p.attrs||{};
+  return tab([[L2("縣市","County"),hesc(p.county)],p.town?[L2("鄉鎮","Township"),hesc(p.town)]:null,
+    ...Object.entries(a).filter(([kk])=>!(kk==="中文地名"&&a[kk]===p.name)).map(([kk,v])=>[hesc(kk),hesc(v)])])+
+    `<div class="m" style="margin-top:6px">${L2("91–98 年原民會委外調查成果，不是依《原住民族土地或部落範圍土地劃設辦法》公告的法定範圍。","2002–2009 survey commissioned by the Council of Indigenous Peoples; not territory designated under the 2017 delineation regulations.")}</div>`;
+}
+const landCanvas=L.canvas({pane:"geo",padding:.3});
 const GEO_CAT=(window.GEOTEX_CATALOG||[]).map(([key,s,n,geom,kb])=>{
   let region,name;
   if(s.startsWith("大地電磁法測點")){region=(s.match(/\)\((\S+)/)||[])[1]||"全臺";name="大地電磁法測點";}
@@ -734,7 +763,7 @@ const GEO_CAT=(window.GEOTEX_CATALOG||[]).map(([key,s,n,geom,kb])=>{
 // 井：從各地區清單抽出，依用途分成四類，每類一次列出全臺的井。結元公司的 KMZ 依點的顏色拆成探勘井、地質調查井、水井。
 const JY=window.GEOTEX_D?.kmz_jieyuan?.features||[];
 const WSUB={exp:["wexp","地熱探勘井","exploration wells"],svy:["wsvy","地質調查井","geological survey wells"],wat:["wwat","水井","water wells"],spr:["water"],
-  sexp:["sexp"],sdev:["sdev"],sdemo:["sdemo"],splant:["splant"]};
+  sexp:["sexp"],sdev:["sdev"],sdemo:["sdemo"],splant:["splant"],lnp:["lnp"],lres:["lres"],ltrad:["ltrad"],lname:["lname"]};
 const WELL_GROUPS=[
   {id:"geo",zh:"地熱井",en:"Geothermal wells",items:[["geo_geothermaldrill","exp"],["kmz_sihuangziping","exp"],["kmz_matsao","exp"],["kmz_jieyuan","exp","#1c7ed6"],
     ["kmz_jieyuan","svy","#c2255c"],["geo_hualien_drill","svy"],["geo_taitung_drill","svy"],["geo_ttwulu_drill","svy"],["geo_tcguguan_drill","svy"]]},
@@ -746,6 +775,10 @@ const WELL_GROUPS=[
     note:["同公司＋同鄉鎮視為同一案場，只放在最新階段（示範獎勵 → 探勘許可 → 開發許可 → 電廠），較早階段寫在彈窗歷程。有虛線圈的點是約略位置。",
       "A company's sites in the same township count as one site and appear only at the latest stage (demonstration incentive → exploration → development → power plant); earlier stages are listed in the popup. Dashed rings mark approximate locations."],
     items:[["ea_demo","sdemo"],["ea_explore","sexp"],["ea_develop","sdev"],["ea_plant","splant"]]},
+  {id:"land",box:"landchecks",zh:"土地與保護區",en:"Land & protected areas",
+    note:["國家公園範圍是 109 年彙整版，部分園區已有更新的通盤檢討（彈窗有寫）；澎湖南方四島沒有可用範圍。傳統領域是 91–98 年調查成果，不是法定公告範圍。",
+      "National park boundaries are a 2020 compilation (newer reviews noted in popups); no usable boundary for South Penghu. Traditional territory is 2002–2009 survey results, not legally designated."],
+    items:[["land_np","lnp"],["land_reserve","lres"],["land_trad","ltrad"],["land_tradname","lname"]]},
 ];
 const WELL_ITEMS=[];
 WELL_GROUPS.forEach(g=>{g.items=g.items.map(([key,sub,pick])=>{
@@ -761,11 +794,15 @@ function makeGeoLayer(c,fc){
   const k=c.kind, title=f=>{const p=f.properties;return p.Site||p.sitename||p.name||p.Survey_Place||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;};
   const meta=c.well?c.name:`${T(c.region)}・${c.name}`, isK=/^kmz_/.test(c.src||c.key);
   const bind=(f,l)=>l.bindPopup(()=>{const ll=l.getLatLng?l.getLatLng():l.getBounds().getCenter();
+    if(LAND_EN[k]) return pop(hesc(landTitle(f.properties,k)),L2(KIND[k][0],LAND_EN[k]),landBody(f.properties,k),LAND_SRC[k]);
     if(SITE_SHAPE[k]) return pop(hesc(f.properties.company),L2(`現有地熱案場・${f.properties.cat}・${f.properties.status}`,`Existing project · ${st(f.properties.cat)} · ${st(f.properties.status)}`),siteBody(f.properties),SITE_SRC);
     if(isK) return pop(hesc(title(f)),meta,kwellBody(f.properties)+
       `<div style="margin-top:6px"><a href="${earthUrl(ll.lat,ll.lng,1500)}" target="_blank" rel="noopener">${L2("在 Google Earth 開啟這裡","Open here in Google Earth")}</a></div>`,KMZ_SRC);
     return pop(k==="gm"?(f.properties.rockname||c.name):title(f),meta,propTable(f.properties,c.key)+
       `<div style="margin-top:6px"><a href="${earthUrl(ll.lat,ll.lng,l.getLatLng?1500:6000)}" target="_blank" rel="noopener">${L2("在 Google Earth 開啟這裡","Open here in Google Earth")}</a></div>`);});
+  if(LAND_STYLE[k]) return L.geoJSON(fc,{pane:"geofill",style:LAND_STYLE[k],onEachFeature:(f,l)=>{bind(f,l);l.bindTooltip(hesc(landTitle(f.properties,k)),{sticky:true});}});
+  if(k==="lname") return L.geoJSON(fc,{pointToLayer:(f,ll)=>L.circleMarker(ll,{renderer:landCanvas,radius:3.5,color:"#fff",weight:1,fillColor:KIND.lname[1],fillOpacity:.9})
+    .bindTooltip(hesc(landTitle(f.properties,k)),{direction:"top"}),onEachFeature:bind});
   if(k==="gm") return L.geoJSON(fc,{pane:"geofill",style:f=>({color:"#5a4632",weight:.6,fillColor:rockColor(f.properties),fillOpacity:.5}),onEachFeature:bind});
   if(k==="line"||k==="section") return L.geoJSON(fc,{pane:"geo",style:k==="line"?{color:"#7b3f9e",weight:1.5,opacity:.85}:{color:"#2c3e50",weight:2.5,dashArray:"8 4"},onEachFeature:bind});
   return L.geoJSON(fc,{
@@ -800,9 +837,17 @@ function wellLegend(){
   if(sym.length) parts.push(`<div class="row">${sym.map(k=>`<span class="wl">${WICON[k](9)}${L2(KIND[k][0],WSUB[{wexp:"exp",wsvy:"svy",wwat:"wat"}[k]][2].replace(/^./,ch=>ch.toUpperCase()))}</span>`).join("")}</div>`);
   if(kinds.has("water")) parts.push(`<div class="row">${L2("溫泉井水質 pH：","Hot spring well pH: ")}${[["<3","#c0392b"],["3–5","#e67e22"],["5–7","#d4ac0d"],["≥7","#2e86c1"]].map(([t,c])=>`<span><span class="k" style="background:${c};border-radius:50%"></span>${t}</span>`).join("")}</div>`);
   const env=window._wellEnvLegend?.()||""; if(env) parts.push(env);
-  lg.innerHTML=parts.join(""); lg.hidden=!parts.length; syncWells(); siteLegend();
+  lg.innerHTML=parts.join(""); lg.hidden=!parts.length; syncWells(); siteLegend(); landLegend();
 }
 // 現有地熱案場圖例：開啟的類別符號，加上實心＝已通過、空心＝申請中
+function landLegend(){
+  const lg=document.getElementById("landlegend"); if(!lg) return;
+  const on=WELL_ITEMS.filter(c=>geoOn[c.key]&&LAND_EN[c.kind]);
+  if(!on.length){lg.hidden=true;lg.innerHTML="";return;}
+  lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${landSw(c.kind)}${L2(KIND[c.kind][0],LAND_EN[c.kind])}</span>`).join("")}</div>`+
+    [...new Set(on.map(c=>LAND_SRC[c.kind]))].map(t=>`<div class="src">${t}</div>`).join("");
+  lg.hidden=false;
+}
 function siteLegend(){
   const lg=document.getElementById("sitelegend"); if(!lg) return;
   const on=WELL_ITEMS.filter(c=>geoOn[c.key]&&SITE_SHAPE[c.kind]);
@@ -859,7 +904,7 @@ function renderWellChecks(){
       const lab=document.createElement("label");
       if(it.env){ const [nm,cnt,col]=ENV_WELL[it.env];
         lab.innerHTML=`<input type="checkbox" id="${it.env}"> <span class="sw" style="background:${col}${it.env==="envBor"?";border-radius:1px":""}"></span>${nm}<span class="count">${cnt}</span>`; }
-      else{ lab.innerHTML=`<input type="checkbox" id="gx_${it.key}"> <span class="wsym">${SITE_SHAPE[it.kind]?siteIcon(it.kind,12):WICON[it.kind]?WICON[it.kind](8):`<span class="sw" style="background:${KIND.water[1]}"></span>`}</span>${it.name}<span class="count">${it.n}</span>`;
+      else{ lab.innerHTML=`<input type="checkbox" id="gx_${it.key}"> <span class="wsym">${LAND_EN[it.kind]?landSw(it.kind):SITE_SHAPE[it.kind]?siteIcon(it.kind,12):WICON[it.kind]?WICON[it.kind](8):`<span class="sw" style="background:${KIND.water[1]}"></span>`}</span>${it.name}<span class="count">${it.n}</span>`;
         const cb=lab.querySelector("input"); cb.onchange=()=>toggleGeo(it,cb.checked,cb); }
       const cb=lab.querySelector("input"); cb.addEventListener("change",()=>g.sync()); subs.push(cb); list.appendChild(lab);
     });
@@ -895,11 +940,12 @@ function exportKML(){
     const isS=!!SITE_SHAPE[c.kind], icon=n=>`<Style id="s_${c.key}${n?"_p":""}"><IconStyle><color>${n?"88"+col.slice(2):col}</color><scale>${isS?1:0.8}</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LineStyle><color>${col}</color><width>2</width></LineStyle><PolyStyle><color>66${col.slice(2)}</color></PolyStyle></Style>`;
     const style=icon(false)+(isS?icon(true):"");
     const pms=fc.features.map(f=>{const p=f.properties||{};
-      const nm=isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
-      const desc=isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
+      const isL=!!LAND_EN[c.kind];
+      const nm=isL?landTitle(p,c.kind):isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
+      const desc=isL?landBody(p,c.kind)+`<div>${LAND_SRC[c.kind]}</div>`:isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
       return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&isHollow(p.status)?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
-    return `<Folder><name>${xesc(isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
-  const srcs=[on.some(c=>!SITE_SHAPE[c.kind])?GEO_SRC:"",on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；有虛線圈（approx）的點為鄉鎮或縣市代表點，屬約略位置","; approximate points sit at township or county representative points"):""].filter(Boolean).join("\n");
+    return `<Folder><name>${xesc(LAND_EN[c.kind]?L2("土地與保護區・","Land – ")+c.name:isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
+  const srcs=[on.some(c=>!SITE_SHAPE[c.kind]&&!LAND_EN[c.kind])?GEO_SRC:"",...[...new Set(on.filter(c=>LAND_EN[c.kind]).map(c=>LAND_SRC[c.kind].replace(/<[^>]+>/g,"")))],on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；有虛線圈（approx）的點為鄉鎮或縣市代表點，屬約略位置","; approximate points sit at township or county representative points"):""].filter(Boolean).join("\n");
   const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>臺灣地熱地圖匯出</name><description>${xesc(srcs)}</description>\n${folders}\n</Document></kml>`;
   const url=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"}));
   const a=document.createElement("a"); a.href=url; a.download=`臺灣地熱地圖_${on.length}個圖層.kml`; document.body.appendChild(a); a.click(); a.remove();
