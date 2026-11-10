@@ -470,3 +470,24 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 .geopop .fact .fsrc{display:block;font-size:11px;color:var(--muted)}
 .geopop mark.unc{background:#fff3bf;color:inherit;padding:0 2px}
 #landlegend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+
+/* ===== 框選範圍輸出圖片 ===== */
+.shotmode{cursor:crosshair!important;touch-action:none}
+.shotmode .leaflet-interactive{cursor:crosshair!important}
+#shotbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+#shotbanner .linkbtn{color:var(--sheet);font-size:13px}
+#shotdlg{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+#shotdlg[hidden]{display:none!important}
+.shotform{background:var(--sheet);color:var(--ink);border:1px solid var(--ink);width:min(380px,100%);max-height:calc(100% - 32px);overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.shotform h3{margin:0 0 4px;font:700 17px var(--display)}
+.shotform .opt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;cursor:pointer}
+.shotform .opt span{font:12px var(--mono);color:var(--muted)}
+.shotform .opt em{font-size:12px;color:var(--accent);font-style:normal}
+.shotform .opt.off{opacity:.5;cursor:default}
+.shotform select{width:auto;padding:2px 6px;font-size:13px}
+#shotbusy{position:fixed;inset:0;z-index:5000;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:600 15px var(--body);color:var(--ink)}
+#shotbusy[hidden]{display:none!important}
+#shotbusy .spin{display:inline-block;width:16px;height:16px;margin-right:10px;vertical-align:-2px;border:2px solid var(--rule);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (max-width:760px){ #shotbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} .shotform select{font-size:16px} }

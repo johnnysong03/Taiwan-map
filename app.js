@@ -176,7 +176,7 @@ const ContourLayer=L.Layer.extend({
   onAdd(m){ this._active=true;
     loadMlc().then(()=>{ if(!this._active||!window.maplibregl||!L.maplibreGL) return;
       if(!demSrc){ demSrc=new mlcontour.DemSource({url:"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",encoding:"terrarium",maxzoom:12,worker:true,cacheSize:120}); demSrc.setupMaplibre(maplibregl); }
-      this._gl=L.maplibreGL({pane:"contour",interactive:false,style:this._style(),
+      this._gl=L.maplibreGL({pane:"contour",interactive:false,preserveDrawingBuffer:true,style:this._style(),
         attribution:L2('等高線高程：<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>','Contour elevation: <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>')}).addTo(m);
       this._applyOpacity();
       this._obs=new MutationObserver(()=>this._restyle()); this._obs.observe(document.documentElement,{attributes:true,attributeFilter:["data-tone"]});
@@ -1163,7 +1163,7 @@ function setVector(on){
     if(!vec){
       if(!window.maplibregl||!L.maplibreGL||!window.NAVY_STYLE){ return false; }
       map.createPane("vec"); map.getPane("vec").style.zIndex=200;
-      vec=L.maplibreGL({style:NAVY_STYLE,pane:"vec",localIdeographFontFamily:"'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif",
+      vec=L.maplibreGL({style:NAVY_STYLE,pane:"vec",preserveDrawingBuffer:true,localIdeographFontFamily:"'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif",
         attribution:'© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'});
     }
     map.removeLayer(base); if(!map.hasLayer(vec)) vec.addTo(map); setTimeout(()=>{vecHillshade();syncHsBox();},0);
@@ -1918,4 +1918,190 @@ function buildChatPane(){
   map.on("popupopen",()=>document.body.classList.add("popup-on")).on("popupclose",()=>document.body.classList.remove("popup-on"));
   side.addEventListener("transitionend",e=>{ if(e.propertyName==="height") map.invalidateSize(); });
   MOBILE.addEventListener("change",()=>{ fold(); setTimeout(()=>map.invalidateSize(),60); });
+})();
+
+// ---------- 框選範圍輸出高解析 PNG：2×／4×，可加比例尺、指北針、座標格線、圖例與資料來源 ----------
+(()=>{
+  const lay=document.getElementById("layers"), tone=document.getElementById("toneset"); if(!lay||!tone) return;
+  const fs=document.createElement("fieldset"); fs.id="shotset";
+  fs.innerHTML=`<legend class="label">${L2("輸出圖片","Export image")}</legend>
+    <button type="button" class="btn filebtn" id="shotbtn">${L2("框選範圍截圖","Select an area to export")}</button>
+    <div class="src">${L2("在地圖上拖曳框出範圍，輸出 2×、4× 或 8× 高解析 PNG。","Drag a box on the map, then export a 2×, 4× or 8× PNG.")}</div>`;
+  tone.after(fs);
+  const btn=fs.querySelector("#shotbtn"), mc=map.getContainer();
+  const banner=document.createElement("div"); banner.id="shotbanner"; banner.hidden=true;
+  banner.innerHTML=`<span>${L2("在地圖上拖曳，框出要輸出的範圍","Drag on the map to select the area")}</span><button type="button" class="linkbtn">${L2("取消","Cancel")}</button>`;
+  document.getElementById("mapwrap").appendChild(banner);
+  let mode=false, start=null, rect=null;
+  const clearRect=()=>{ if(rect){ map.removeLayer(rect); rect=null; } };
+  const setMode=on=>{ mode=on; banner.hidden=!on; mc.classList.toggle("shotmode",on);
+    btn.textContent=on?L2("取消框選","Cancel selection"):L2("框選範圍截圖","Select an area to export");
+    if(on){ map.dragging.disable(); map.closePopup();
+      if(MOBILE.matches){ if(!lay.classList.contains("min")) document.getElementById("lmin").click(); sheet("peek"); } }
+    else map.dragging.enable(); };
+  btn.onclick=()=>{ clearRect(); setMode(!mode); };
+  banner.querySelector("button").onclick=()=>{ clearRect(); setMode(false); };
+  let eatClick=false;
+  mc.addEventListener("pointerdown",e=>{ if(!mode||e.target.closest(".leaflet-control")) return;
+    e.preventDefault(); e.stopPropagation(); clearRect(); start=map.mouseEventToLatLng(e);
+    rect=L.rectangle([start,start],{color:"#c0392b",weight:2,dashArray:"6 4",fillOpacity:.08,interactive:false}).addTo(map);
+    try{ mc.setPointerCapture(e.pointerId); }catch(_){} },true);
+  mc.addEventListener("pointermove",e=>{ if(!mode||!start) return; e.preventDefault(); e.stopPropagation(); rect.setBounds(L.latLngBounds(start,map.mouseEventToLatLng(e))); },true);
+  mc.addEventListener("pointerup",e=>{ if(!mode||!start) return; e.stopPropagation(); eatClick=true; setTimeout(()=>eatClick=false,400);
+    const b=rect.getBounds(); start=null; setMode(false);
+    const a=map.latLngToContainerPoint(b.getNorthWest()), c=map.latLngToContainerPoint(b.getSouthEast());
+    if(c.x-a.x<24||c.y-a.y<24){ clearRect(); return; }
+    openDialog(b,Math.round(c.x-a.x),Math.round(c.y-a.y)); },true);
+  mc.addEventListener("click",e=>{ if(eatClick){ e.stopPropagation(); e.preventDefault(); eatClick=false; } },true);
+
+  // 設定視窗
+  const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  const MAXPX=IOS?16e6:64e6; // 瀏覽器畫布面積上限（iOS Safari 約 1,670 萬像素）
+  const dlg=document.createElement("div"); dlg.id="shotdlg"; dlg.hidden=true; document.body.appendChild(dlg);
+  const busy=document.createElement("div"); busy.id="shotbusy"; busy.hidden=true; document.body.appendChild(busy);
+  function openDialog(b,w,h){
+    const opts=[2,4,8].map(f=>{ const W=w*f,H=h*f, ok=W*H<=MAXPX&&map.getZoom()+Math.log2(f)<=map.getMaxZoom();
+      return {f,W,H,ok}; });
+    const want=MOBILE.matches?4:2, def=(opts.find(o=>o.f===want&&o.ok)||opts.filter(o=>o.ok).pop()||opts[0]).f; // 手機螢幕窄，預設用 4×
+    dlg.innerHTML=`<form class="shotform"><h3>${L2("輸出高解析圖片","Export a high-resolution image")}</h3>
+      <div class="mkl">${L2("倍率（越大越清楚，檔案也越大）","Scale (larger = sharper and bigger file)")}</div>
+      ${opts.map(o=>`<label class="opt${o.ok?"":" off"}"><input type="radio" name="f" value="${o.f}" ${o.f===def?"checked":""} ${o.ok?"":"disabled"}>
+        <b>${o.f}×</b> <span>${o.W.toLocaleString()} × ${o.H.toLocaleString()} px</span>${o.ok?"":`<em>${L2("太大，請縮小範圍","too large, select a smaller area")}</em>`}</label>`).join("")}
+      <div class="mkl">${L2("加上","Include")}</div>
+      <label class="opt"><input type="checkbox" name="scale" checked> ${L2("比例尺與指北針","Scale bar and north arrow")}</label>
+      <label class="opt"><input type="checkbox" name="grid" checked> ${L2("座標格線","Coordinate grid")}
+        <select name="gridtype"><option value="twd97">TWD97</option><option value="wgs84">${L2("經緯度","Lat/long")}</option></select></label>
+      <label class="opt"><input type="checkbox" name="legend" checked> ${L2("圖例與資料來源","Legend and data sources")}</label>
+      <div class="mkrow"><button type="submit" class="btn">${L2("輸出 PNG","Export PNG")}</button><button type="button" class="linkbtn" data-a="x">${L2("取消","Cancel")}</button></div></form>`;
+    dlg.hidden=false;
+    const f=dlg.querySelector("form");
+    f.querySelector('[data-a="x"]').onclick=()=>{ dlg.hidden=true; clearRect(); };
+    f.onsubmit=async e=>{ e.preventDefault(); const o={f:+f.f.value,scale:f.scale.checked,grid:f.grid.checked,gridtype:f.gridtype.value,legend:f.legend.checked};
+      dlg.hidden=true; clearRect(); await capture(b,w,h,o); };
+  }
+
+  // 截圖：把地圖暫時放大成「範圍 × 倍率」的尺寸、放大對應級數，等圖磚載完再擷取
+  let h2i=null;
+  const loadH2I=()=>h2i??=new Promise((ok,fail)=>{ if(window.htmlToImage) return ok();
+    const sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.13/html-to-image.min.js";
+    sc.onload=ok; sc.onerror=()=>{ const s2=document.createElement("script"); s2.src="https://unpkg.com/html-to-image@1.11.13/dist/html-to-image.js"; s2.onload=ok; s2.onerror=()=>{h2i=null;fail();}; document.head.appendChild(s2); };
+    document.head.appendChild(sc); });
+  const waitTiles=ms=>new Promise(res=>{ const t0=Date.now();
+    const tick=()=>{ let wait=false;
+      map.eachLayer(l=>{ if(l.isLoading?.()) wait=true; const g=l.getMaplibreMap?.(); if(g&&(!g.loaded()||!g.areTilesLoaded())) wait=true; });
+      if(!wait||Date.now()-t0>ms) setTimeout(res,500); else setTimeout(tick,250); };
+    setTimeout(tick,400); });
+  const say=t=>{ busy.innerHTML=`<div><span class="spin"></span>${t}</div>`; busy.hidden=false; };
+  async function capture(b,w,h,o){
+    const z0=map.getZoom(), c0=map.getCenter(), z=Math.min(map.getMaxZoom(),z0+Math.log2(o.f)), W=w*o.f, H=h*o.f;
+    const el=map.getContainer(), saved=el.getAttribute("style")||"";
+    say(L2("正在載入高解析圖磚…","Loading high-resolution tiles…"));
+    let shot=null, nb=null, err=null;
+    try{
+      await loadH2I();
+      el.setAttribute("style",saved+`;position:fixed;left:0;top:0;width:${W}px;height:${H}px;z-index:0`);
+      map.invalidateSize({pan:false}); map.setView(b.getCenter(),z,{animate:false});
+      await waitTiles(45000);
+      nb=map.getBounds();
+      say(L2("正在合成圖片…","Composing the image…"));
+      shot=await htmlToImage.toCanvas(el,{width:W,height:H,pixelRatio:1,skipFonts:true,cacheBust:false,
+        filter:n=>!(n.classList&&(n.classList.contains("leaflet-control-container")||n.classList.contains("leaflet-popup-pane")))});
+    }catch(e){ err=e; }
+    finally{ el.setAttribute("style",saved); map.invalidateSize({pan:false}); map.setView(c0,z0,{animate:false}); }
+    if(!shot){ say(L2("輸出失敗：可能有圖層的圖磚不允許擷取，或圖片太大。請關掉部分圖層或縮小範圍再試。","Export failed: a layer may block capture, or the image is too large. Turn off some layers or select a smaller area."));
+      console.error(err); setTimeout(()=>busy.hidden=true,4000); return; }
+    const out=compose(shot,nb,o);
+    out.toBlob(blob=>{ const u=URL.createObjectURL(blob), a=document.createElement("a"), d=new Date(), p=n=>String(n).padStart(2,"0");
+      a.href=u; a.download=`${APP==="geo"?"taiwan-geothermal":"taiwan-architecture"}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}_${o.f}x.png`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),8000); busy.hidden=true; },"image/png");
+  }
+
+  // 合成：地圖＋格線＋比例尺／指北針＋圖例與來源
+  const merc=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
+  const imerc=y=>(2*Math.atan(Math.exp(y))-Math.PI/2)*180/Math.PI;
+  const nice=(v,c=[1,2,5])=>{ const p=10**Math.floor(Math.log10(v)); for(const k of c.concat([10])) if(k*p>=v) return k*p; return 10*p; };
+  const FONT='"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+  function compose(shot,nb,o){
+    const W=shot.width,H=shot.height,s=Math.max(1,o.f*0.75);
+    const N=nb.getNorth(),S=nb.getSouth(),Wl=nb.getWest(),E=nb.getEast(), yN=merc(N), yS=merc(S);
+    const ll=(x,y)=>[imerc(yN+(y/H)*(yS-yN)), Wl+(x/W)*(E-Wl)];
+    const m=o.grid?Math.round(44*s):Math.round(14*s);
+    // 圖例文字
+    const lines=[];
+    if(o.legend){
+      const t=TONES.find(t=>t.k===curTone);
+      const base=document.querySelector('input[name="base"]:checked')?.parentElement.textContent.trim();
+      lines.push({b:true,t:`${document.title}　${new Date().toLocaleString(EN?"en":"zh-TW",{hour12:false})}`});
+      lines.push({t:`${L2("底圖","Base map")}：${base||""}${t?`（${L2("色調","style")}：${T(t.name)}）`:""}`});
+      const on=[...document.querySelectorAll('#overs input:checked, #side input[type="checkbox"]:checked')].filter(i=>i.id!=="inview"&&i.closest("label"));
+      if(on.length){ lines.push({t:L2("已開啟圖層：","Layers on:")});
+        on.forEach(i=>{ const lab=i.closest("label"), sw=lab.querySelector(".sw"); lines.push({t:lab.textContent.replace(/\s+/g," ").trim(),sw:sw?getComputedStyle(sw).backgroundColor:null}); }); }
+      const mk=document.querySelectorAll("#marklist .mkitem").length; if(mk) lines.push({t:L2(`我的標示：${mk} 個`,`My markers: ${mk}`)});
+      document.querySelectorAll("#implist .nm").forEach(n=>lines.push({t:`${L2("匯入點位","Imported")}：${n.textContent}`}));
+      const [x1,y1]=toTM2(N,Wl),[x2,y2]=toTM2(S,E);
+      lines.push({t:`${L2("範圍","Extent")}：WGS84 ${N.toFixed(5)}N ${Wl.toFixed(5)}E – ${S.toFixed(5)}N ${E.toFixed(5)}E；TWD97 X ${x1.toFixed(0)}–${x2.toFixed(0)}、Y ${y2.toFixed(0)}–${y1.toFixed(0)}`});
+      const attr=(map.attributionControl?._container?.textContent||"").replace(/^[^|]*Leaflet\s*\|\s*/,"").trim();
+      if(attr) lines.push({t:`${L2("資料來源","Sources")}：${attr}`});
+      const foot=[...document.querySelectorAll("#side .foot")].find(f=>f.offsetParent!==null||!f.closest("[hidden]"));
+      if(foot) lines.push({t:foot.textContent.replace(/\s+/g," ").trim(),small:true});
+    }
+    // 先量圖例高度
+    const meas=document.createElement("canvas").getContext("2d");
+    const fsz=Math.round(13*s), lh=Math.round(fsz*1.5), maxw=W+2*m-2*m;
+    const wrap=(t,size,b)=>{ meas.font=`${b?"700 ":""}${size}px ${FONT}`; const out=[]; let cur="";
+      for(const ch of t){ if(meas.measureText(cur+ch).width>maxw-(size*1.6)){ out.push(cur); cur=ch; } else cur+=ch; } if(cur) out.push(cur); return out; };
+    const rows=[]; lines.forEach(l=>{ const size=l.small?Math.round(fsz*.85):(l.b?Math.round(fsz*1.15):fsz); wrap(l.t,size,l.b).forEach((tx,i)=>rows.push({tx,size,b:l.b,sw:i===0?l.sw:null})); });
+    const legH=rows.length?Math.round(rows.reduce((a,r)=>a+r.size*1.5,0)+Math.max(m,18*s)):0;
+    const cv=document.createElement("canvas"); cv.width=W+2*m; cv.height=H+2*m+legH;
+    const g=cv.getContext("2d"); g.fillStyle="#ffffff"; g.fillRect(0,0,cv.width,cv.height);
+    g.drawImage(shot,m,m);
+    g.strokeStyle="#222"; g.lineWidth=Math.max(1,1.2*s); g.strokeRect(m,m,W,H);
+    // 座標格線
+    if(o.grid){
+      g.save(); g.beginPath(); g.rect(m,m,W,H); g.clip();
+      g.strokeStyle="rgba(20,20,20,.55)"; g.lineWidth=Math.max(1,.8*s); g.setLineDash([6*s,4*s]);
+      const labels=[];
+      if(o.gridtype==="wgs84"){
+        const step=nice((E-Wl)/5,[1,2,2.5,5]), stepY=nice((N-S)/5,[1,2,2.5,5]);
+        for(let v=Math.ceil(Wl/step)*step; v<E; v+=step){ const x=m+(v-Wl)/(E-Wl)*W; g.beginPath(); g.moveTo(x,m); g.lineTo(x,m+H); g.stroke(); labels.push(["x",x,dms(v,"E")]); }
+        for(let v=Math.ceil(S/stepY)*stepY; v<N; v+=stepY){ const y=m+(yN-merc(v))/(yN-yS)*H; g.beginPath(); g.moveTo(m,y); g.lineTo(m+W,y); g.stroke(); labels.push(["y",y,dms(v,"N")]); }
+      }else{
+        const tm=(x,y)=>{ const [la,lo]=ll(x,y); return toTM2(la,lo); };
+        const [ax]=tm(0,H/2),[bx]=tm(W,H/2),[,ay]=tm(W/2,H),[,by]=tm(W/2,0);
+        const step=nice(Math.max(bx-ax,by-ay)/5);
+        const findX=(X,y)=>{ let lo=-W*0.2,hi=W*1.2; for(let i=0;i<30;i++){ const mid=(lo+hi)/2; if(tm(mid,y)[0]<X) lo=mid; else hi=mid; } return (lo+hi)/2; };
+        const findY=(Y,x)=>{ let lo=-H*0.2,hi=H*1.2; for(let i=0;i<30;i++){ const mid=(lo+hi)/2; if(tm(x,mid)[1]>Y) lo=mid; else hi=mid; } return (lo+hi)/2; };
+        for(let X=Math.ceil(ax/step)*step; X<bx; X+=step){ g.beginPath(); for(let y=0;y<=H;y+=Math.max(8,H/60)){ const x=findX(X,y); y?g.lineTo(m+x,m+y):g.moveTo(m+x,m+y); } g.stroke(); labels.push(["x",m+findX(X,0),`X ${X}`,m+findX(X,H)]); }
+        for(let Y=Math.ceil(ay/step)*step; Y<by; Y+=step){ g.beginPath(); for(let x=0;x<=W;x+=Math.max(8,W/60)){ const y=findY(Y,x); x?g.lineTo(m+x,m+y):g.moveTo(m+x,m+y); } g.stroke(); labels.push(["y",m+findY(Y,0),`Y ${Y}`,m+findY(Y,W)]); }
+      }
+      g.restore();
+      g.fillStyle="#222"; g.font=`${Math.round(11*s)}px ${FONT}`;
+      labels.forEach(([k,p,t,p2])=>{ if(k==="x"){ g.textAlign="center"; g.textBaseline="bottom"; g.fillText(t,p,m-4*s); g.textBaseline="top"; g.fillText(t,p2??p,m+H+4*s); }
+        else{ g.save(); g.translate(m-5*s,p); g.rotate(-Math.PI/2); g.textAlign="center"; g.textBaseline="bottom"; g.fillText(t,0,0); g.restore();
+          g.save(); g.translate(m+W+5*s,p2??p); g.rotate(Math.PI/2); g.textAlign="center"; g.textBaseline="bottom"; g.fillText(t,0,0); g.restore(); } });
+    }
+    // 比例尺與指北針
+    if(o.scale){
+      const lat=(N+S)/2, mpp=Math.cos(lat*Math.PI/180)*40075016.686*((E-Wl)/360)/W;
+      const len=nice(mpp*W/5), px=len/mpp, x0=m+16*s, y0=m+H-18*s, bh=7*s;
+      const lab=len>=1000?`${len/1000} km`:`${len} m`; g.font=`600 ${Math.round(12*s)}px ${FONT}`;
+      g.fillStyle="rgba(255,255,255,.85)"; g.fillRect(x0-8*s,y0-26*s,px+20*s+g.measureText(lab).width,34*s);
+      g.fillStyle="#222"; g.fillRect(x0,y0-bh,px/2,bh); g.strokeStyle="#222"; g.lineWidth=1.2*s; g.strokeRect(x0,y0-bh,px,bh);
+      g.font=`600 ${Math.round(12*s)}px ${FONT}`; g.textBaseline="bottom"; g.textAlign="left";
+      g.fillText("0",x0-3*s,y0-bh-2*s); g.fillText(lab,x0+px+5*s,y0+1*s);
+      const cx=m+W-30*s, cy=m+34*s, r=18*s;
+      g.fillStyle="rgba(255,255,255,.85)"; g.beginPath(); g.arc(cx,cy,r+8*s,0,Math.PI*2); g.fill();
+      g.fillStyle="#222"; g.beginPath(); g.moveTo(cx,cy-r); g.lineTo(cx+r*.45,cy+r*.6); g.lineTo(cx,cy+r*.25); g.closePath(); g.fill();
+      g.strokeStyle="#222"; g.lineWidth=1.2*s; g.beginPath(); g.moveTo(cx,cy-r); g.lineTo(cx-r*.45,cy+r*.6); g.lineTo(cx,cy+r*.25); g.closePath(); g.stroke();
+      g.font=`700 ${Math.round(12*s)}px ${FONT}`; g.textAlign="center"; g.textBaseline="bottom"; g.fillText("N",cx,cy-r-1*s);
+    }
+    // 圖例與資料來源
+    if(rows.length){
+      let y=m+H+Math.max(m*0.6,12*s); g.textAlign="left"; g.textBaseline="top";
+      rows.forEach(r=>{ let x=m; if(r.sw){ g.fillStyle=r.sw; g.fillRect(x,y+r.size*.25,r.size*.8,r.size*.8); x+=r.size*1.2; }
+        g.fillStyle=r.b?"#111":"#333"; g.font=`${r.b?"700 ":""}${r.size}px ${FONT}`; g.fillText(r.tx,x,y); y+=r.size*1.5; });
+    }
+    return cv;
+  }
+  const dms=(v,h)=>{ const a=Math.abs(v), d=Math.floor(a), mi=Math.floor((a-d)*60), se=Math.round(((a-d)*60-mi)*60); return `${d}°${String(mi).padStart(2,"0")}′${se?String(se).padStart(2,"0")+"″":""}${v<0?(h==="E"?"W":"S"):h}`; };
 })();
