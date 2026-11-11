@@ -814,10 +814,48 @@ WELL_GROUPS.forEach(g=>{g.items=g.items.map(([key,sub,pick])=>{
 for(let i=GEO_CAT.length-1;i>=0;i--) if(WELL_ITEMS.some(w=>w.src===GEO_CAT[i].key)) GEO_CAT.splice(i,1);
 GEO_CAT.push(...WELL_ITEMS);
 const geoOn={};
+// ---------- 地熱井的「相關資料」：同一口井在其他資料集的紀錄，以及附近 500 m 內的其他調查資料 ----------
+const normW=s=>String(s??"").replace(/[^0-9A-Za-z]/g,"").toUpperCase();
+const anyTitle=p=>p.Site||p.sitename||p.name||p.Survey_Place||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||p.company||p.hole||p.sect||"";
+const relTitle=p=>anyTitle(p)||(p.id!=null?L2(`未命名（編號 ${p.id}）`,`unnamed (#${p.id})`):L2("未命名","unnamed"));
+let ALLPTS=null;
+const loadAllPts=()=>ALLPTS??=Promise.all([...new Map(GEO_CAT.filter(x=>x.geom==="Point").map(x=>[x.src||x.key,x])).values()]
+  .map(x=>loadSet(x.src||x.key).then(fc=>({c:x,fc}),()=>null))).then(a=>a.filter(Boolean));
+function relBody(x,p){const k=x.src||x.key;
+  return /^ea_/.test(k)?siteBody(p):k==="bh_logs"?bhBody(p):/^kmz_/.test(k)?kwellBody(p):LAND_EN[x.kind]?landBody(p,x.kind):propTable(p,k);}
+const relName=x=>x.src&&/^kmz_/.test(x.src)?`${T(x.region)}・${x.name.replace(/・[^・]*$/,"")}`:x.well||x.region==="全臺"?x.name:`${T(x.region)}・${x.name}`;
+// 只重算彈窗大小與位置；popup.update() 會重跑內容函式，把插入的區塊洗掉
+const relayout=pp=>{ pp._updateLayout?.(); pp._updatePosition?.(); pp._adjustPan?.(); };
+async function wellRelated(popup,f,c){
+  let el=null; for(let i=0;i<20&&!(el=popup.getElement()?.querySelector(".geopop"));i++) await new Promise(r=>setTimeout(r,50));  // 彈窗內容晚一點才放進去
+  if(!el||el.querySelector(".wrel")) return;
+  const box=document.createElement("div"); box.className="wrel"; box.innerHTML=`<div class="m">${L2("查詢相關資料中…","Looking up related data…")}</div>`;
+  el.insertBefore(box,el.querySelector(".src")); relayout(popup);
+  let sets; try{ sets=await loadAllPts(); }catch(e){ box.remove(); return; }
+  const me=L.latLng(f.geometry.coordinates[1],f.geometry.coordinates[0]), nm=normW(anyTitle(f.properties)), self=c.src||c.key;
+  const same=[], near=new Map();
+  for(const {c:x,fc} of sets){ const k=x.src||x.key;
+    for(const g of fc.features||[]){ if(g===f||!g.geometry||g.geometry.type!=="Point") continue;
+      const p=g.properties||{}, d=me.distanceTo([g.geometry.coordinates[1],g.geometry.coordinates[0]]); if(d>500) continue;
+      const t=anyTitle(p), sameWell=k!==self&&(d<=30||(nm&&normW(t)===nm&&d<=200));
+      if(sameWell) same.push({x,p,t,d});
+      else if(!(k===self&&d<1)){ const r=near.get(k)||{x,n:0,best:null}; r.n++; if(!r.best||d<r.best.d) r.best={t:t||relTitle(p),d}; near.set(k,r);} } }
+  const dm=d=>d<1?L2("同位置","same spot"):L2(`相距 ${Math.round(d)} m`,`${Math.round(d)} m away`);
+  let h="";
+  if(same.length) h+=`<div class="m" style="margin-top:8px"><b>${L2("同一口井的其他紀錄","Same well in other datasets")}</b></div>`+
+    same.sort((a,b)=>a.d-b.d).map(r=>`<details class="wsame"><summary>${hesc(relName(r.x))}：${hesc(r.t||relTitle(r.p))}（${dm(r.d)}）</summary>${relBody(r.x,r.p)}</details>`).join("");
+  const nr=[...near.values()].sort((a,b)=>a.best.d-b.best.d);
+  h+=`<div class="m" style="margin-top:8px"><b>${L2("附近 500 m 內的其他調查資料","Other data within 500 m")}</b></div>`+
+    (nr.length?`<table class="sitetab">${nr.slice(0,10).map(r=>`<tr><td>${hesc(relName(r.x))}</td><td>${L2(`${r.n} 筆，最近：${hesc(r.best.t)}（${dm(r.best.d)}）`,`${r.n}; nearest ${hesc(r.best.t)} (${dm(r.best.d)})`)}</td></tr>`).join("")}</table>`
+      :`<div class="m">${L2("沒有找到。","None found.")}</div>`)+
+    `<div class="m">${L2("依網站上已收錄的資料自動比對（同一口井：相距 30 m 內，或井號相同且 200 m 內），僅供參考。","Matched automatically against data on this site (same well: within 30 m, or same well number within 200 m).")}</div>`;
+  box.innerHTML=h; relayout(popup); box.querySelectorAll("details").forEach(d=>d.addEventListener("toggle",()=>relayout(popup)));
+}
 function makeGeoLayer(c,fc){
   const k=c.kind, title=f=>{const p=f.properties;return p.Site||p.sitename||p.name||p.Survey_Place||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;};
   const meta=c.well?c.name:`${T(c.region)}・${c.name}`, isK=/^kmz_/.test(c.src||c.key);
-  const bind=(f,l)=>l.bindPopup(()=>{const ll=l.getLatLng?l.getLatLng():l.getBounds().getCenter();
+  const bind=(f,l)=>{bind0(f,l); if(c.well==="geo") l.on("popupopen",e=>setTimeout(()=>wellRelated(e.popup,f,c),0));};
+  const bind0=(f,l)=>l.bindPopup(()=>{const ll=l.getLatLng?l.getLatLng():l.getBounds().getCenter();
     if(k==="wbor") return pop(hesc(f.properties.hole),meta,bhBody(f.properties),bhSrc(f.properties));
     if(LAND_EN[k]) return pop(hesc(landTitle(f.properties,k)),L2(KIND[k][0],LAND_EN[k]),landBody(f.properties,k),LAND_SRC[k]);
     if(SITE_SHAPE[k]) return pop(hesc(f.properties.company),L2(`現有地熱案場・${f.properties.cat}・${f.properties.status}`,`Existing project · ${st(f.properties.cat)} · ${st(f.properties.status)}`),siteBody(f.properties),SITE_SRC);
@@ -885,6 +923,10 @@ function siteLegend(){
   lg.hidden=false;
 }
 const syncWells=()=>WELL_GROUPS.forEach(g=>g.sync?.());
+// 截圖用：目前開啟的「電廠」圖層裡每座電廠的位置與名稱
+window._shotLabels=()=>WELL_ITEMS.filter(c=>c.kind==="splant"&&geoOn[c.key]&&c.fc).flatMap(c=>c.fc.features.map(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates;
+  const nm=p.info?.name?L2(p.info.name[0],p.info.name[1]):(p.project||p.company);
+  return {lat,lng,text:nm+(p.status==="規劃中"?L2("（規劃中）"," (planned)"):""),color:KIND.splant[1]};}));
 window._wellLegend=wellLegend;
 async function toggleGeo(c,on,box){
   if(!on){ if(c.layer) map.removeLayer(c.layer); geoOn[c.key]=false; geoLegend(); return; }
@@ -2178,7 +2220,9 @@ function buildChatPane(){
       lines.push({t:`${L2("底圖","Base map")}：${base||""}${t?`（${L2("色調","style")}：${T(t.name)}）`:""}`});
       const on=[...document.querySelectorAll('#overs input:checked, #side input[type="checkbox"]:checked')].filter(i=>i.id!=="inview"&&i.closest("label"));
       if(on.length){ lines.push({t:L2("已開啟圖層：","Layers on:")});
-        on.forEach(i=>{ const lab=i.closest("label"), sw=lab.querySelector(".sw"); lines.push({t:lab.textContent.replace(/\s+/g," ").trim(),sw:sw?getComputedStyle(sw).backgroundColor:null}); }); }
+        on.forEach(i=>{ const lab=i.closest("label"), sw=lab.querySelector(".sw"), cl=lab.cloneNode(true), cnt=cl.querySelector(".count");
+          if(cnt) cnt.remove(); const nm=cl.textContent.replace(/\s+/g," ").trim(), ct=cnt?.textContent.trim();  // 名稱和數量分開，免得黏成「電廠7」
+          lines.push({t:ct?L2(`${nm}（${ct}）`,`${nm} (${ct})`):nm,sw:sw?getComputedStyle(sw).backgroundColor:null}); }); }
       const mk=document.querySelectorAll("#marklist .mkitem").length; if(mk) lines.push({t:L2(`我的標示：${mk} 個`,`My markers: ${mk}`)});
       document.querySelectorAll("#implist .nm").forEach(n=>lines.push({t:`${L2("匯入點位","Imported")}：${n.textContent}`}));
       const [x1,y1]=toTM2(N,Wl),[x2,y2]=toTM2(S,E);
@@ -2223,6 +2267,15 @@ function buildChatPane(){
         else{ g.save(); g.translate(m-5*s,p); g.rotate(-Math.PI/2); g.textAlign="center"; g.textBaseline="bottom"; g.fillText(t,0,0); g.restore();
           g.save(); g.translate(m+W+5*s,p2??p); g.rotate(Math.PI/2); g.textAlign="center"; g.textBaseline="bottom"; g.fillText(t,0,0); g.restore(); } });
     }
+    // 電廠名稱：截圖範圍內有開「電廠」圖層時，把名稱寫在符號旁邊（白邊、避開彼此重疊）
+    const labs=(window._shotLabels?.()||[]).filter(q=>q.lat<=N&&q.lat>=S&&q.lng>=Wl&&q.lng<=E);
+    if(labs.length){ const fz=Math.round(12.5*s), boxes=[]; g.font=`700 ${fz}px ${FONT}`; g.textBaseline="middle"; g.lineJoin="round";
+      labs.forEach(q=>{ const x=m+(q.lng-Wl)/(E-Wl)*W, y=m+(yN-merc(q.lat))/(yN-yS)*H, tw=g.measureText(q.text).width, off=11*s;
+        const cand=[[x+off,y,"left"],[x-off,y,"right"],[x,y-off-fz*.6,"center"],[x,y+off+fz*.6,"center"]];
+        for(const [tx,ty,al] of cand){ const x0=al==="left"?tx:al==="right"?tx-tw:tx-tw/2, bx=[x0-2*s,ty-fz*.65,x0+tw+2*s,ty+fz*.65];
+          if(bx[0]<m||bx[2]>m+W||bx[1]<m||bx[3]>m+H) continue;
+          if(boxes.some(b=>!(bx[2]<b[0]||bx[0]>b[2]||bx[3]<b[1]||bx[1]>b[3]))) continue;
+          boxes.push(bx); g.textAlign=al; g.strokeStyle="rgba(255,255,255,.95)"; g.lineWidth=4*s; g.strokeText(q.text,tx,ty); g.fillStyle=q.color||"#087f5b"; g.fillText(q.text,tx,ty); break; } }); }
     // 比例尺與指北針
     if(o.scale){
       const lat=(N+S)/2, mpp=Math.cos(lat*Math.PI/180)*40075016.686*((E-Wl)/360)/W;

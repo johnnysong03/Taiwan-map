@@ -508,3 +508,7 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 @media (max-width:760px){ #qkpanel select,#qkpanel input[type=number]{font-size:16px;width:5.6em} }
 #welllegend .zl .wdesc{display:flex;gap:6px;align-items:flex-start;line-height:1.45}
 #welllegend .zl .wdesc>i{flex:none;margin-top:4px}
+/* 地熱井彈窗：相關資料 */
+.geopop .wrel .wsame{margin:2px 0;font-size:12.5px}
+.geopop .wrel .wsame>summary{cursor:pointer;color:var(--ink)}
+.geopop .wrel .wsame[open]>summary{margin-bottom:4px}
