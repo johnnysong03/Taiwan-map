@@ -1519,10 +1519,10 @@ const NU_CTY=new Set("BCDEFGHJKMNOPQTUVX".split("")); // 有非都市向量檔�
 // 非都市分區與使用地的名稱、代碼依內政部地政司代碼表（data.gov.tw/dataset/25113）；AK 河川區、AL 海域區見於非都市土地使用分區圖。
 const NU_NAMES={AA:"特定農業區",AB:"一般農業區",AC:"鄉村區",AD:"工業區",AE:"森林區",AF:"山坡地保育區",AG:"風景區",AH:"特定專用區",AJ:"國家公園區",AK:"河川區",AL:"海域區",
   EA:"甲種建築用地",EB:"乙種建築用地",EC:"丙種建築用地",ED:"丁種建築用地",EE:"農牧用地",EF:"礦業用地",EG:"交通用地",EH:"水利用地",EJ:"遊憩用地",
-  EK:"古蹟保存用地",EL:"生態保護用地",EM:"國土保安用地",EN:"墳墓用地",EP:"特定目的事業用地",EQ:"鹽業用地",ER:"窯業用地",ES:"林業用地",ET:"養殖用地",EZ:"暫未編定"};
+  EK:"古蹟保存用地",EL:"生態保護用地",EM:"國土保安用地",EN:"殯葬用地",EW:"海域用地",EP:"特定目的事業用地",EQ:"鹽業用地",ER:"窯業用地",ES:"林業用地",ET:"養殖用地",EZ:"暫未編定"};
 const NU_EN={AA:"Special agricultural zone",AB:"General agricultural zone",AC:"Rural zone",AD:"Industrial zone",AE:"Forest zone",AF:"Slopeland conservation zone",AG:"Scenic zone",AH:"Special-use zone",AJ:"National park zone",AK:"River zone",AL:"Marine zone",
   EA:"Class A building land",EB:"Class B building land",EC:"Class C building land",ED:"Class D building land",EE:"Agriculture & husbandry land",EF:"Mining land",EG:"Transport land",EH:"Water conservancy land",EJ:"Recreation land",
-  EK:"Heritage preservation land",EL:"Ecological protection land",EM:"National security land",EN:"Cemetery land",EP:"Special-purpose business land",EQ:"Salt industry land",ER:"Kiln industry land",ES:"Forestry land",ET:"Aquaculture land",EZ:"Not yet designated"};
+  EK:"Heritage preservation land",EL:"Ecological protection land",EM:"National land conservation land",EN:"Funeral land",EW:"Marine land",EP:"Special-purpose business land",EQ:"Salt industry land",ER:"Kiln industry land",ES:"Forestry land",ET:"Aquaculture land",EZ:"Not yet designated"};
 // 非都市使用分區圖磚顏色：依「非都市土地使用分區類別圖」與「11種使用分區」圖例，和圖磚實際的 10 種主色逐一比對而得。
 // 灰色 (102,102,102) 經內政部向量檔比對為海域區（AL，例如新北市石門沿岸）；圖磚在外海是透明的。
 const NU1_KEY=[[[255,255,0],"AA"],[[255,165,0],"AB"],[[115,0,0],"AD"],[[255,0,0],"AC"],[[38,115,0],"AE"],[[76,230,0],"AF"],
@@ -1536,7 +1536,16 @@ const nuClass=code=>NU_CLASS.find(x=>x.k===code)||NU_CLASS[NU_CLASS.length-1];
 // 卡片上的分區文字：圖例類別名稱；原始分區名稱與圖例不同時，括號附上原名與代碼
 const nuZoneText=code=>{const c=nuClass(code), own=NU_NAMES[code], lab=L2(c.zh,c.en);
   return own&&own!==c.zh?`${lab}（${L2(own,NU_EN[code])}，${code}）`:`${lab}（${code}）`;};
-const NU2_KEY=[]; // 使用地類別：官方圖例尚待補上
+// 使用地類別（nURBAN2 圖磚）：依國土測繪圖資服務雲「非都市土地使用地類別」圖例（docs/reference），
+// 並在全臺多處圖磚實測底色與斜線色。好幾類共用同一底色，只靠斜線區分；甲、乙、丙種建築用地顏色完全相同，無法區分。
+// 生態保護、古蹟保存、海域用地在實測樣本中沒有出現，顏色依圖例推定（未能確認）。
+const U2C={yel:[255,241,0],for:[112,181,44],dbrn:[129,41,45],red:[230,0,18],blu:[0,117,194],lblu:[0,167,234],pink:[232,82,152],pur:[165,0,130],gry:[181,181,182],wht:[255,255,255],sea:[216,216,216],
+  dkg:[0,105,62],vio:[117,124,187],blk:[35,24,21]};
+// [底色, 斜線色或 null, 使用地代碼（多個候選以 | 分隔）, 是否已實測]
+const U2_RULES=[["yel",null,"EE",1],["for","dkg","EM",1],["for",null,"ES",1],["dbrn","dkg","ER",1],["dbrn","wht","EG",1],["dbrn","vio","EF",1],["dbrn",null,"ED",1],
+  ["red","dkg","EP",1],["red",null,"EA|EB|EC",1],["blu","wht","EH",1],["blu",null,"EQ",1],["lblu",null,"ET",1],["pink",null,"EJ",1],["pur",null,"EZ",1],["gry","blk","EN",1],["gry",null,"EN",1],
+  ["wht","dkg","EL",0],["wht","blk","EK",0],["sea",null,"EW",0]];
+const NU2_KEY=Object.entries(U2C).filter(([k])=>!["dkg","vio","blk"].includes(k)).map(([k,c])=>[c,k]);
 const nuName=c=>EN?NU_EN[c]:NU_NAMES[c];
 // 取最接近的圖例色（容許圖磚邊緣的混色），差太多就當作圖例未列
 const nuMatch=(rgb,key)=>{let best=null,bd=1e9;for(const [c,code] of key){const d=Math.hypot(rgb[0]-c[0],rgb[1]-c[1],rgb[2]-c[2]);if(d<bd){bd=d;best=code;}}return bd<=40?best:null;};
@@ -1545,10 +1554,10 @@ const nuMatch=(rgb,key)=>{let best=null,bd=1e9;for(const [c,code] of key){const 
 // re 比對臺北市的分區代碼，nre 比對新北市的分區名稱（新北資料沒有代碼）。比對順序有差：例如廣場要排在公園之前。
 const ZG=[
   {k:"mag",re:/^(PED|PTA3|PUG)/,nre:/廣場|高速公路|加油/,c:"rgb(255,0,255)",zh:"廣場、高速公路、加油站",en:"Plazas, freeways, gas stations"},
-  {k:"water",re:/^(PW|W$|PFA)/,nre:/河川|河道|行水/,c:"rgb(127,255,255)",zh:"河川區、河道",en:"Rivers, river channels"},
+  {k:"water",re:/^(PW|W$|PFA)/,nre:/河川|河道|行水|水岸發展|海濱浴場/,c:"rgb(127,255,255)",zh:"河川區、河道、水岸發展區、海濱浴場",en:"Rivers, river channels, waterfront development, beaches"},
   {k:"util",re:/^(PUB|PUA|PUD|PTB|PPA|PPB|PPC|PFD2)/,nre:/變電|電力|鐵路|垃圾|污水|汙水|煤氣|瓦斯|屠宰|焚化|鐵塔/,c:"rgb(183,183,183)",zh:"電力、鐵路、垃圾、污水、煤氣設施",en:"Power, railway, refuse, sewage, gas"},
   {k:"fun",re:/^PDA/,nre:/殯|火葬/,c:"rgb(255,255,127)",zh:"殯葬設施",en:"Funeral facilities"},
-  {k:"green",re:/^(L$|PE|PDB)/,nre:/公園|綠地|體育|兒童遊樂|墓|風景|園道|綠帶/,c:"rgb(0,255,0)",zh:"風景區、公園綠地、體育場、墳墓",en:"Scenic, parks & green space, sports, cemeteries"},
+  {k:"green",re:/^(L$|PE|PDB)/,nre:/公園|綠地|體育|兒童遊樂|墓|風景|園道|綠帶|名勝古蹟|紀念性/,c:"rgb(0,255,0)",zh:"風景區、公園綠地、體育場、墳墓、名勝古蹟紀念性建築",en:"Scenic, parks & green space, sports, cemeteries, historic memorial buildings"},
   {k:"mkt",re:/^(PM|PTD)/,nre:/市場|停車/,c:"rgb(255,63,0)",zh:"市場、停車場",en:"Markets, parking"},
   {k:"edu",re:/^(C|PS|PGA0)/,nre:/學|文教|文小|文中|文高|文大|社教/,c:"rgb(191,127,255)",zh:"文教區、學校、社教",en:"Education, schools"},
   {k:"gov",re:/^(G|PG|PTE$|PUF|PUC|PH|PUE)/,nre:/機關|行政|郵|電信|醫|衛生|自來水|消防|警|航空/,c:"rgb(0,127,255)",zh:"行政區、機關（含郵電、醫療、自來水）、航空站",en:"Administrative, government (incl. post, telecom, medical, water works), airport"},
@@ -1604,18 +1613,68 @@ async function pixelAt(layer,lat,lng,z=17){
   const s=ctx.canvas.width/256, d=ctx.getImageData(Math.min(255,Math.floor((xf-tx)*256))*s|0,Math.min(255,Math.floor((yf-ty)*256))*s|0,1,1).data;
   return d[3]<128?null:[d[0],d[1],d[2]];
 }
+// 讀點選位置周圍 (2r+1)×(2r+1) 像素，回傳各顏色的像素數（透明不算）；斜線圖例要看一小塊才分得出來
+async function pixelWin(layer,lat,lng,r=4,z=17){
+  const n=2**z, xf=(lng+180)/360*n, rr=lat*Math.PI/180, yf=(1-Math.log(Math.tan(rr)+1/Math.cos(rr))/Math.PI)/2*n;
+  const px=Math.floor(xf*256), py=Math.floor(yf*256), cnt=new Map();
+  const tiles=new Set(); for(let dy=-r;dy<=r;dy+=r) for(let dx=-r;dx<=r;dx+=r) tiles.add(`${(px+dx)>>8},${(py+dy)>>8}`);
+  const ctxs={};
+  await Promise.all([...tiles].map(async t=>{const [tx,ty]=t.split(",").map(Number), key=`${layer}/${z}/${ty}/${tx}`;
+    let ctx=tileCache.get(key);
+    if(!ctx){ const blob=await fetch(`https://wmts.nlsc.gov.tw/wmts/${layer}/default/GoogleMapsCompatible/${z}/${ty}/${tx}`).then(q=>{if(!q.ok) throw new Error(q.status);return q.blob();});
+      const bmp=await createImageBitmap(blob), c=document.createElement("canvas"); c.width=bmp.width; c.height=bmp.height;
+      ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(bmp,0,0);
+      if(tileCache.size>40) tileCache.delete(tileCache.keys().next().value); tileCache.set(key,ctx); }
+    ctxs[t]=ctx; }));
+  for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){const X=px+dx,Y=py+dy,ctx=ctxs[`${X>>8},${Y>>8}`]; if(!ctx) continue;
+    const s=ctx.canvas.width/256, d=ctx.getImageData((X&255)*s|0,(Y&255)*s|0,1,1).data; if(d[3]<128) continue;
+    const k=`${d[0]},${d[1]},${d[2]}`; cnt.set(k,(cnt.get(k)||0)+1);}
+  return cnt;
+}
+const near=(a,b,t=12)=>Math.abs(a[0]-b[0])<=t&&Math.abs(a[1]-b[1])<=t&&Math.abs(a[2]-b[2])<=t;
+// 使用地類別判讀：先找底色（像素最多的已知色），再看有沒有該底色會搭配的斜線色（占一成以上）
+function useTypeOf(cnt){
+  let tot=0; const got={}; for(const [k,v] of cnt){tot+=v; const c=k.split(",").map(Number); const nm=Object.keys(U2C).find(n=>near(c,U2C[n])); if(nm) got[nm]=(got[nm]||0)+v;}
+  if(!tot) return null;
+  const known=Object.entries(got).sort((a,b)=>b[1]-a[1]); if(!known.length) return {rgb:[...cnt.entries()].sort((a,b)=>b[1]-a[1])[0][0].split(",").map(Number)};
+  for(const [base] of known){ const rules=U2_RULES.filter(r=>r[0]===base); if(!rules.length) continue;
+    const hit=rules.find(r=>r[1]&&(got[r[1]]||0)>=tot*.06)||rules.find(r=>!r[1]);
+    if(hit) return {rgb:U2C[base],codes:hit[2].split("|"),checked:!!hit[3],hatch:hit[1]?U2C[hit[1]]:null}; }
+  return {rgb:U2C[known[0][0]]};
+}
 const sw=rgb=>`<span class="zsw" style="background:rgb(${rgb.join(",")})"></span>`;
 const swc=c=>`<span class="zsw" style="background:${c}"></span>`;
 const zNote=()=>`<div class="src">${L2("以點選位置判斷，不是逐筆地號的邊界；位在分區交界時可能判斷錯誤。正式分區請以主管機關核發的土地使用分區證明為準。","Based on the clicked point, not on parcel boundaries, so it may be wrong near zone edges. Official zoning comes from a zoning certificate issued by the local government.")}</div>`;
 const srcLine=(k,date)=>`<div class="src">${L2(`資料：${ZSRC[k].zh}，資料集更新 ${date}。`,`Data: ${ZSRC[k].en}, dataset updated ${date}.`)}</div>`;
 // 使用地類別（讀圖磚顏色）
-function useTypeRow(rgb){
+function useTypeRow(u){
   const lab=L2("使用地類別","Land-use type");
-  if(!rgb) return `<dt>${lab}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`;
-  const code=nuMatch(rgb,NU2_KEY);
-  return `<dt>${lab}</dt><dd>${sw(rgb)}${code?nuName(code):NU2_KEY.length?L2("圖例未列的顏色","Colour not in the legend"):L2("顏色對照尚待官方圖例確認","Colour key not yet confirmed against the official legend")}</dd>`;
+  if(!u) return `<dt>${lab}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`;
+  const swH=u.hatch?`<span class="zsw" style="background:repeating-linear-gradient(-45deg,rgb(${u.hatch.join(",")}) 0 2px,rgb(${u.rgb.join(",")}) 2px 5px)"></span>`:sw(u.rgb);
+  if(!u.codes) return `<dt>${lab}</dt><dd>${sw(u.rgb)}${L2("圖例未列的顏色","Colour not in the legend")}</dd>`;
+  const txt=u.codes.length>1?L2(`${u.codes.map(c=>NU_NAMES[c].replace("建築用地","")).join("、")}建築用地（圖磚顏色相同，無法區分，請以土地登記謄本為準）`,`${u.codes.map(c=>NU_EN[c]).join(" / ")} (identical tile colours; check the land register)`)
+    :`${nuName(u.codes[0])}${u.codes[0]==="EW"?"":`（${u.codes[0]}）`}`;
+  return `<dt>${lab}</dt><dd>${swH}${txt}${u.checked?"":L2("；此類顏色依圖例推定，未在圖磚實測（未能確認）","; colour inferred from the legend, not verified on tiles")}</dd>`;
 }
-async function zoneHTML(cc,lat,lng){
+// 非都市土地使用分區與使用地編定原則表（製定非都市土地使用分區圖及編定各種使用地作業須知；docs/reference，107 年 3 月檔案版本）
+// 欄：特農非山、特農山、一農非山、一農山、鄉村、工業、森林、山坡地保育、風景、河川、特定專用、海域；v 可編定、t 依條件編定（△）、x 不可
+const NU_RULE_COLS=["AA0","AA1","AB0","AB1","AC","AD","AE","AF","AG","AK","AH","AL"];
+const NU_RULE=[["EA","vxvxxxxxxxvx"],["EB","xxxxvxxxxxxx"],["EC","xvxvxxtttxxx"],["ED","tttttvtttxtx"],["EE","vvvvvvvvvtvx"],["ES","xxvvvvvvvxvx"],["ET","ttvvvxvvvxvx"],
+  ["EQ","xxttxxxxxxtx"],["EF","ttttxxtttxtx"],["ER","xxttxtxvxxtx"],["EG","vvvvvvvvvtvx"],["EH","vvvvvvvvvvvx"],["EJ","ttvvvvvvvxvx"],["EK","vvvvvvvvvtvx"],["EL","vvvvvvvvvtvx"],
+  ["EM","vvvvvvvvvtvx"],["EN","ttvvtxtvtxvx"],["EP","vvvvvvvvvtvx"],["EW","xxxxxxxxxxxv"]];
+const NU_RULE_NOTE={AA:["以編定農牧用地為主。","Mainly agriculture & husbandry land."],AB:["以編定農牧用地為主。","Mainly agriculture & husbandry land."],AC:["以編定建築用地或遊憩用地為主。","Mainly building or recreation land."],
+  AD:["以編定丁種建築用地為主。","Mainly Class D building land."],AE:["以編定林業用地為主。","Mainly forestry land."],AF:["以編定林業用地為主。","Mainly forestry land."],AG:["以編定林業用地、遊憩用地為主。","Mainly forestry and recreation land."],
+  AK:["以編定水利用地為主，依現況編定為農牧用地者以私有土地為限。","Mainly water conservancy land; agriculture land only for private land in current use."],AH:["以該區性質之主要用地為主。","Mainly the land type matching the zone's purpose."]};
+function nuRuleHTML(zone){
+  const cols=NU_RULE_COLS.map((c,i)=>[c,i]).filter(([c])=>c.slice(0,2)===zone); if(!cols.length) return zone==="AJ"?`<div class="src">${L2("編定原則表沒有列國家公園區，使用依國家公園計畫管制。","The designation table does not cover national park zones; use follows the national park plan.")}</div>`:"";
+  const list=(i,m)=>NU_RULE.filter(r=>r[1][i]===m).map(r=>nuName(r[0])).join("、")||L2("（無）","(none)");
+  const blk=([c,i])=>`${cols.length>1?`<b>${c.endsWith("1")?L2("山坡地","Slopeland"):L2("非山坡地","Non-slopeland")}</b>　`:""}${L2("可編定：","Allowed: ")}${list(i,"v")}<br>${L2("依條件編定（△）：","Conditional (△): ")}${list(i,"t")}`;
+  const note=NU_RULE_NOTE[zone];
+  return `<details class="zrule"><summary>${L2("這個分區可以編定哪些使用地","Land-use types allowed in this zone")}</summary><div>${cols.map(blk).join("<br>")}${note?`<br>${L2("備註：","Note: ")}${L2(...note)}`:""}</div>`+
+    `<div class="src">${L2("依據：「製定非都市土地使用分區圖及編定各種使用地作業須知」編定原則表（本站收錄的檔案為 107 年 3 月版本，是否為最新版未能確認）。特定農業區、一般農業區分非山坡地與山坡地兩欄，這一點是否在山坡地範圍請開「山坡地範圍」圖層確認。",
+      "Source: designation table of the operating guidelines for non-urban zoning maps (copy dated March 2018; whether it is the latest version is unconfirmed).")}</div></details>`;
+}
+async function zoneCore(cc,lat,lng){
   // 1. 都市計畫（臺北市、新北市）
   const urbanKey=cc==="A"?"tpe":cc==="F"?"ntpc":null;
   if(urbanKey){
@@ -1625,26 +1684,142 @@ async function zoneHTML(cc,lat,lng){
   }
   // 2. 非都市土地：使用分區用內政部向量檔，使用地類別讀圖磚
   if(NU_CTY.has(cc)){
-    const [z,c2]=await Promise.all([zoneAt("nu-"+cc,lat,lng),pixelAt("nURBAN2",lat,lng).catch(()=>null)]);
-    if(z) return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}<dt>${L2("使用分區","Zone")}</dt><dd>${swc(zColor(z.key,z.code))}${nuZoneText(z.code)}</dd>${useTypeRow(c2)}</dl>`+nuDefHTML(z.code)+
+    const [z,c2]=await Promise.all([zoneAt("nu-"+cc,lat,lng),pixelWin("nURBAN2",lat,lng).then(useTypeOf).catch(()=>null)]);
+    if(z) return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}<dt>${L2("使用分區","Zone")}</dt><dd>${swc(zColor(z.key,z.code))}${nuZoneText(z.code)}</dd>${useTypeRow(c2)}</dl>`+nuDefHTML(z.code)+nuRuleHTML(z.code)+
       srcLine("nu",z.date)+`<div class="src">${L2(`使用地類別：${ZSRC.tile.zh}，依圖磚顏色判讀，圖磚未標示更新日期。`,`Land-use type: ${ZSRC.tile.en}, read from the tile colour; the tiles carry no update date.`)}</div>`+zNote();
     return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，多半位在都市計畫區或國家公園。本站目前只有臺北市、新北市的都市計畫分區，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is most likely inside an urban plan area or a national park. This site only has urban plan zoning for Taipei and New Taipei; check the local government's urban planning service elsewhere.")}</dd></dl>`+
       srcLine(cc==="F"?"ntpc":"nu",cc==="F"?ZN.data.ntpc.date:ZN.data["nu-"+cc].date);
   }
   // 3. 沒有向量檔的縣市（嘉義市、金門、連江）：使用分區與使用地類別都讀圖磚
-  const [c1,c2]=await Promise.all([pixelAt("nURBAN1",lat,lng),pixelAt("nURBAN2",lat,lng)]);
+  const [c1,c2]=await Promise.all([pixelAt("nURBAN1",lat,lng),pixelWin("nURBAN2",lat,lng).then(useTypeOf)]);
   if(!c1&&!c2) return `<dl class="zone"><dt>${L2("土地使用分區","Zoning")}</dt><dd>${L2("不在非都市土地分區圖範圍內，可能是都市計畫區或國家公園。本站目前只有臺北市、新北市的都市計畫分區，其他縣市請洽該縣市的都市計畫查詢系統。","Not covered by the non-urban zoning map, so it is probably inside an urban plan area or a national park. This site only has urban plan zoning for Taipei and New Taipei; check the local government's urban planning service elsewhere.")}</dd></dl>`+
     `<div class="src">${L2(`資料：${ZSRC.tile.zh}。`,`Data: ${ZSRC.tile.en}.`)}</div>`;
   const c1code=c1&&nuMatch(c1,NU1_KEY);
   const row1=!c1?`<dt>${L2("使用分區","Zone")}</dt><dd>${L2("（圖上無資料）","(no data)")}</dd>`:`<dt>${L2("使用分區","Zone")}</dt><dd>${sw(c1)}${c1code?nuZoneText(c1code):L2("圖例未列的顏色","Colour not in the legend")}</dd>`;
-  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row1}${useTypeRow(c2)}</dl>`+(c1code?nuDefHTML(c1code):"")+
+  return `<dl class="zone">${L2("<dt class=\"h\">非都市土地</dt>","<dt class=\"h\">Non-urban land</dt>")}${row1}${useTypeRow(c2)}</dl>`+(c1code?nuDefHTML(c1code)+nuRuleHTML(c1code):"")+
     `<div class="src">${L2(`資料：${ZSRC.tile.zh}，依圖磚顏色對照圖例判讀，圖磚未標示更新日期。`,`Data: ${ZSRC.tile.en}, read from the tile colour against the legend; the tiles carry no update date.`)}</div>${zNote()}`;
+}
+// ---------- 共用的小工具：載入 script、差分整數座標解碼 ----------
+const loadScript=(src,test)=>test()?Promise.resolve():new Promise((ok,fail)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=fail;document.head.appendChild(s);});
+const once={}; const loadOnce=(src,test)=>once[src]??=loadScript(src,test).catch(e=>{delete once[src];throw e;});
+// ---------- 國土利用現況調查：讀 LUIMAP 圖磚顏色反查第三級類別（色碼與圖磚逐一比對相符） ----------
+const loadLUI=()=>loadOnce("zoning/lui.js",()=>!!window.LUI).then(()=>window.LUI);
+async function luiHTML(lat,lng){
+  const [U,cnt]=await Promise.all([loadLUI(),pixelWin("LUIMAP",lat,lng,2)]);
+  const lab=L2("國土利用現況","Land use (survey)");
+  const hits={}; for(const [k,v] of cnt){const c=k.split(",").map(Number); const m=U.l3.find(x=>near(c,x[2],6)); if(m) hits[m[0]]=(hits[m[0]]||0)+v;}
+  const best=Object.entries(hits).sort((a,b)=>b[1]-a[1])[0];
+  const src=`<div class="src">${L2("資料：內政部國土測繪中心「國土利用現況調查成果圖」(LUIMAP) 圖磚，依「109 年版分類色碼表」判讀；各地調查年度不同，圖磚未標示年度。分類說明：《國土利用現況調查辦法》附表一（108 年 3 月 28 日發布）。",
+    "Data: NLSC land-use survey tiles (LUIMAP), read with the 2020 colour table; survey years vary by area and are not shown on the tiles. Class descriptions: Land Use Survey Regulations, Table 1 (2019).")}</div>`;
+  if(!best) return `<dl class="zone"><dt class="h">${lab}</dt><dd>${cnt.size?L2("圖磚顏色不在色碼表內（可能在類別交界）。","Tile colour not in the colour table (possibly at a class boundary)."):L2("這裡沒有國土利用調查資料。","No land-use survey data here.")}</dd></dl>`+src;
+  const [code,name,rgb,desc]=U.l3.find(x=>x[0]===best[0]), l1=U.l1[code.slice(0,2)], l2=U.l2[code.slice(0,4)];
+  return `<dl class="zone"><dt class="h">${lab}</dt><dt>${L2("第三級","Level 3")}</dt><dd>${sw(rgb)}${code}　${name}</dd><dt>${L2("上層分類","Parent classes")}</dt><dd>${l1?l1[0]:""} › ${l2||""}</dd></dl>`+
+    (desc?`<div class="zdef"><b>${L2("分類說明","Definition")}</b>　${desc}</div>`:`<div class="zdef">${L2("附表沒有列這一類的說明。","The regulation table gives no description for this class.")}</div>`)+src;
+}
+// ---------- 原住民保留地：點查（先看粗網格，落在網格內才載入範圍檔） ----------
+async function reserveHTML(lat,lng){
+  await loadOnce("land/reserve-grid.js",()=>!!window.RESERVE_GRID);
+  const G=window.RESERVE_GRID, cell=`${Math.floor(lng/G.s)}_${Math.floor(lat/G.s)}`;
+  G.set??=new Set(G.c.split(" "));
+  let hit=null;
+  if(G.set.has(cell)){
+    await loadOnce("geotex/land_reserve.js",()=>!!window.GEOTEX_D?.land_reserve);
+    for(const f of window.GEOTEX_D.land_reserve.features){const g=f.geometry, polys=g.type==="Polygon"?[g.coordinates]:g.coordinates;
+      if(polys.some(p=>inRings(p,lng,lat))){hit=f.properties;break;}}
+  }
+  const lab=L2("原住民保留地","Indigenous reserved land");
+  return `<dl class="zone"><dt class="h">${lab}</dt><dd>${hit?L2(`位於原住民保留地範圍內：${hesc2(hit.county)}${hesc2(hit.town)}・${hesc2(hit.sect)}（${hesc2(hit.code)}）`,`Inside reserved land: ${hesc2(hit.sect)} section (${hesc2(hit.code)}), ${hesc2(hit.town)}, ${hesc2(hit.county)}`)
+    :L2("不在原住民保留地範圍內。","Not inside reserved land.")}</dd></dl>`+
+    `<div class="src">${L2("依點位對照原住民族委員會「原住民保留地範圍資訊」（data.gov.tw 33685，SHP 2022-08-22 上架，2026-11-09 下載，以地段為單位、簡化約 5 公尺）判讀，靠近邊界時可能有誤；不能取代地政機關的土地登記或主管機關核發的證明。",
+      "Point check against the Council of Indigenous Peoples reserved-land extent (data.gov.tw 33685, listed 2022-08-22, downloaded 2026-11-09; by land section, simplified ~5 m). May be wrong near edges; does not replace the land register or an official certificate.")}</div>`;
+}
+const hesc2=s=>String(s??"").replace(/[<>&"]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[ch]));
+// 卡片：土地使用分區＋國土利用現況＋原住民保留地
+async function zoneHTML(cc,lat,lng){
+  const [a,b,c]=await Promise.all([zoneCore(cc,lat,lng),luiHTML(lat,lng).catch(()=>""),reserveHTML(lat,lng).catch(()=>"")]);
+  return a+b+c;
 }
 async function appendZone(info,cc,lat,lng){
   const box=document.createElement("div"); box.className="zonebox"; box.innerHTML=`<div class="m">${L2("查詢土地使用分區中…","Looking up land-use zoning…")}</div>`; info.appendChild(box);
   try{ box.innerHTML=await zoneHTML(cc,lat,lng); }
   catch(err){ box.innerHTML=`<div class="m">${L2("土地使用分區查詢失敗，請確認網路連線後再點一次。","Zoning lookup failed. Check your connection and click again.")}</div>`; }
 }
+// ---------- 土地圖層（兩張地圖共用）：原住民族地區、原住民保留地、傳統領域、山坡地範圍、保安林；另說明地籍圖與國土利用 ----------
+(()=>{
+const ov=document.getElementById("overs"); if(!ov) return;
+const fs=document.createElement("fieldset"); fs.id="landset";
+fs.innerHTML=`<legend class="label">${L2("土地圖層","Land layers")}</legend><div id="lxrows"></div><div id="lxlegend" hidden></div>`;
+ov.after(fs);
+map.createPane("landv"); map.getPane("landv").style.zIndex=395;
+const rd=L.canvas({pane:"landv",padding:.3});
+const dec5r=fl=>{const pts=[];let x=0,y=0;for(let i=0;i<fl.length;i+=2){x+=fl[i];y+=fl[i+1];pts.push([y/1e5,x/1e5]);}return pts;};
+const loadLand=k=>loadOnce(`land/${k}.js`,()=>!!window.LANDDATA?.[k]).then(()=>window.LANDDATA[k]);
+const tab=rows=>`<table class="sitetab">${rows.filter(Boolean).map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table>`;
+const lpop=(t,m,body,src)=>`<div class="geopop"><h4>${t}</h4>${m?`<div class="m">${m}</div>`:""}${body}<div class="src">${src}</div></div>`;
+const polyLayer=(D,style,tip,pop)=>{const g=L.layerGroup(); D.f.forEach(([a,ps])=>ps.forEach(rings=>{const l=L.polygon(rings.map(dec5r),Object.assign({renderer:rd},typeof style==="function"?style(a):style));
+  if(tip) l.bindTooltip(tip(a),{sticky:true}); if(pop) l.bindPopup(()=>pop(a)); l.addTo(g);})); return g;};
+const geoJ=(key,style,pop)=>loadOnce(`geotex/${key}.js`,()=>!!window.GEOTEX_D?.[key]).then(()=>L.geoJSON(window.GEOTEX_D[key],{renderer:rd,style,onEachFeature:(f,l)=>l.bindPopup(()=>pop(f.properties))}));
+const SRC={
+  indig:L2('名單：原住民族委員會公布之「原住民地區」55 個鄉（鎮、市、區），行政院 91 年 4 月 16 日院臺疆字第 0910017300 號函核定。邊界：內政部<a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">鄉鎮市區界線</a>（官方下載站無法連線，改用 taiwan-atlas 套件 2021.9.20 版的 1:10,000 簡化轉檔）',
+    'List: the 55 indigenous areas published by the Council of Indigenous Peoples (Executive Yuan approval, 16 Apr 2002). Boundaries: MOI <a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">township boundaries</a> via the taiwan-atlas 2021.9.20 package (1:10,000, simplified)'),
+  slope:L2('資料：農業部農村發展及水土保持署<a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">115 年度山坡地範圍圖（水保法、不含六都）</a>（檔案日期 115-07-08，簡化 15 公尺）。六都的山坡地範圍由各市政府公告，這裡沒有',
+    'Data: ARDSWC <a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">2026 slopeland map (Soil and Water Conservation Act, excluding the six special municipalities)</a>, file dated 2026-07-08, simplified 15 m'),
+  pforest:L2('資料：農業部林業及自然保育署<a href="https://data.gov.tw/dataset/9928" target="_blank" rel="noopener">全臺保安林分布概略圖</a>（1151 版，簡化 8 公尺）。概略圖僅供參考，實際範圍以公告為準',
+    'Data: Forestry and Nature Conservation Agency <a href="https://data.gov.tw/dataset/9928" target="_blank" rel="noopener">protection forest overview</a> (May 2026 edition, simplified 8 m). Indicative only'),
+  lres:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">原住民保留地範圍資訊</a>（SHP 2022-08-22 上架，2026-11-09 下載，以地段為單位）',
+    'Data: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">reserved land extent</a> (listed 2022-08-22, downloaded 2026-11-09; by land section)'),
+  ltrad:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">歷年原住民族傳統領域調查成果範圍（91–98 年）</a>。這是調查成果，不是依法公告的傳統領域範圍',
+    'Data: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">traditional territory survey 2002–2009</a>. Survey results, not legally designated territory'),
+};
+const ST={indig:a=>({color:a[1]==="山地"?"#c92a2a":"#e67700",weight:1.4,fillColor:a[1]==="山地"?"#c92a2a":"#e67700",fillOpacity:.1}),
+  lres:{color:"#d9480f",weight:1,fillColor:"#d9480f",fillOpacity:.22},ltrad:{color:"#7048e8",weight:1.6,dashArray:"6 4",fillColor:"#7048e8",fillOpacity:.1},
+  slope:{color:"#795548",weight:.8,fillColor:"#a1887f",fillOpacity:.28},pforest:{color:"#1b5e20",weight:.8,fillColor:"#43a047",fillOpacity:.38}};
+const LX=[
+  {k:"indig",zh:"原住民族地區（55 個鄉鎮市區）",en:"Indigenous areas (55 townships)",make:async()=>polyLayer(await loadLand("indig"),ST.indig,a=>a[0],
+    a=>lpop(a[0],a[1]==="山地"?L2("山地原住民鄉（區）","Mountain indigenous township"):L2("平地原住民鄉（鎮、市）","Plains indigenous township"),"",SRC.indig)),
+    leg:[[ST.indig(["","山地"]),L2("山地原住民鄉（區），30 個","Mountain indigenous townships (30)")],[ST.indig(["","平地"]),L2("平地原住民鄉（鎮、市），25 個","Plains indigenous townships (25)")]]},
+  {k:"lres",zh:"原住民保留地",en:"Indigenous reserved land",geo:1,make:()=>geoJ("land_reserve",ST.lres,p=>lpop(hesc2(p.sect),`${hesc2(p.county)}${hesc2(p.town)}・${hesc2(p.code)}`,
+    `<div class="m">${L2("範圍以地段為單位；個別土地是否為原住民保留地，以地政機關的土地登記為準。","Grouped by land section; the land register is authoritative.")}</div>`,SRC.lres)),
+    leg:[[ST.lres,L2("原住民保留地（點地圖可查是否在範圍內）","Reserved land (click the map to check a point)")]]},
+  {k:"ltrad",zh:"原住民傳統領域（91–98 年調查成果）",en:"Indigenous traditional territory (2002–2009 survey)",geo:1,make:()=>geoJ("land_trad",ST.ltrad,p=>lpop(hesc2(p.name||p.attrs?.族群||""),`${hesc2(p.county||"")}${hesc2(p.town||"")}`,
+    tab(Object.entries(p.attrs||{}).map(([k,v])=>[hesc2(k),hesc2(v)])),SRC.ltrad)),
+    leg:[[ST.ltrad,L2("傳統領域調查成果範圍（非法定範圍）","Traditional territory survey extent (not legal designation)")]]},
+  {k:"slope",zh:"山坡地範圍（水保法，不含六都）",en:"Slopeland (excluding six municipalities)",make:async()=>polyLayer(await loadLand("slope"),ST.slope,a=>L2(`${a[0]} 山坡地範圍`,`${a[0]} slopeland`),
+    a=>lpop(L2(`${a[0]} 山坡地範圍`,`${a[0]} slopeland`),hesc2(a[1]),tab([[L2("劃入公告日期","Announced"),hesc2(a[2])],[L2("公告文號","Document no."),hesc2(a[3])],[L2("主管機關","Authority"),hesc2(a[4])]]),SRC.slope)),
+    leg:[[ST.slope,L2("山坡地範圍（臺北、新北、桃園、臺中、臺南、高雄不在此圖）","Slopeland (six special municipalities not included)")]]},
+  {k:"pforest",zh:"保安林地分布概略圖",en:"Protection forests (overview)",make:async()=>polyLayer(await loadLand("pforest"),ST.pforest,a=>L2(`第 ${a[0]} 號保安林`,`Protection forest no. ${a[0]}`),
+    a=>lpop(L2(`第 ${a[0]} 號保安林`,`Protection forest no. ${a[0]}`),hesc2(a[1]),tab([[L2("種類","Type"),hesc2(a[2])],[L2("面積","Area"),`${a[3]} ha`],[L2("管理分署","Branch"),hesc2(a[4])]]),SRC.pforest)),
+    leg:[[ST.pforest,L2("保安林（概略範圍）","Protection forest (indicative)")]]},
+];
+const on={}, layers={}, rows=fs.querySelector("#lxrows"), lg=fs.querySelector("#lxlegend");
+const luiOver=OVERS["國土利用現況調查"];
+function legend(msg){
+  const parts=LX.filter(x=>on[x.k]).map(x=>`<div class="zl"><b>${L2(x.zh,x.en)}</b>${x.leg.map(([st,t])=>`<span><i style="background:${st.fillColor}55;border:1.5px ${st.dashArray?"dashed":"solid"} ${st.color}"></i>${t}</span>`).join("")}<div class="src">${SRC[x.k]}</div></div>`);
+  if(luiOver&&map.hasLayer(luiOver)&&window.LUI) parts.push(`<div class="zl"><b>${L2("國土利用現況調查（第一級）","Land-use survey (level 1)")}</b>`+Object.entries(window.LUI.l1).map(([c,[n,rgb]])=>`<span><i style="background:rgb(${rgb.join(",")})"></i>${c} ${n}</span>`).join("")+
+    `<div class="src">${L2("圖磚用第三級 93 類各自的顏色，這裡只列第一級的代表色；點地圖可查該點的第三級類別與分類說明。","Tiles use 93 level-3 colours; only level-1 colours are listed. Click the map for the level-3 class and its definition.")}</div></div>`);
+  if(msg) parts.push(`<div class="src">${msg}</div>`);
+  lg.innerHTML=parts.join(""); lg.hidden=!parts.length;
+}
+LX.filter(x=>!(x.geo&&APP==="geo")).forEach(x=>{
+  const lab=document.createElement("label"); lab.innerHTML=`<input type="checkbox" id="lx_${x.k}"> ${L2(x.zh,x.en)}`;
+  const cb=lab.querySelector("input");
+  cb.onchange=async()=>{
+    if(!cb.checked){ if(layers[x.k]) map.removeLayer(layers[x.k]); on[x.k]=false; legend(); return; }
+    cb.disabled=true;
+    try{ layers[x.k]??=await x.make(); if(cb.checked){ layers[x.k].addTo(map); on[x.k]=true; } legend(); }
+    catch(e){ cb.checked=false; legend(L2("資料載入失敗，請確認網路連線後再試一次。","Data failed to load. Check your connection and try again.")); }
+    finally{ cb.disabled=false; }
+  };
+  rows.appendChild(lab);
+});
+const note=t=>{const d=document.createElement("div"); d.className="src"; d.style.margin="4px 0"; d.innerHTML=t; rows.appendChild(d);};
+if(APP==="geo") note(L2("原住民保留地、傳統領域調查成果在左側「土地與保護區」。","Reserved land and traditional territory are in the sidebar under Land & protected areas."));
+note(L2('地籍圖：國土測繪中心開放的只有「公有土地地籍圖」（上方疊加圖資），私有地的地籍圖不開放下載；要查個別地號請到<a href="https://easymap.land.moi.gov.tw/" target="_blank" rel="noopener">地籍圖資網路便民服務系統</a>。',
+  'Cadastre: NLSC only publishes the public-land cadastre (in Overlays above); private parcels are not open data. Look up parcels on the <a href="https://easymap.land.moi.gov.tw/" target="_blank" rel="noopener">MOI cadastral map service</a>.'));
+note(L2("國土利用現況調查成果圖在上方疊加圖資，勾選後這裡會顯示圖例。點地圖可查原住民保留地與國土利用類別。","The land-use survey map is in Overlays above; its legend appears here when on. Click the map to check reserved land and the land-use class."));
+ov.addEventListener("change",()=>setTimeout(()=>{ if(luiOver&&map.hasLayer(luiOver)) loadLUI().then(()=>legend()).catch(()=>{}); else legend(); },0));
+})();
+
 if(APP==="arch"){
 // ---------- 地號查詢 ----------
 const LQ = {mode:false, loaded:null, sect:"", pin:null};
@@ -1931,7 +2106,7 @@ async function ecoLayer(){
 const zonLayer=async()=>ZN.n1;
 map.on("click",async e=>{
   if(!$e("envZon").checked||e.propagatedFrom||(window._mkAdding&&window._mkAdding())) return;
-  const {lat,lng}=e.latlng, pop=L.popup({maxWidth:320,minWidth:260}).setLatLng(e.latlng)
+  const {lat,lng}=e.latlng, pop=L.popup({maxWidth:Math.min(320,POPW),minWidth:Math.min(260,POPW)}).setLatLng(e.latlng)
     .setContent(`<div class="geopop zonepop"><div class="m">${L2("查詢地段與土地使用分區中…","Looking up the land section and zoning…")}</div></div>`).openOn(map);
   try{
     const xml=await fetch(`https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lng.toFixed(6)}/${lat.toFixed(6)}`).then(r=>r.text());

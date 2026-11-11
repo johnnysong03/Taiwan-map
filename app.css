@@ -108,9 +108,9 @@ select{padding:7px 10px;border:1px solid var(--rule);border-radius:4px;backgroun
 .zonebox dd{margin:0;font-weight:500}
 .zsw{display:inline-block;width:11px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px;margin-right:6px;vertical-align:-1px}
 #zonelegend,#envlegend{margin-top:6px}
-#zonelegend .zl,#envlegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:4px}
-#zonelegend .zl b,#envlegend .zl b{font-size:12px}
-#zonelegend .zl i,#envlegend .zl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
+#zonelegend .zl,#envlegend .zl,#lxlegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:4px}
+#zonelegend .zl b,#envlegend .zl b,#lxlegend .zl b{font-size:12px}
+#zonelegend .zl i,#envlegend .zl i,#lxlegend .zl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
 #ownlegend{margin-top:6px}
 #ownlegend .ramp{height:10px;border-radius:2px;border:1px solid var(--rule)}
 #ownlegend .ticks{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
@@ -522,3 +522,10 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 #fdpanel .fdmode label{display:flex;align-items:center;gap:4px;cursor:pointer}
 #fdpanel .qleg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
 #fdpanel .qleg i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+
+/* 土地圖層面板、編定原則表 */
+#landset label{display:block}
+#lxlegend{margin-top:6px}
+details.zrule{margin:6px 0 2px;font-size:12.5px}
+details.zrule summary{cursor:pointer;color:var(--accent,#a33);font-weight:600}
+details.zrule>div{margin:4px 0;line-height:1.6}
