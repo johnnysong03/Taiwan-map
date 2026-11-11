@@ -920,12 +920,13 @@ function updateBuffers(){ bufLayer.clearLayers(); bufStat={n:0,skip:0};
     L.circle([lat,lng],{radius:BUF_R,pane:"geofill",color:KIND[c.kind][1],weight:1.6,dashArray:"6 4",fillColor:KIND[c.kind][1],fillOpacity:.1,interactive:false}).addTo(bufLayer);}));
   if(bufOn&&bufStat.n){ if(!map.hasLayer(bufLayer)) bufLayer.addTo(map); } else map.removeLayer(bufLayer); }
 // KML 用：以 72 邊形近似 500 m 圓
-const circleRing=(lat,lng,r)=>Array.from({length:73},(_,i)=>{const a=i/72*2*Math.PI, dLat=r*Math.cos(a)/111320, dLng=r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180));
-  return `${(lng+dLng).toFixed(6)},${(lat+dLat).toFixed(6)},0`;}).join(" ");
+const circleRing=(lat,lng,r)=>{const f=lat*Math.PI/180, mLat=111132.92-559.82*Math.cos(2*f)+1.175*Math.cos(4*f), mLng=111412.84*Math.cos(f)-93.5*Math.cos(3*f);  // 依緯度的每度公尺數
+  return Array.from({length:73},(_,i)=>{const a=i/72*2*Math.PI, dLat=r*Math.cos(a)/mLat, dLng=r*Math.sin(a)/mLng;
+  return `${(lng+dLng).toFixed(6)},${(lat+dLat).toFixed(6)},0`;}).join(" ");};
 const bufKml=c=>{ if(!bufOn) return ""; const col=kcolor(KIND[c.kind][1]).slice(2);
   const pm=c.fc.features.filter(f=>!f.properties.approx).map(f=>{const [lng,lat]=f.geometry.coordinates;
-    return `<Placemark><name>${xesc(f.properties.company)} ${L2("500 m 範圍","500 m buffer")}</name><styleUrl>#b_${c.key}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${circleRing(lat,lng,BUF_R)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;}).join("\n");
-  return pm?`<Folder><name>${L2("500 m 緩衝區","500 m buffer")}</name><Style id="b_${c.key}"><LineStyle><color>ff${col}</color><width>1.5</width></LineStyle><PolyStyle><color>22${col}</color></PolyStyle></Style>\n${pm}</Folder>`:""; };
+    return `<Placemark><name>${xesc(f.properties.company)} ${L2("半徑 500 m 範圍","500 m radius")}</name><styleUrl>#b_${c.key}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${circleRing(lat,lng,BUF_R)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;}).join("\n");
+  return pm?`<Folder><name>${L2("半徑 500 m 緩衝區","500 m radius buffer")}</name><Style id="b_${c.key}"><LineStyle><color>ff${col}</color><width>1.5</width></LineStyle><PolyStyle><color>22${col}</color></PolyStyle></Style>\n${pm}</Folder>`:""; };
 function siteLegend(){
   const lg=document.getElementById("sitelegend"); if(!lg) return;
   updateBuffers();
@@ -933,7 +934,7 @@ function siteLegend(){
   if(!on.length){lg.hidden=true;lg.innerHTML="";return;}
   const k0=on[0].kind;
   lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${siteIcon(c.kind,12)}${L2(KIND[c.kind][0],st(KIND[c.kind][0]))}</span>`).join("")}</div>`+
-    (bufOn?`<div class="row"><span class="wl"><span class="k" style="border:1.5px dashed ${KIND[k0][1]};border-radius:50%;background:${KIND[k0][1]}1a"></span>${L2(`500 m 緩衝區：${bufStat.n} 處${bufStat.skip?`（${bufStat.skip} 個約略位置不畫）`:""}`,`500 m buffer: ${bufStat.n} sites${bufStat.skip?` (${bufStat.skip} approximate locations skipped)`:""}`)}</span></div>`:"")+
+    (bufOn?`<div class="row"><span class="wl"><span class="k" style="border:1.5px dashed ${KIND[k0][1]};border-radius:50%;background:${KIND[k0][1]}1a"></span>${L2(`半徑 500 m 緩衝區：${bufStat.n} 處${bufStat.skip?`（${bufStat.skip} 個約略位置不畫）`:""}`,`500 m radius buffer: ${bufStat.n} sites${bufStat.skip?` (${bufStat.skip} approximate locations skipped)`:""}`)}</span></div>`:"")+
     `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過／營運中","Approved / operating")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中／規劃中","Under review / planned")}</span><span class="wl">${siteIcon(k0,12,false,true)}${L2("約略位置","Approximate location")}</span></div>`+
     `<div class="src">${L2("沒有虛線圈的點用使用者提供的座標（經緯度或 Google 地圖連結），都經國土測繪中心反查確認在能源署寫的鄉鎮內；有虛線圈的是約略位置，用鄉鎮或縣市代表點定位。空心代表申請中或規劃中，跟定位精度無關。","Points without a dashed ring use user-supplied coordinates (lat/long or Google Maps links), each checked with NLSC reverse lookup; dashed rings mark approximate locations at township or county representative points. Hollow means under review or planned, not location accuracy.")} ${SITE_SRC}</div>`;
   lg.hidden=false;
@@ -1007,7 +1008,7 @@ renderWellChecks();
 // 「現有地熱案場」組加上 500 m 緩衝區開關
 (()=>{ const g=document.querySelector("#sitechecks .wgroup"); if(!g) return;
   const lab=document.createElement("label"); lab.className="bufopt";
-  lab.innerHTML=`<input type="checkbox" id="sitebuf"> <span class="sw" style="border:1.5px dashed #087f5b;border-radius:50%;background:#087f5b1a"></span>${L2("顯示 500 m 緩衝區（目前勾選的類別）","Show 500 m buffers (ticked categories)")}`;
+  lab.innerHTML=`<input type="checkbox" id="sitebuf"> <span class="sw" style="border:1.5px dashed #087f5b;border-radius:50%;background:#087f5b1a"></span>${L2("顯示半徑 500 m 緩衝區（目前勾選的類別）","Show 500 m radius buffers (ticked categories)")}`;
   lab.querySelector("input").onchange=e=>{ bufOn=e.target.checked; siteLegend(); };
   const note=g.querySelector(":scope>.src"); g.insertBefore(lab,note||null); })();
 // ---------- 匯出 KML：把目前開啟的圖層存成 Google Earth 可以開啟的檔案 ----------
