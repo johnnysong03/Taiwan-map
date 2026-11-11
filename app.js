@@ -871,7 +871,7 @@ function makeGeoLayer(c,fc){
   return L.geoJSON(fc,{
     pointToLayer:(f,ll)=>{const p=f.properties;
       if(SITE_SHAPE[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[18,18],html:siteIcon(k,18,isHollow(p.status),p.approx)})})
-        .bindTooltip(hesc(p.company)+(p.project?`（${hesc(p.project)}）`:""),{direction:"top",offset:[0,-9]});
+        .bindTooltip(hesc(p.company)+(p.project?`（${hesc(p.project)}）`:"")+(p.info?.capShort?`<br>${hesc(capLabel(p))}`:""),{direction:"top",offset:[0,-9]});
       if(k==="wbor") return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:WICON.wbor(13)})}).bindTooltip(hesc(p.hole),{direction:"top",offset:[0,-8]});
       if(WICON[k]) return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:WICON[k](k==="wexp"?14:12)})}).bindTooltip(hesc(title(f)),{direction:"top",offset:[0,-8]});
       if(k==="kwell") return L.marker(ll,{pane:"geo",icon:L.divIcon({className:"",iconSize:[14,14],html:`<div style="width:14px;height:14px;background:${p.color||KIND.kwell[1]};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,.45)"></div>`})}).bindTooltip(hesc(p.name),{direction:"top",offset:[0,-8]});
@@ -923,10 +923,13 @@ function siteLegend(){
   lg.hidden=false;
 }
 const syncWells=()=>WELL_GROUPS.forEach(g=>g.sync?.());
+// 電廠裝置容量的短標示：規劃中寫「預計裝置容量」
+const capLabel=p=>{const c=p.info?.capShort; if(!c) return ""; const plan=/^預計/.test(c[0]);
+  return plan?L2(`預計裝置容量 ${c[0].replace(/^預計\s*/,"")}`,`Planned capacity ${c[1].replace(/^planned\s*/i,"")}`):L2(`裝置容量 ${c[0]}`,`Capacity ${c[1]}`);};
 // 截圖用：目前開啟的「電廠」圖層裡每座電廠的位置與名稱
 window._shotLabels=()=>WELL_ITEMS.filter(c=>c.kind==="splant"&&geoOn[c.key]&&c.fc).flatMap(c=>c.fc.features.map(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates;
   const nm=p.info?.name?L2(p.info.name[0],p.info.name[1]):(p.project||p.company);
-  return {lat,lng,text:nm+(p.status==="規劃中"?L2("（規劃中）"," (planned)"):""),color:KIND.splant[1]};}));
+  return {lat,lng,text:nm+(p.status==="規劃中"?L2("（規劃中）"," (planned)"):""),sub:capLabel(p),color:KIND.splant[1]};}));
 window._wellLegend=wellLegend;
 async function toggleGeo(c,on,box){
   if(!on){ if(c.layer) map.removeLayer(c.layer); geoOn[c.key]=false; geoLegend(); return; }
@@ -2269,13 +2272,21 @@ function buildChatPane(){
     }
     // 電廠名稱：截圖範圍內有開「電廠」圖層時，把名稱寫在符號旁邊（白邊、避開彼此重疊）
     const labs=(window._shotLabels?.()||[]).filter(q=>q.lat<=N&&q.lat>=S&&q.lng>=Wl&&q.lng<=E);
-    if(labs.length){ const fz=Math.round(12.5*s), boxes=[]; g.font=`700 ${fz}px ${FONT}`; g.textBaseline="middle"; g.lineJoin="round";
-      labs.forEach(q=>{ const x=m+(q.lng-Wl)/(E-Wl)*W, y=m+(yN-merc(q.lat))/(yN-yS)*H, tw=g.measureText(q.text).width, off=11*s;
-        const cand=[[x+off,y,"left"],[x-off,y,"right"],[x,y-off-fz*.6,"center"],[x,y+off+fz*.6,"center"]];
-        for(const [tx,ty,al] of cand){ const x0=al==="left"?tx:al==="right"?tx-tw:tx-tw/2, bx=[x0-2*s,ty-fz*.65,x0+tw+2*s,ty+fz*.65];
+    if(labs.length){ const fz=Math.round(12.5*s), fz2=Math.round(11*s), boxes=[]; g.textBaseline="middle"; g.lineJoin="round";
+      const tw1=t=>{g.font=`700 ${fz}px ${FONT}`;return g.measureText(t).width;}, tw2=t=>{g.font=`600 ${fz2}px ${FONT}`;return g.measureText(t).width;};
+      const put=(t,x,y,al,f,col)=>{g.font=f;g.textAlign=al;g.strokeStyle="rgba(255,255,255,.95)";g.lineWidth=4*s;g.strokeText(t,x,y);g.fillStyle=col;g.fillText(t,x,y);};
+      labs.forEach(q=>{ const x=m+(q.lng-Wl)/(E-Wl)*W, y=m+(yN-merc(q.lat))/(yN-yS)*H, off=11*s;
+        const tw=Math.max(tw1(q.text),q.sub?tw2(q.sub):0), th=q.sub?fz*1.25+fz2*1.2:fz*1.3;   // 兩行：名稱、裝置容量
+        const dy=th/2+off*.6, cx=Math.min(Math.max(x,m+tw/2+3*s),m+W-tw/2-3*s);   // 靠邊時置中標籤往內移
+        const cand=[[x+off,y,"left"],[x-off,y,"right"],[cx,y-off-th/2,"center"],[cx,y+off+th/2,"center"],
+          [x-off,y-dy,"right"],[x-off,y+dy,"right"],[x+off,y-dy,"left"],[x+off,y+dy,"left"],[cx,y-off-th*1.6,"center"],[cx,y+off+th*1.6,"center"]];
+        for(const [tx,ty,al] of cand){ const x0=al==="left"?tx:al==="right"?tx-tw:tx-tw/2, bx=[x0-2*s,ty-th/2,x0+tw+2*s,ty+th/2];
           if(bx[0]<m||bx[2]>m+W||bx[1]<m||bx[3]>m+H) continue;
           if(boxes.some(b=>!(bx[2]<b[0]||bx[0]>b[2]||bx[3]<b[1]||bx[1]>b[3]))) continue;
-          boxes.push(bx); g.textAlign=al; g.strokeStyle="rgba(255,255,255,.95)"; g.lineWidth=4*s; g.strokeText(q.text,tx,ty); g.fillStyle=q.color||"#087f5b"; g.fillText(q.text,tx,ty); break; } }); }
+          boxes.push(bx); const col=q.color||"#087f5b";
+          if(q.sub){ put(q.text,tx,ty-fz2*.6,al,`700 ${fz}px ${FONT}`,col); put(q.sub,tx,ty+fz*.62,al,`600 ${fz2}px ${FONT}`,"#333"); }
+          else put(q.text,tx,ty,al,`700 ${fz}px ${FONT}`,col);
+          break; } }); }
     // 比例尺與指北針
     if(o.scale){
       const lat=(N+S)/2, mpp=Math.cos(lat*Math.PI/180)*40075016.686*((E-Wl)/360)/W;
