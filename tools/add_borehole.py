@@ -3,6 +3,7 @@
 
 用法（在 repo 根目錄執行，需要能連到 geotech.gsmma.gov.tw）：
     python3 tools/add_borehole.py 40401902-1120403_10YL-DS-S070 01053383-A0684_DB-24-1
+    python3 tools/add_borehole.py --list 清單.txt     # 一行一個「計畫編號_孔號」，# 後為註解
 
 參數是「計畫編號_孔號」，就是從資料庫下載的柱狀圖檔名中間那段
 （例如 ____40401902-1120403_10YL-DS-S070_001.emf → 40401902-1120403_10YL-DS-S070）。
@@ -13,7 +14,8 @@
   2. 下載每一頁柱狀圖（PNG）到 geotex/boreholes/；
   3. 讀取基本資料（工程名稱、地點、高程、坐標、日期、鑽探公司）；
   4. 新增或更新 geotex/bh_logs.js 裡的那一筆（已存在就覆蓋）。
-只用 Python 標準函式庫。
+每孔之間會停 8 秒、每抓完一孔就存檔；碰到資料庫防火牆擋下（Access Blocked）會立刻停止，
+沒抓的寫到 add_borehole_failed.txt，隔天用 --list 接著抓即可。只用 Python 標準函式庫。
 """
 import base64, html, http.cookiejar, json, os, re, sys, time, urllib.parse, urllib.request
 
@@ -29,15 +31,23 @@ HDR = {"Content-Type": "application/json; charset=utf-8", "Origin": "https://geo
        "Referer": BASE + "/Home/Map", "User-Agent": "Mozilla/5.0"}
 
 
-def fetch(url, data=None, tries=4):
+class Blocked(Exception):
+    """資料庫的防火牆擋下請求（回「連線已遭阻擋 Access Blocked」頁面）。"""
+
+
+def fetch(url, data=None, tries=3):
     for i in range(tries):
         try:
-            return opener.open(urllib.request.Request(url, data=data, headers=HDR), timeout=180).read()
+            b = opener.open(urllib.request.Request(url, data=data, headers=HDR), timeout=180).read()
         except Exception as e:  # 資料庫偶爾回 500 或斷線，稍等再試
             if i == tries - 1:
                 raise
             print(f"  重試（{e}）")
-            time.sleep(3 * (i + 1))
+            time.sleep(10 * (i + 1))
+            continue
+        if b"Access Blocked" in b[:2000] or "連線已遭阻擋".encode() in b[:2000]:
+            raise Blocked("地調中心資料庫的防火牆擋下了請求，請隔一段時間（例如明天）再試，不要連續重跑")
+        return b
 
 
 def norm(s):
@@ -131,24 +141,39 @@ def add(arg):
     return row
 
 
+DELAY = 8  # 每孔之間停幾秒；資料庫有防火牆，抓太快會被擋
+
+
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    if args[:1] == ["--list"] and len(args) > 1:  # 從文字檔讀清單：一行一個「計畫編號_孔號」，# 後為註解
+        args = [l.split("#")[0].strip() for l in open(args[1], encoding="utf-8")] + args[2:]
+        args = [a for a in args if a]
+    if not args:
         print(__doc__)
         return
     rows = load()
     opener.open(urllib.request.Request(BASE + "/Home/Map", headers=HDR), timeout=60).read()  # 取得工作階段
     failed = []
-    for a in sys.argv[1:]:
+    for n, a in enumerate(args):
+        if n:
+            time.sleep(DELAY)
         try:
             r = add(a)
+        except Blocked as e:
+            print(f"  停止：{e}")
+            failed += args[n:]
+            break
         except (Exception, SystemExit) as e:
             print(f"  略過 {a}：{e}")
             failed.append(a)
             continue
         rows = [x for x in rows if x["id"] != r["id"]] + [r]
-    save(rows)
+        save(rows)  # 每孔存一次，中途被擋也不會白抓
     if failed:
         print("沒有加入：" + "、".join(failed))
+        open("add_borehole_failed.txt", "w", encoding="utf-8").write("\n".join(failed) + "\n")
+        print("沒加入的已寫到 add_borehole_failed.txt，之後可以用 --list add_borehole_failed.txt 接著抓")
     print(f"完成：geotex/bh_logs.js 共 {len(rows)} 孔")
 
 

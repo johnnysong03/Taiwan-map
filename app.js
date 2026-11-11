@@ -1729,7 +1729,7 @@ function envLegend(msg){
 // 觀測井與工程鑽孔的圖例放在側欄「井」區塊（wellLegend 會呼叫這裡）
 window._wellEnvLegend=()=>{const on=id=>$e(id).checked, p=[];
   if(on("envWel")) p.push(`<div class="zl"><b>${L2("水文地質觀測井","Hydrogeological wells")}</b>`+WEL_SET.map(([k,c,lab])=>`<span><i style="background:${c};border-radius:50%"></i>${lab}</span>`).join("")+`</div>`);
-  if(on("envBor")) p.push(`<div class="zl"><b>${L2("工程鑽孔分布","Engineering boreholes")}</b><div class="src">${L2("地調中心工程地質探勘資料庫（約 7.3 萬孔），只顯示位置。孔號、深度與柱狀圖請到","GSMMA engineering geology database (about 73,000 holes), locations only. For hole numbers, depths and logs, open the")} <a href="${GEOTECH}/Home/Map" target="_blank" rel="noopener">${L2("工程地質探勘資料庫圖台","official map")}</a>${L2("查詢。","." )}</div></div>`);
+  if(on("envBor")) p.push(`<div class="zl"><b>${L2("工程鑽孔分布","Engineering boreholes")}</b><div class="src">${L2("地調中心工程地質探勘資料庫（約 7.3 萬孔），只顯示位置。孔號、深度與柱狀圖請到","GSMMA engineering geology database (about 73,000 holes), locations only. For hole numbers, depths and logs, open the")} <a href="${GEOTECH}/Home/Map" target="_blank" rel="noopener">${L2("工程地質探勘資料庫圖台","official map")}</a>${L2("查詢。已收錄柱狀圖的孔見「鑽孔柱狀圖」圖層。","; holes with logs on this site are in the Borehole logs layer.")}</div></div>`);
   return p.join("");};
 async function envToggle(id){
   const box=$e(id), def=ENV_DEF[id]; cwaUI();
