@@ -506,3 +506,5 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 #qkpanel .qleg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 #qkpanel .qleg i.ramp{width:48px;border-radius:2px;background:linear-gradient(90deg,hsla(48,95%,58%,.3),hsla(24,95%,48%,.6),hsla(0,95%,38%,.85))}
 @media (max-width:760px){ #qkpanel select,#qkpanel input[type=number]{font-size:16px;width:5.6em} }
+#welllegend .zl .wdesc{display:flex;gap:6px;align-items:flex-start;line-height:1.45}
+#welllegend .zl .wdesc>i{flex:none;margin-top:4px}

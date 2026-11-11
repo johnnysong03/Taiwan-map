@@ -916,7 +916,7 @@ function renderGeoChecks(){
   });
 }
 // 「井」區塊：每類一個總開關（勾了就開全臺這類的井），底下列出各組資料可以單獨開關。只建一次，環境資料區塊之後會接上 envWel、envBor 的開關。
-const ENV_WELL={envWel:[L2("水文地質觀測井（地調中心，即時）","Hydrogeological observation wells (GSMMA, live)"),L2("即時","live"),"#1e88e5"],
+const ENV_WELL={envWel:[L2("水文地質觀測井（地調中心，即時）","Hydrogeological observation wells (GSMMA, live)"),L2("即時","live"),"conic-gradient(#6d4c41 0 25%,#1e88e5 0 50%,#00897b 0 75%,#8e24aa 0)"],
   envBor:[L2("工程鑽孔分布（地調中心）","Engineering boreholes (GSMMA)"),L2("約 7.3 萬","~73k"),"#444"]};
 function renderWellChecks(){
   if(!document.getElementById("wellchecks")) return;
@@ -1737,11 +1737,20 @@ async function volLayer(){ const D=await loadEnv("volcano"), sel=$e("volhaz").va
 // 地調中心「臺灣水文地質資訊系統」觀測井：勾選時即時以 POST 取得 GeoJSON（不需金鑰，CORS 開放）
 const HYDRO="https://hydro.geologycloud.tw";
 const SRC_WEL=L2("資料：經濟部地質調查及礦業管理中心「臺灣水文地質資訊系統」（即時查詢）","Data: GSMMA Taiwan Hydrogeological Information System (live)");
+// 顏色依臺灣水文地質資訊系統的分類：資料提供單位與區域（不是水位或水質）
 const WEL_SET=[["mt","#6d4c41",L2("地礦中心・山區","GSMMA mountain")],["p","#1e88e5",L2("地礦中心・平原","GSMMA plain")],["wra","#00897b",L2("水利署","Water Resources Agency")],["wrap","#8e24aa",L2("水利規劃分署","WRA Planning Branch")]];
+const WEL_DESC={mt:L2("經濟部地質調查及礦業管理中心「山區」水文地質調查鑽設的觀測井","Wells drilled by GSMMA for its mountain hydrogeology programme"),
+  p:L2("地調中心在平原（地下水分區）鑽設的水文地質觀測井","GSMMA hydrogeological wells in the plains (groundwater districts)"),
+  wra:L2("經濟部水利署的觀測站","Stations of the Water Resources Agency"),
+  wrap:L2("經濟部水利署水利規劃分署的觀測站","Stations of the WRA Water Resources Planning Branch")};
+const WEL_STAT={};
 async function welLayer(){
   const g=L.layerGroup(); let n=0;
   const res=await Promise.all(WEL_SET.map(([k])=>fetch(`${HYDRO}/data/${k}/hydrostation`,{method:"POST"}).then(r=>{if(!r.ok) throw new Error("http "+r.status);return r.json();})));
-  res.forEach((j,i)=>{const [k,c,lab]=WEL_SET[i]; (j.data?.features||[]).forEach(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates; n++;
+  res.forEach((j,i)=>{const [k,c,lab]=WEL_SET[i], fs=j.data?.features||[], dep=fs.map(f=>+f.properties.Well_Depth).filter(v=>v>0);
+    WEL_STAT[k]={n:fs.length,d0:dep.length?Math.min(...dep):null,d1:dep.length?Math.max(...dep):null,
+      wl:fs.filter(f=>f.properties.Water_Line).length,core:fs.filter(f=>f.properties.Rock_Image).length};
+    fs.forEach(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates; n++;
     const yn=v=>v?L2("有","yes"):L2("無","no");
     L.circleMarker([lat,lng],{renderer:envRd,radius:4.5,color:"#fff",weight:1,fillColor:c,fillOpacity:.95}).bindTooltip(eesc(p.STATION_NAME),{direction:"top"})
       .bindPopup(()=>epop(p.STATION_NAME,`${lab}・${eesc(p.STATION_NMBR)}`,erow([[L2("縣市","County"),eesc(p.City_Name)],[L2("流域","Basin"),eesc(p.River_Name)],[L2("水文地質分區","Hydrogeological unit"),eesc(p.Wsect_Name)],
@@ -1831,7 +1840,12 @@ function envLegend(msg){
 }
 // 觀測井與工程鑽孔的圖例放在側欄「井」區塊（wellLegend 會呼叫這裡）
 window._wellEnvLegend=()=>{const on=id=>$e(id).checked, p=[];
-  if(on("envWel")) p.push(`<div class="zl"><b>${L2("水文地質觀測井","Hydrogeological wells")}</b>`+WEL_SET.map(([k,c,lab])=>`<span><i style="background:${c};border-radius:50%"></i>${lab}</span>`).join("")+`</div>`);
+  if(on("envWel")) p.push(`<div class="zl"><b>${L2("水文地質觀測井：顏色代表資料提供單位與區域","Hydrogeological wells: colour shows the data provider and area")}</b>`+
+    WEL_SET.map(([k,c,lab])=>{const t=WEL_STAT[k];
+      const st=t?L2(`，${t.n} 口${t.d0!=null?`，井深 ${t.d0}–${t.d1} m`:""}${t.core?`，${t.core} 口有岩心影像`:""}${t.wl?`，${t.wl} 口有水位資料`:""}`,
+        `; ${t.n} wells${t.d0!=null?`, ${t.d0}–${t.d1} m deep`:""}${t.core?`, ${t.core} with core images`:""}${t.wl?`, ${t.wl} with water-level data`:""}`):"";
+      return `<span class="wdesc"><i style="background:${c};border-radius:50%"></i><span><b>${lab}</b>${L2("：",": ")}${WEL_DESC[k]}${st}</span></span>`;}).join("")+
+    `<div class="src">${L2("分類與資料來自經濟部地質調查及礦業管理中心「臺灣水文地質資訊系統」；點井位可看井深、鑽井年與有哪些資料。","Categories and data from GSMMA's Taiwan Hydrogeological Information System; tap a well for depth, year and available data.")}</div></div>`);
   if(on("envBor")) p.push(`<div class="zl"><b>${L2("工程鑽孔分布","Engineering boreholes")}</b><div class="src">${L2("地調中心工程地質探勘資料庫（約 7.3 萬孔），只顯示位置。孔號、深度與柱狀圖請到","GSMMA engineering geology database (about 73,000 holes), locations only. For hole numbers, depths and logs, open the")} <a href="${GEOTECH}/Home/Map" target="_blank" rel="noopener">${L2("工程地質探勘資料庫圖台","official map")}</a>${L2("查詢。已收錄柱狀圖的孔見「鑽孔柱狀圖」圖層。","; holes with logs on this site are in the Borehole logs layer.")}</div></div>`);
   return p.join("");};
 async function envToggle(id){
