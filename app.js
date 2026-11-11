@@ -912,12 +912,28 @@ function landLegend(){
     [...new Set(on.map(c=>LAND_SRC[c.kind]))].map(t=>`<div class="src">${t}</div>`).join("");
   lg.hidden=false;
 }
+// ---------- 現有地熱案場 500 m 緩衝區：跟著目前勾選的案場類別畫；約略位置（鄉鎮代表點）不畫 ----------
+const BUF_R=500, bufLayer=L.layerGroup(); let bufOn=false, bufStat={n:0,skip:0};
+function updateBuffers(){ bufLayer.clearLayers(); bufStat={n:0,skip:0};
+  if(bufOn) WELL_ITEMS.filter(c=>SITE_SHAPE[c.kind]&&geoOn[c.key]&&c.fc).forEach(c=>c.fc.features.forEach(f=>{
+    if(f.properties.approx){bufStat.skip++;return;} const [lng,lat]=f.geometry.coordinates; bufStat.n++;
+    L.circle([lat,lng],{radius:BUF_R,pane:"geofill",color:KIND[c.kind][1],weight:1.6,dashArray:"6 4",fillColor:KIND[c.kind][1],fillOpacity:.1,interactive:false}).addTo(bufLayer);}));
+  if(bufOn&&bufStat.n){ if(!map.hasLayer(bufLayer)) bufLayer.addTo(map); } else map.removeLayer(bufLayer); }
+// KML 用：以 72 邊形近似 500 m 圓
+const circleRing=(lat,lng,r)=>Array.from({length:73},(_,i)=>{const a=i/72*2*Math.PI, dLat=r*Math.cos(a)/111320, dLng=r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180));
+  return `${(lng+dLng).toFixed(6)},${(lat+dLat).toFixed(6)},0`;}).join(" ");
+const bufKml=c=>{ if(!bufOn) return ""; const col=kcolor(KIND[c.kind][1]).slice(2);
+  const pm=c.fc.features.filter(f=>!f.properties.approx).map(f=>{const [lng,lat]=f.geometry.coordinates;
+    return `<Placemark><name>${xesc(f.properties.company)} ${L2("500 m 範圍","500 m buffer")}</name><styleUrl>#b_${c.key}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${circleRing(lat,lng,BUF_R)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;}).join("\n");
+  return pm?`<Folder><name>${L2("500 m 緩衝區","500 m buffer")}</name><Style id="b_${c.key}"><LineStyle><color>ff${col}</color><width>1.5</width></LineStyle><PolyStyle><color>22${col}</color></PolyStyle></Style>\n${pm}</Folder>`:""; };
 function siteLegend(){
   const lg=document.getElementById("sitelegend"); if(!lg) return;
+  updateBuffers();
   const on=WELL_ITEMS.filter(c=>geoOn[c.key]&&SITE_SHAPE[c.kind]);
   if(!on.length){lg.hidden=true;lg.innerHTML="";return;}
   const k0=on[0].kind;
   lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${siteIcon(c.kind,12)}${L2(KIND[c.kind][0],st(KIND[c.kind][0]))}</span>`).join("")}</div>`+
+    (bufOn?`<div class="row"><span class="wl"><span class="k" style="border:1.5px dashed ${KIND[k0][1]};border-radius:50%;background:${KIND[k0][1]}1a"></span>${L2(`500 m 緩衝區：${bufStat.n} 處${bufStat.skip?`（${bufStat.skip} 個約略位置不畫）`:""}`,`500 m buffer: ${bufStat.n} sites${bufStat.skip?` (${bufStat.skip} approximate locations skipped)`:""}`)}</span></div>`:"")+
     `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過／營運中","Approved / operating")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中／規劃中","Under review / planned")}</span><span class="wl">${siteIcon(k0,12,false,true)}${L2("約略位置","Approximate location")}</span></div>`+
     `<div class="src">${L2("沒有虛線圈的點用使用者提供的座標（經緯度或 Google 地圖連結），都經國土測繪中心反查確認在能源署寫的鄉鎮內；有虛線圈的是約略位置，用鄉鎮或縣市代表點定位。空心代表申請中或規劃中，跟定位精度無關。","Points without a dashed ring use user-supplied coordinates (lat/long or Google Maps links), each checked with NLSC reverse lookup; dashed rings mark approximate locations at township or county representative points. Hollow means under review or planned, not location accuracy.")} ${SITE_SRC}</div>`;
   lg.hidden=false;
@@ -988,6 +1004,12 @@ function renderWellChecks(){
   });
 }
 renderWellChecks();
+// 「現有地熱案場」組加上 500 m 緩衝區開關
+(()=>{ const g=document.querySelector("#sitechecks .wgroup"); if(!g) return;
+  const lab=document.createElement("label"); lab.className="bufopt";
+  lab.innerHTML=`<input type="checkbox" id="sitebuf"> <span class="sw" style="border:1.5px dashed #087f5b;border-radius:50%;background:#087f5b1a"></span>${L2("顯示 500 m 緩衝區（目前勾選的類別）","Show 500 m buffers (ticked categories)")}`;
+  lab.querySelector("input").onchange=e=>{ bufOn=e.target.checked; siteLegend(); };
+  const note=g.querySelector(":scope>.src"); g.insertBefore(lab,note||null); })();
 // ---------- 匯出 KML：把目前開啟的圖層存成 Google Earth 可以開啟的檔案 ----------
 const xesc=s=>String(s??"").replace(/[<>&]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]));
 const kcoord=c=>c.map(p=>`${p[0]},${p[1]},${p[2]??0}`).join(" ");
@@ -1015,7 +1037,7 @@ function exportKML(){
       const nm=isB?p.hole:isL?landTitle(p,c.kind):isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
       const desc=isB?bhBody(p,true)+`<div>${bhSrc(p)}</div>`:isL?landBody(p,c.kind)+`<div>${LAND_SRC[c.kind]}</div>`:isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
       return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&isHollow(p.status)?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
-    return `<Folder><name>${xesc(LAND_EN[c.kind]?L2("土地與保護區・","Land – ")+c.name:isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
+    return `<Folder><name>${xesc(LAND_EN[c.kind]?L2("土地與保護區・","Land – ")+c.name:isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}${isS?bufKml(c):""}</Folder>`;}).join("\n");
   const srcs=[on.some(c=>!SITE_SHAPE[c.kind]&&!LAND_EN[c.kind]&&c.kind!=="wbor")?GEO_SRC:"",on.some(c=>c.kind==="wbor")?BH_SRC.replace(/<[^>]+>/g,""):"",...[...new Set(on.filter(c=>LAND_EN[c.kind]).map(c=>LAND_SRC[c.kind].replace(/<[^>]+>/g,"")))],on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；有虛線圈（approx）的點為鄉鎮或縣市代表點，屬約略位置","; approximate points sit at township or county representative points"):""].filter(Boolean).join("\n");
   const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>臺灣地熱地圖匯出</name><description>${xesc(srcs)}</description>\n${folders}\n</Document></kml>`;
   const url=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"}));

@@ -512,3 +512,4 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 .geopop .wrel .wsame{margin:2px 0;font-size:12.5px}
 .geopop .wrel .wsame>summary{cursor:pointer;color:var(--ink)}
 .geopop .wrel .wsame[open]>summary{margin-bottom:4px}
+#sitechecks .bufopt{border-top:1px dotted var(--rule);margin-top:4px;padding-top:6px;font-size:13.5px}
