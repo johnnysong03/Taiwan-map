@@ -32,11 +32,13 @@
       <div class="label wlabel" data-en="Land &amp; protected areas (all Taiwan)">土地與保護區（全臺）</div>
       <div id="landchecks"></div>
       <div id="landlegend" hidden></div>
+      <div class="label wlabel" data-en="Earthquake catalogue (2000–2025)">地震目錄（2000–2025）</div>
+      <div id="quakebox"></div>
       <button type="button" class="btn" id="kmlbtn" disabled data-en="Export KML (select layers first)">匯出 KML（先勾選圖層）</button>
       <div class="ghint" data-en="Choose an area (grouped into north, central, south and east) and tick the datasets to show. Wells are listed separately by type; ticking a type shows all of its wells across Taiwan. Existing geothermal projects (Energy Administration) are split into demonstration incentives, exploration permits, development permits and power plants; points with a dashed ring are approximate. Click a point, line or area to see its values and open the spot in Google Earth. Exported KML files open in Google Earth on the web or desktop.">選一個地區（依北、中、南、東分組），勾選要看的資料。井另外依用途分四類，勾一類就會顯示全臺這類的井。現有地熱案場（能源署）分示範獎勵、探勘許可、開發許可、電廠四類，有虛線圈的點是約略位置。點地圖上的點、線或區塊可以看數值，也能在 Google Earth 開啟該位置。匯出的 KML 檔可以用 Google Earth 網頁版或桌面版開啟。</div>
     </div>
   </div>
-  <div class="foot" data-en="Data: Geological Survey and Mining Management Agency, MOEA, &lt;a href=&quot;https://geotex.geologycloud.tw/main/openapi&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Geothermal Exploration Information Platform&lt;/a&gt; open data (downloaded 2026-11-07). Water chemistry in mg/L; geothermometers and water temperature in °C. Site names are shown in Chinese. Existing geothermal projects: Energy Administration, MOEA, &lt;a href=&quot;https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Geothermal Single Service Window&lt;/a&gt; (downloaded 2026-11-09); some coordinates and plant details supplied by the user and checked. National park boundaries: Forestry and Nature Conservation Agency ecological network map (2020 compilation); indigenous reserved land and traditional territory survey: Council of Indigenous Peoples open data (downloaded 2026-11-09). Base maps: National Land Surveying and Mapping Center.">資料：經濟部地質調查及礦業管理中心「<a href="https://geotex.geologycloud.tw/main/openapi" target="_blank" rel="noopener">地熱探勘資訊平臺</a>」第一類開放資料（2026-11-07 下載）。水化學濃度單位為 mg/L，地溫計與水溫為 °C。現有地熱案場：經濟部能源署「<a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">地熱發電單一服務窗口</a>」（2026-11-09 下載），部分座標與電廠資訊由使用者提供並經查證。國家公園範圍：林業及自然保育署國土生態綠網圖台（109 年彙整版）；原住民保留地、傳統領域調查成果：原住民族委員會開放資料（2026-11-09 下載）。底圖與圖資：內政部國土測繪中心。</div>
+  <div class="foot" data-en="Data: Geological Survey and Mining Management Agency, MOEA, &lt;a href=&quot;https://geotex.geologycloud.tw/main/openapi&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Geothermal Exploration Information Platform&lt;/a&gt; open data (downloaded 2026-11-07). Water chemistry in mg/L; geothermometers and water temperature in °C. Site names are shown in Chinese. Existing geothermal projects: Energy Administration, MOEA, &lt;a href=&quot;https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Geothermal Single Service Window&lt;/a&gt; (downloaded 2026-11-09); some coordinates and plant details supplied by the user and checked. Earthquake catalogue: Central Weather Administration Seismological Center (2000–2025, downloaded by the user). National park boundaries: Forestry and Nature Conservation Agency ecological network map (2020 compilation); indigenous reserved land and traditional territory survey: Council of Indigenous Peoples open data (downloaded 2026-11-09). Base maps: National Land Surveying and Mapping Center.">資料：經濟部地質調查及礦業管理中心「<a href="https://geotex.geologycloud.tw/main/openapi" target="_blank" rel="noopener">地熱探勘資訊平臺</a>」第一類開放資料（2026-11-07 下載）。水化學濃度單位為 mg/L，地溫計與水溫為 °C。現有地熱案場：經濟部能源署「<a href="https://ea01.moeaea.gov.tw/b0403/SupplyChainNew/Index" target="_blank" rel="noopener">地熱發電單一服務窗口</a>」（2026-11-09 下載），部分座標與電廠資訊由使用者提供並經查證。地震目錄：交通部中央氣象署地震測報中心（2000–2025，使用者下載）。國家公園範圍：林業及自然保育署國土生態綠網圖台（109 年彙整版）；原住民保留地、傳統領域調查成果：原住民族委員會開放資料（2026-11-09 下載）。底圖與圖資：內政部國土測繪中心。</div>
 </aside>
 
 <main id="mapwrap">
@@ -136,6 +138,7 @@
 <script src="geotex/ea-sites.js"></script>
 <script src="geotex/land.js"></script>
 <script src="geotex/bh_logs.js"></script>
+<script src="geotex/quakes/meta.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

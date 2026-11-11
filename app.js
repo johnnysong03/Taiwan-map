@@ -982,6 +982,109 @@ const _geoLegend=geoLegend;
 geoLegend=function(){_geoLegend(); if(kmlBtn){const n=GEO_CAT.filter(c=>geoOn[c.key]).length; kmlBtn.disabled=!n; kmlBtn.textContent=n?L2(`匯出 KML（${n} 個圖層）`,`Export KML (${n} layer${n>1?"s":""})`):L2("匯出 KML（先勾選圖層）","Export KML (select layers first)");}};
 geoLegend();
 
+// ---------- 地震目錄（氣象署地震測報中心，geotex/quakes/，由 tools/build_quakes.py 產生）----------
+// 縮小（zoom < 9）畫 0.1° 密度方格；放大才載入看得到的 0.5° 區塊、畫每一筆。用一張畫布直接畫，68 萬筆也不會卡。
+const QK=(()=>{
+  const box=document.getElementById("quakebox"); if(!box||!window.QUAKE_META) return null;
+  const M=window.QUAKE_META, PZ=9, EP=Date.UTC(2000,0,1);
+  const b64=s=>{const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return new DataView(u.buffer);};
+  const qColor=d=>d<10?"#c0392b":d<30?"#e8590c":d<70?"#e67e22":"#2e6da4";
+  const SRC=L2("資料：交通部中央氣象署地震測報中心地震目錄（使用者下載，2000-01-01～2025-03-01）。經緯度精度 0.01°（約 1 公里），時間照原始檔。",
+    "Data: Central Weather Administration Seismological Center earthquake catalogue (downloaded by the user, 2000-01-01 to 2025-03-01). Coordinates to 0.01° (~1 km); times as in the source.");
+  // 密度格點：每筆 8 bytes = uint16 方格、uint8 年、uint8 規模級×4+深度級、uint32 筆數
+  let C=null, NC=0, cubeP=null;  // 密度格點：勾選圖層時才載入 geotex/quakes/cube.js
+  const loadCube=()=>cubeP??=new Promise((ok,fail)=>{const s=document.createElement("script");s.src="geotex/quakes/cube.js";
+    s.onload=()=>{const cv=b64(window.QUAKE_CUBE); NC=cv.byteLength/8; C={cell:new Uint16Array(NC),yr:new Uint8Array(NC),md:new Uint8Array(NC),n:new Uint32Array(NC)};
+      for(let i=0;i<NC;i++){C.cell[i]=cv.getUint16(i*8,true);C.yr[i]=cv.getUint8(i*8+2);C.md[i]=cv.getUint8(i*8+3);C.n[i]=cv.getUint32(i*8+4,true);}
+      delete window.QUAKE_CUBE; ok();}; s.onerror=fail; document.head.appendChild(s);});
+  const F={y0:M.y0,y1:M.y1,m0:0,m1:Math.ceil(M.mMax*10)/10,d0:0,d1:Math.ceil(M.dMax)};
+  const DE=[0,...M.depEdges,1e9];
+  let grid=null;
+  function aggregate(){ grid=new Map();
+    for(let i=0;i<NC;i++){const y=M.y0+C.yr[i]; if(y<F.y0||y>F.y1) continue; const mb=C.md[i]>>2, db=C.md[i]&3;
+      if(mb+1<=F.m0||mb>F.m1) continue; if(DE[db+1]<=F.d0||DE[db]>F.d1) continue; grid.set(C.cell[i],(grid.get(C.cell[i])||0)+C.n[i]);} }
+  // 點資料區塊
+  const T={}, loading={};
+  function loadTile(k){ if(T[k]||loading[k]) return loading[k];
+    return loading[k]=new Promise((ok,fail)=>{const s=document.createElement("script");s.src=`geotex/quakes/t_${k}.js`;
+      s.onload=()=>{const v=b64(window.QUAKE_T[k]),n=v.byteLength/12,t={n,ts:new Uint32Array(n),y:new Uint16Array(n),lng:new Float32Array(n),lat:new Float32Array(n),m:new Float32Array(n),d:new Float32Array(n)};
+        for(let i=0;i<n;i++){const o=i*12;t.ts[i]=v.getUint32(o,true);t.y[i]=new Date(EP+t.ts[i]*1000).getUTCFullYear();t.lng[i]=(v.getUint16(o+4,true)+11900)/100;t.lat[i]=(v.getUint16(o+6,true)+2100)/100;t.m[i]=v.getUint16(o+8,true)/100;t.d[i]=v.getUint16(o+10,true)/100;}
+        delete window.QUAKE_T[k]; T[k]=t; ok(t);}; s.onerror=fail; document.head.appendChild(s);}); }
+  const tilesInView=()=>{const b=map.getBounds().pad(.05),ks=[];
+    for(const k of Object.keys(M.tiles)){const [x,y]=k.split("_").map(Number),w=M.lon0+x*M.tile,s=M.lat0+y*M.tile;
+      if(b.intersects(L.latLngBounds([s,w],[s+M.tile,w+M.tile]))) ks.push(k);} return ks;};
+  const pass=(t,i)=>{const y=t.y[i];return y>=F.y0&&y<=F.y1&&t.m[i]>=F.m0&&t.m[i]<=F.m1&&t.d[i]>=F.d0&&t.d[i]<=F.d1;};
+  const fmtT=s=>new Date(EP+s*1000).toISOString().slice(0,19).replace("T"," ");
+  // 畫布圖層
+  map.createPane("quake"); map.getPane("quake").style.zIndex=405; map.getPane("quake").style.pointerEvents="none";
+  let cvs=null, on=false, hits=[], shown=0, mode="";
+  const status=document.createElement("div"); status.className="src";
+  function draw(){ if(!on) return;
+    const sz=map.getSize(), dpr=window.devicePixelRatio||1; cvs.width=sz.x*dpr; cvs.height=sz.y*dpr; cvs.style.width=sz.x+"px"; cvs.style.height=sz.y+"px";
+    L.DomUtil.setPosition(cvs,map.containerPointToLayerPoint([0,0])); cvs.style.opacity=1;
+    const g=cvs.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,sz.x,sz.y); hits=[]; shown=0;
+    const pb=map.getPixelBounds().min, z=map.getZoom(), P=(la,lo)=>{const p=map.project([la,lo],z);return [p.x-pb.x,p.y-pb.y];};
+    if(z<PZ){ mode="grid"; if(!C){ status.textContent=L2("載入地震資料中…","Loading earthquakes…"); loadCube().then(draw,()=>{status.textContent=L2("地震資料載入失敗，請確認 geotex/quakes 資料夾和網頁放在一起。","Could not load geotex/quakes.");}); return; }
+      if(!grid) aggregate(); let mx=1; grid.forEach(n=>{if(n>mx)mx=n;});
+      grid.forEach((n,c)=>{const x=c%M.nx,y=Math.floor(c/M.nx),w=M.lon0+x*M.cell,s=M.lat0+y*M.cell,[x0,y1]=P(s,w),[x1,y0]=P(s+M.cell,w+M.cell);
+        if(x1<0||y1<0||x0>sz.x||y0>sz.y) return; const a=Math.log(n+1)/Math.log(mx+1);
+        g.fillStyle=`hsla(${48-a*48},95%,${58-a*20}%,${.25+a*.6})`; g.fillRect(x0,y0,x1-x0+.5,y1-y0+.5); shown+=n; hits.push([x0,y0,x1,y1,c,n]);});
+      status.textContent=L2(`縮小顯示密度（0.1° 方格），畫面內符合條件 ${shown.toLocaleString()} 筆；放大到縣市層級會顯示每一筆地震。`,`Density view (0.1° cells), ${shown.toLocaleString()} events in view; zoom in to see individual earthquakes.`);
+      return; }
+    mode="pts"; const ks=tilesInView(), miss=ks.filter(k=>!T[k]);
+    if(miss.length){ status.textContent=L2("載入地震資料中…","Loading earthquakes…"); Promise.all(miss.map(loadTile)).then(draw,()=>{status.textContent=L2("地震資料載入失敗，請確認 geotex/quakes 資料夾和網頁放在一起。","Could not load geotex/quakes.");}); }
+    const r0=z>=13?2.2:z>=11?1.6:1.1;
+    for(const k of ks){const t=T[k]; if(!t) continue;
+      for(let i=0;i<t.n;i++){ if(!pass(t,i)) continue; const [x,y]=P(t.lat[i],t.lng[i]); if(x<-20||y<-20||x>sz.x+20||y>sz.y+20) continue;
+        const r=Math.max(1.5,r0*(t.m[i]+.6)); g.beginPath(); g.arc(x,y,r,0,6.2832); g.fillStyle=qColor(t.d[i]); g.globalAlpha=t.m[i]>=4?.9:.55; g.fill();
+        if(t.m[i]>=4){g.globalAlpha=1;g.lineWidth=1;g.strokeStyle="#fff";g.stroke();} shown++; hits.push([x,y,r,k,i]);}}
+    g.globalAlpha=1;
+    if(!miss.length) status.textContent=L2(`畫面內符合條件 ${shown.toLocaleString()} 筆，點圓點看詳細資料。`,`${shown.toLocaleString()} events in view; tap a dot for details.`);
+  }
+  function onClick(e){ if(!on) return; const p=e.containerPoint;
+    if(mode!=="pts") return;  // 縮小時不攔截點擊，免得干擾分區查詢、新增標示等功能
+    let best=null,bd=1e9; for(const h of hits){const dd=Math.hypot(h[0]-p.x,h[1]-p.y); if(dd<=Math.max(h[2],6)+2&&dd<=bd){bd=dd;best=h;}} if(!best) return;
+    const t=T[best[3]],i=best[4],ll=[t.lat[i],t.lng[i]];
+    L.popup().setLatLng(ll).setContent(`<div class="geopop"><h4>${L2("規模","M")} ${t.m[i].toFixed(2)}・${fmtT(t.ts[i])}</h4><div class="m">${L2("地震目錄（氣象署）","Earthquake catalogue (CWA)")}</div>`+
+      `<table class="sitetab"><tr><td>${L2("時間","Time")}</td><td>${fmtT(t.ts[i])}</td></tr><tr><td>${L2("規模","Magnitude")}</td><td>${t.m[i].toFixed(2)}</td></tr><tr><td>${L2("深度","Depth")}</td><td>${t.d[i].toFixed(2)} km</td></tr><tr><td>${L2("震央","Epicentre")}</td><td>${t.lat[i].toFixed(2)}°N, ${t.lng[i].toFixed(2)}°E</td></tr></table>`+
+      `<div style="margin-top:6px"><a href="${earthUrl(ll[0],ll[1],40000)}" target="_blank" rel="noopener">${L2("在 Google Earth 開啟這裡","Open here in Google Earth")}</a></div><div class="src">${SRC}</div></div>`).openOn(map); }
+  // 介面：開關、篩選、圖例、匯出
+  const yrs=Array.from({length:M.y1-M.y0+1},(_,k)=>M.y0+k).map(y=>`<option>${y}</option>`).join("");
+  box.innerHTML=`<label class="qhead"><input type="checkbox" id="qkon"> <span class="sw" style="background:conic-gradient(#c0392b 0 25%,#e67e22 0 50%,#2e6da4 0 75%,#f5c542 0)"></span>${L2("地震目錄（氣象署）","Earthquake catalogue (CWA)")}<span class="count">${M.n.toLocaleString()}</span></label>
+  <div id="qkpanel" hidden><div class="qrow"><span>${L2("年份","Year")}</span><select id="qy0">${yrs}</select>–<select id="qy1">${yrs}</select></div>
+  <div class="qrow"><span>${L2("規模","Magnitude")}</span><input id="qm0" type="number" step="0.5" min="0" max="8">–<input id="qm1" type="number" step="0.5" min="0" max="8"></div>
+  <div class="qrow"><span>${L2("深度 km","Depth km")}</span><input id="qd0" type="number" step="5" min="0" max="400">–<input id="qd1" type="number" step="5" min="0" max="400"></div>
+  <div class="qrow"><button type="button" class="linkbtn" id="qreset">${L2("恢復全部","Reset")}</button><button type="button" class="linkbtn" id="qkml">${L2("匯出畫面內地震 KML","Export quakes in view (KML)")}</button></div>
+  <div class="qleg">${[["#c0392b","<10"],["#e8590c","10–30"],["#e67e22","30–70"],["#2e6da4","≥70"]].map(([c,t])=>`<span><i style="background:${c}"></i>${t} km</span>`).join("")}</div>
+  <div class="qleg"><span><i class="ramp"></i>${L2("縮小時：顏色越深、地震越多（對數尺度）","Zoomed out: darker = more earthquakes (log scale)")}</span></div></div>`;
+  const $=id=>document.getElementById(id), panel=$("qkpanel"); panel.appendChild(status);
+  const note=document.createElement("div"); note.className="src"; note.textContent=L2("縮小時的篩選以整數規模級（例如 2.0–2.99）與深度級（<10、10–30、30–70、≥70 km）計算；放大後的點是精確篩選。",
+    "When zoomed out, filters snap to whole-magnitude and depth classes; dots shown when zoomed in are filtered exactly."); panel.appendChild(note);
+  const src=document.createElement("div"); src.className="src"; src.textContent=SRC; panel.appendChild(src);
+  const sync=()=>{$("qy0").value=F.y0;$("qy1").value=F.y1;$("qm0").value=F.m0;$("qm1").value=F.m1;$("qd0").value=F.d0;$("qd1").value=F.d1;};
+  const read=()=>{const n=(id,def)=>{const v=parseFloat($(id).value);return isNaN(v)?def:v;};
+    F.y0=+$("qy0").value;F.y1=+$("qy1").value;if(F.y0>F.y1)[F.y0,F.y1]=[F.y1,F.y0];
+    F.m0=n("qm0",0);F.m1=n("qm1",9);if(F.m0>F.m1)[F.m0,F.m1]=[F.m1,F.m0];F.d0=n("qd0",0);F.d1=n("qd1",1e4);if(F.d0>F.d1)[F.d0,F.d1]=[F.d1,F.d0];
+    grid=null; sync(); draw();};
+  ["qy0","qy1","qm0","qm1","qd0","qd1"].forEach(id=>$(id).addEventListener("change",read));
+  $("qreset").onclick=()=>{Object.assign(F,{y0:M.y0,y1:M.y1,m0:0,m1:Math.ceil(M.mMax*10)/10,d0:0,d1:Math.ceil(M.dMax)});grid=null;sync();draw();};
+  $("qkml").onclick=async()=>{ if(map.getZoom()<PZ){status.textContent=L2(`請先放大到縣市層級（縮放 ${PZ} 以上）再匯出。`,`Zoom in to level ${PZ}+ first.`);return;}
+    const ks=tilesInView(); await Promise.all(ks.map(loadTile)); const b=map.getBounds(), ev=[];
+    for(const k of ks){const t=T[k];for(let i=0;i<t.n;i++) if(pass(t,i)&&b.contains([t.lat[i],t.lng[i]])) ev.push([t,i]);}
+    ev.sort((a,c)=>c[0].m[c[1]]-a[0].m[a[1]]); const cut=ev.slice(0,20000);
+    const sty=[["s0","#c0392b"],["s1","#e8590c"],["s2","#e67e22"],["s3","#2e6da4"]].map(([id,c])=>`<Style id="${id}"><IconStyle><color>${kcolor(c)}</color><scale>0.6</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle></Style>`).join("");
+    const pm=cut.map(([t,i])=>{const d=t.d[i];return `<Placemark><name>M${t.m[i].toFixed(1)}</name><description>${fmtT(t.ts[i])}，${L2("深度","depth")} ${d.toFixed(2)} km</description><styleUrl>#s${d<10?0:d<30?1:d<70?2:3}</styleUrl><Point><coordinates>${t.lng[i]},${t.lat[i]},0</coordinates></Point></Placemark>`;}).join("\n");
+    const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${L2("地震目錄","Earthquakes")} ${F.y0}–${F.y1} M${F.m0}–${F.m1}</name><description>${xesc(SRC)}${ev.length>cut.length?xesc(L2(`（畫面內 ${ev.length} 筆，只匯出規模最大的 20000 筆）`,` (${ev.length} in view; largest 20000 exported)`)):""}</description>${sty}\n${pm}\n</Document></kml>`;
+    const url=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"})); const a=document.createElement("a"); a.href=url; a.download=`地震目錄_${F.y0}-${F.y1}_M${F.m0}-${F.m1}_${cut.length}筆.kml`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),5000);
+    status.textContent=L2(`已匯出 ${cut.length.toLocaleString()} 筆${ev.length>cut.length?`（畫面內共 ${ev.length.toLocaleString()} 筆，只取規模最大的 20000 筆）`:""}。`,`Exported ${cut.length.toLocaleString()} events.`); };
+  sync();
+  $("qkon").onchange=e=>{ on=e.target.checked; panel.hidden=!on;
+    if(on){ cvs??=L.DomUtil.create("canvas","",map.getPane("quake")); cvs.style.position="absolute"; cvs.style.display=""; draw(); }
+    else if(cvs){ cvs.style.display="none"; } };
+  map.on("moveend zoomend resize",draw); map.on("zoomstart",()=>{if(cvs)cvs.style.opacity=0;}); map.on("click",onClick);
+  return {draw,F};
+})();
+
 // ---------- 我的標示：點地圖新增、可編輯名稱／備註／顏色／形狀／照片／連結，可拖曳；存在瀏覽器 localStorage ----------
 const MK_KEY="geo-mymarks";
 const MK_COLORS=["#c0392b","#e67e22","#d4ac0d","#2e8b57","#1f6fb5","#7d3c98","#3a2816"];
