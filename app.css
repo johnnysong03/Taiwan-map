@@ -493,8 +493,8 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 @media (max-width:760px){ #shotbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} .shotform select{font-size:16px} }
 .geopop table.bhlay td:first-child{font-family:var(--mono);font-size:12px}
 /* 地熱地圖：地震目錄 */
-#quakebox{border:1px solid var(--rule);padding:6px 8px}
-#quakebox .qhead{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px}
+#quakebox,#feederbox{border:1px solid var(--rule);padding:6px 8px}
+#quakebox .qhead,#feederbox .qhead{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px}
 #quakebox .qhead .sw{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none}
 #quakebox .qhead .count{margin-left:auto}
 #qkpanel{display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:13px}
@@ -513,3 +513,10 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 .geopop .wrel .wsame>summary{cursor:pointer;color:var(--ink)}
 .geopop .wrel .wsame[open]>summary{margin-bottom:4px}
 #sitechecks .bufopt{border-top:1px dotted var(--rule);margin-top:4px;padding-top:6px;font-size:13.5px}
+#feederbox .qhead{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px}
+#feederbox .qhead .sw{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none}
+#feederbox .qhead .count{margin-left:auto}
+#fdpanel{display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:13px}
+#fdpanel[hidden]{display:none}
+#fdpanel .qleg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
+#fdpanel .qleg i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
