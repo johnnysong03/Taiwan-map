@@ -491,3 +491,4 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 #shotbusy .spin{display:inline-block;width:16px;height:16px;margin-right:10px;vertical-align:-2px;border:2px solid var(--rule);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (max-width:760px){ #shotbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} .shotform select{font-size:16px} }
+.geopop table.bhlay td:first-child{font-family:var(--mono);font-size:12px}

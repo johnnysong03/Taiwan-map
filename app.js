@@ -726,6 +726,7 @@ const WICON={wexp:s=>`<div style="width:${s}px;height:${s}px;background:#c92a2a;
 // 鑽孔柱狀圖（地調中心工程地質探勘資料庫，geotex/bh_logs.js；新增方式見 geotex/boreholes/README.md）
 const BH_SRC=L2('資料：經濟部地質調查及礦業管理中心<a href="https://geotech.gsmma.gov.tw/imoeagis/Home/Map" target="_blank" rel="noopener">工程地質探勘資料庫</a>（柱狀圖與基本資料）',
   'Data: GSMMA <a href="https://geotech.gsmma.gov.tw/imoeagis/Home/Map" target="_blank" rel="noopener">engineering geology database</a> (logs and borehole data)');
+const bhSrc=p=>p.source?L2("資料：","Data: ")+hesc(p.source):BH_SRC;
 const rocShow=d=>{const m=/^(\d+)-(\d\d)-(\d\d)$/.exec(d||"");return m?L2(`民國 ${+m[1]} 年 ${+m[2]} 月 ${+m[3]} 日（${+m[1]+1911}-${m[2]}-${m[3]}）`,`${+m[1]+1911}-${m[2]}-${m[3]}`):"";};
 const bhImg=(p,i,abs)=>{const u=`geotex/boreholes/${encodeURIComponent(p.id)}_p${i}.png`;return abs?new URL(u,location.href).href:u;};
 function bhBody(p,abs){
@@ -735,11 +736,15 @@ function bhBody(p,abs){
     p.x!=null&&[L2("原始坐標","Original coordinates"),`${crs} X ${p.x}／Y ${p.y}`],
     (p.start||p.end)&&[L2("鑽探日期","Drilling dates"),[rocShow(p.start),rocShow(p.end)].filter(Boolean).join(L2(" 至 "," to "))],
     p.company&&[L2("鑽探公司","Driller"),hesc(p.company)],
-    [L2("坐標","Coordinates"),L2(`資料庫鑽孔圖層提供的 WGS84${crs==="TWD67"||!crs?"（原始坐標非 TWD97 時由資料庫換算）":""}`,"WGS84 from the database borehole layer")],
+    p.gwl!=null&&p.gwl!==""&&[L2("地下水位","Groundwater level"),L2(`地表下 ${p.gwl} m`,`${p.gwl} m below ground`)+(p.gwlDate?`（${hesc(p.gwlDate)}）`:"")],
+    [L2("坐標","Coordinates"),p.coordNote?hesc(p.coordNote):p.source?L2("由原始坐標換算為 WGS84","Converted to WGS84 from the original coordinates"):L2(`資料庫鑽孔圖層提供的 WGS84${crs==="TWD67"||!crs?"（原始坐標非 TWD97 時由資料庫換算）":""}`,"WGS84 from the database borehole layer")],
     p.note&&[L2("備註","Note"),hesc(p.note)]].filter(Boolean);
   const pages=Array.from({length:p.pages||0},(_,k)=>k+1).map(i=>`<a href="${bhImg(p,i,abs)}" target="_blank" rel="noopener" title="${L2(`第 ${i} 頁（開新分頁看大圖）`,`Page ${i} (opens full size)`)}"><img src="${bhImg(p,i,abs)}" alt="${hesc(p.hole)} ${L2(`柱狀圖第 ${i} 頁`,`log page ${i}`)}" loading="lazy" style="display:block;width:100%;margin:4px 0;border:1px solid var(--rule);background:#fff"></a>`).join("");
-  return `<table class="sitetab">${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`+
-    `<div class="m" style="margin:6px 0 2px">${L2(`柱狀圖 ${p.pages} 頁，點圖看大圖`,`${p.pages} log page${p.pages>1?"s":""}; tap to enlarge`)}</div>${pages}`;
+  // 分層（layers）與標準貫入 N 值（spt）是選填欄位，GEO2010 匯入的孔會有；格式見 geotex/boreholes/README.md
+  const layers=(p.layers||[]).length?`<div class="m" style="margin:8px 0 2px">${L2("分層","Strata")}</div><table class="sitetab bhlay"><tr><td>${L2("深度 (m)","Depth (m)")}</td><td>${L2("土層／岩性描述","Description")}</td></tr>${p.layers.map(l=>`<tr><td>${l.top}–${l.bot}</td><td>${hesc(l.desc||"")}${l.uscs?` <b>${hesc(l.uscs)}</b>`:""}</td></tr>`).join("")}</table>`:"";
+  const spt=(p.spt||[]).length?`<div class="m" style="margin:8px 0 2px">${L2("標準貫入試驗 N 值","SPT N-values")}</div><div style="font:12px var(--mono)">${p.spt.map(t=>`${t.depth} m：N=${hesc(String(t.n))}`).join("；")}</div>`:"";
+  return `<table class="sitetab">${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`+layers+spt+
+    (p.pages?`<div class="m" style="margin:6px 0 2px">${L2(`柱狀圖 ${p.pages} 頁，點圖看大圖`,`${p.pages} log page${p.pages>1?"s":""}; tap to enlarge`)}</div>${pages}`:"");
 }
 // ---------- 土地與保護區：國家公園範圍、原住民保留地、傳統領域調查成果 ----------
 const LAND_EN={lnp:"National park boundary",lres:"Indigenous reserved land",ltrad:"Traditional territory (2002–2009 survey)",lname:"Traditional place name"};
@@ -813,7 +818,7 @@ function makeGeoLayer(c,fc){
   const k=c.kind, title=f=>{const p=f.properties;return p.Site||p.sitename||p.name||p.Survey_Place||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;};
   const meta=c.well?c.name:`${T(c.region)}・${c.name}`, isK=/^kmz_/.test(c.src||c.key);
   const bind=(f,l)=>l.bindPopup(()=>{const ll=l.getLatLng?l.getLatLng():l.getBounds().getCenter();
-    if(k==="wbor") return pop(hesc(f.properties.hole),meta,bhBody(f.properties),BH_SRC);
+    if(k==="wbor") return pop(hesc(f.properties.hole),meta,bhBody(f.properties),bhSrc(f.properties));
     if(LAND_EN[k]) return pop(hesc(landTitle(f.properties,k)),L2(KIND[k][0],LAND_EN[k]),landBody(f.properties,k),LAND_SRC[k]);
     if(SITE_SHAPE[k]) return pop(hesc(f.properties.company),L2(`現有地熱案場・${f.properties.cat}・${f.properties.status}`,`Existing project · ${st(f.properties.cat)} · ${st(f.properties.status)}`),siteBody(f.properties),SITE_SRC);
     if(isK) return pop(hesc(title(f)),meta,kwellBody(f.properties)+
@@ -963,7 +968,7 @@ function exportKML(){
     const pms=fc.features.map(f=>{const p=f.properties||{};
       const isL=!!LAND_EN[c.kind], isB=c.kind==="wbor";
       const nm=isB?p.hole:isL?landTitle(p,c.kind):isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
-      const desc=isB?bhBody(p,true)+`<div>${BH_SRC}</div>`:isL?landBody(p,c.kind)+`<div>${LAND_SRC[c.kind]}</div>`:isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
+      const desc=isB?bhBody(p,true)+`<div>${bhSrc(p)}</div>`:isL?landBody(p,c.kind)+`<div>${LAND_SRC[c.kind]}</div>`:isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
       return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&isHollow(p.status)?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
     return `<Folder><name>${xesc(LAND_EN[c.kind]?L2("土地與保護區・","Land – ")+c.name:isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n");
   const srcs=[on.some(c=>!SITE_SHAPE[c.kind]&&!LAND_EN[c.kind]&&c.kind!=="wbor")?GEO_SRC:"",on.some(c=>c.kind==="wbor")?BH_SRC.replace(/<[^>]+>/g,""):"",...[...new Set(on.filter(c=>LAND_EN[c.kind]).map(c=>LAND_SRC[c.kind].replace(/<[^>]+>/g,"")))],on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；有虛線圈（approx）的點為鄉鎮或縣市代表點，屬約略位置","; approximate points sit at township or county representative points"):""].filter(Boolean).join("\n");
