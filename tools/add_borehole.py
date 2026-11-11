@@ -83,10 +83,11 @@ def load():
 def save(rows):
     rows.sort(key=lambda r: (r["proj"], r["hole"]))
     body = ",\n".join(json.dumps(r, ensure_ascii=False) for r in rows)
-    open(DATA, "w", encoding="utf-8").write(
+    open(DATA, "w", encoding="utf-8", newline="\n").write(
         "// 鑽孔柱狀圖：經濟部地質調查及礦業管理中心「工程地質探勘資料庫」（https://geotech.gsmma.gov.tw/imoeagis/Home/Map）。\n"
         "// 一孔一行；新增請用 tools/add_borehole.py（說明見 geotex/boreholes/README.md），也可以手動照格式加一行。\n"
         "// 柱狀圖圖片在 geotex/boreholes/<id>_p<頁>.png；坐標用資料庫鑽孔圖層提供的 WGS84（TWD67 的孔由資料庫換算）。\n"
+        "// 有 source 欄位的孔來自使用者提供的 GEO2010 MDB（tools/import_geo2010.py 匯入），坐標換算方式見各孔 coordNote。\n"
         "window.BH_LOGS=" + START + "[\n" + body + "\n]" + END + ";\n"
         "(()=>{const rows=window.BH_LOGS||[];\n"
         "window.GEOTEX_CATALOG=(window.GEOTEX_CATALOG||[]).concat([[\"bh_logs\",\"全臺：鑽孔柱狀圖(Borehole logs)\",rows.length,\"Point\",0,\"bh\"]]);\n"
