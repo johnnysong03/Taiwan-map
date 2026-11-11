@@ -218,6 +218,8 @@ const OVERS = APP==="arch" ? {
   "地質敏感區（山崩與地滑）": nlsc("GeoSensitive2",OP),
   "土壤液化潛勢": nlsc("SoilLiquefaction",OP),
   "國土利用現況調查": nlsc("LUIMAP",OP),
+  "公有土地地籍圖": nlsc("LAND_OPENDATA",OP),
+  "地段外圍圖（段籍圖）": nlsc("LANDSECT",OP),
   "鄉鎮區界": nlsc("TOWN",OP),
 };
 // paper grain
@@ -288,11 +290,13 @@ Object.keys(OVERS).forEach((k,i)=>{
   const id="o"+i, lab=document.createElement("label"), lyr=OVERS[k];
   lyr.setOpacity(0.85);
   lab.innerHTML=`<input type="checkbox" id="${id}"> ${T(k)}`;
+  const hint=k==="公有土地地籍圖"?L2("國土測繪中心開放的只有公有土地，私有地不會顯示；放大到街區層級才看得到。","NLSC open data covers public land only; private parcels are not shown. Visible when zoomed in to street level."):"";
   lab.querySelector("input").onchange=e=>{
     if(e.target.checked){ lyr.addTo(map); if(map.getZoom()<16 && /地籍|段籍|建物框/.test(k)) map.setZoom(17); }
     else map.removeLayer(lyr);
   };
   oversEl.appendChild(lab);
+  if(hint){ const d=document.createElement("div"); d.className="src"; d.style.margin="-2px 0 4px 22px"; d.textContent=hint; oversEl.appendChild(d); }
 });
 document.getElementById("opacity").oninput=e=>Object.values(OVERS).forEach(l=>l.setOpacity(+e.target.value));
 document.getElementById("lmin").onclick=e=>{const p=document.getElementById("layers");p.classList.toggle("min");e.target.textContent=p.classList.contains("min")?L2("展開","Expand"):L2("收合","Collapse")};
@@ -912,29 +916,35 @@ function landLegend(){
     [...new Set(on.map(c=>LAND_SRC[c.kind]))].map(t=>`<div class="src">${t}</div>`).join("");
   lg.hidden=false;
 }
-// ---------- 現有地熱案場 500 m 緩衝區：跟著目前勾選的案場類別畫；約略位置（鄉鎮代表點）不畫 ----------
-const BUF_R=500, bufLayer=L.layerGroup(); let bufOn=false, bufStat={n:0,skip:0};
-function updateBuffers(){ bufLayer.clearLayers(); bufStat={n:0,skip:0};
-  if(bufOn) WELL_ITEMS.filter(c=>SITE_SHAPE[c.kind]&&geoOn[c.key]&&c.fc).forEach(c=>c.fc.features.forEach(f=>{
-    if(f.properties.approx){bufStat.skip++;return;} const [lng,lat]=f.geometry.coordinates; bufStat.n++;
-    L.circle([lat,lng],{radius:BUF_R,pane:"geofill",color:KIND[c.kind][1],weight:1.6,dashArray:"6 4",fillColor:KIND[c.kind][1],fillOpacity:.1,interactive:false}).addTo(bufLayer);}));
+// ---------- 現有地熱案場 500 m 緩衝區：所有案場類別都畫（不管有沒有勾選）；約略位置用淡色細虛線，只是示意 ----------
+const BUF_R=500, bufLayer=L.layerGroup(); let bufOn=false, bufStat={n:0,approx:0};
+const siteFeats=c=>{ const fc=c.fc||window.GEOTEX_D?.[c.src||c.key]; if(!fc) return [];
+  return c.pick?fc.features.filter(f=>f.properties.color===c.pick):fc.features; };
+const bufSites=()=>WELL_ITEMS.filter(c=>SITE_SHAPE[c.kind]).flatMap(c=>siteFeats(c).map(f=>[c,f]));
+function updateBuffers(){ bufLayer.clearLayers(); bufStat={n:0,approx:0};
+  if(bufOn) bufSites().forEach(([c,f])=>{ const [lng,lat]=f.geometry.coordinates, ap=!!f.properties.approx, col=KIND[c.kind][1];
+    bufStat.n++; if(ap) bufStat.approx++;
+    L.circle([lat,lng],ap?{radius:BUF_R,pane:"geofill",color:col,weight:1.2,opacity:.7,dashArray:"2 5",fillColor:col,fillOpacity:.04,interactive:false}
+      :{radius:BUF_R,pane:"geofill",color:col,weight:1.6,dashArray:"6 4",fillColor:col,fillOpacity:.1,interactive:false}).addTo(bufLayer); });
   if(bufOn&&bufStat.n){ if(!map.hasLayer(bufLayer)) bufLayer.addTo(map); } else map.removeLayer(bufLayer); }
 // KML 用：以 72 邊形近似 500 m 圓
 const circleRing=(lat,lng,r)=>{const f=lat*Math.PI/180, mLat=111132.92-559.82*Math.cos(2*f)+1.175*Math.cos(4*f), mLng=111412.84*Math.cos(f)-93.5*Math.cos(3*f);  // 依緯度的每度公尺數
   return Array.from({length:73},(_,i)=>{const a=i/72*2*Math.PI, dLat=r*Math.cos(a)/mLat, dLng=r*Math.sin(a)/mLng;
   return `${(lng+dLng).toFixed(6)},${(lat+dLat).toFixed(6)},0`;}).join(" ");};
-const bufKml=c=>{ if(!bufOn) return ""; const col=kcolor(KIND[c.kind][1]).slice(2);
-  const pm=c.fc.features.filter(f=>!f.properties.approx).map(f=>{const [lng,lat]=f.geometry.coordinates;
-    return `<Placemark><name>${xesc(f.properties.company)} ${L2("半徑 500 m 範圍","500 m radius")}</name><styleUrl>#b_${c.key}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${circleRing(lat,lng,BUF_R)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;}).join("\n");
-  return pm?`<Folder><name>${L2("半徑 500 m 緩衝區","500 m radius buffer")}</name><Style id="b_${c.key}"><LineStyle><color>ff${col}</color><width>1.5</width></LineStyle><PolyStyle><color>22${col}</color></PolyStyle></Style>\n${pm}</Folder>`:""; };
+// 所有案場的緩衝區放在一個資料夾（跟地圖一樣，不管類別有沒有勾選）
+const bufKml=()=>{ if(!bufOn) return ""; const sty=new Set();
+  const pm=bufSites().map(([c,f])=>{const [lng,lat]=f.geometry.coordinates, ap=!!f.properties.approx, id=`b_${c.key}${ap?"_a":""}`;
+    if(!sty.has(id)){ const col=kcolor(KIND[c.kind][1]).slice(2); sty.add(`<Style id="${id}"><LineStyle><color>${ap?"aa":"ff"}${col}</color><width>${ap?1:1.5}</width></LineStyle><PolyStyle><color>${ap?"0d":"22"}${col}</color></PolyStyle></Style>`); }
+    return `<Placemark><name>${xesc(f.properties.company)} ${L2("半徑 500 m 範圍","500 m radius")}${ap?L2("（約略位置，僅示意）"," (approximate location)"):""}</name><styleUrl>#${id}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${circleRing(lat,lng,BUF_R)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;}).join("\n");
+  return pm?`<Folder><name>${L2("現有地熱案場・半徑 500 m 緩衝區","Existing projects – 500 m radius buffer")}</name>${[...sty].join("")}\n${pm}</Folder>`:""; };
 function siteLegend(){
   const lg=document.getElementById("sitelegend"); if(!lg) return;
   updateBuffers();
   const on=WELL_ITEMS.filter(c=>geoOn[c.key]&&SITE_SHAPE[c.kind]);
-  if(!on.length){lg.hidden=true;lg.innerHTML="";return;}
-  const k0=on[0].kind;
+  if(!on.length&&!bufOn){lg.hidden=true;lg.innerHTML="";return;}
+  const k0=(on[0]||WELL_ITEMS.find(c=>SITE_SHAPE[c.kind])).kind;
   lg.innerHTML=`<div class="row">${on.map(c=>`<span class="wl">${siteIcon(c.kind,12)}${L2(KIND[c.kind][0],st(KIND[c.kind][0]))}</span>`).join("")}</div>`+
-    (bufOn?`<div class="row"><span class="wl"><span class="k" style="border:1.5px dashed ${KIND[k0][1]};border-radius:50%;background:${KIND[k0][1]}1a"></span>${L2(`半徑 500 m 緩衝區：${bufStat.n} 處${bufStat.skip?`（${bufStat.skip} 個約略位置不畫）`:""}`,`500 m radius buffer: ${bufStat.n} sites${bufStat.skip?` (${bufStat.skip} approximate locations skipped)`:""}`)}</span></div>`:"")+
+    (bufOn?`<div class="row"><span class="wl"><span class="k" style="border:1.5px dashed ${KIND[k0][1]};border-radius:50%;background:${KIND[k0][1]}1a"></span>${L2(`半徑 500 m 緩衝區：所有案場 ${bufStat.n} 處${bufStat.approx?`（其中 ${bufStat.approx} 處是約略位置，用淡色細虛線，只是示意）`:""}`,`500 m radius buffer: all ${bufStat.n} sites${bufStat.approx?` (${bufStat.approx} approximate locations in faint dotted lines, indicative only)`:""}`)}</span></div>`:"")+
     `<div class="row"><span class="wl">${siteIcon(k0,12)}${L2("已通過／營運中","Approved / operating")}</span><span class="wl">${siteIcon(k0,12,true)}${L2("申請中／規劃中","Under review / planned")}</span><span class="wl">${siteIcon(k0,12,false,true)}${L2("約略位置","Approximate location")}</span></div>`+
     `<div class="src">${L2("沒有虛線圈的點用使用者提供的座標（經緯度或 Google 地圖連結），都經國土測繪中心反查確認在能源署寫的鄉鎮內；有虛線圈的是約略位置，用鄉鎮或縣市代表點定位。空心代表申請中或規劃中，跟定位精度無關。","Points without a dashed ring use user-supplied coordinates (lat/long or Google Maps links), each checked with NLSC reverse lookup; dashed rings mark approximate locations at township or county representative points. Hollow means under review or planned, not location accuracy.")} ${SITE_SRC}</div>`;
   lg.hidden=false;
@@ -1008,7 +1018,7 @@ renderWellChecks();
 // 「現有地熱案場」組加上 500 m 緩衝區開關
 (()=>{ const g=document.querySelector("#sitechecks .wgroup"); if(!g) return;
   const lab=document.createElement("label"); lab.className="bufopt";
-  lab.innerHTML=`<input type="checkbox" id="sitebuf"> <span class="sw" style="border:1.5px dashed #087f5b;border-radius:50%;background:#087f5b1a"></span>${L2("顯示半徑 500 m 緩衝區（目前勾選的類別）","Show 500 m radius buffers (ticked categories)")}`;
+  lab.innerHTML=`<input type="checkbox" id="sitebuf"> <span class="sw" style="border:1.5px dashed #087f5b;border-radius:50%;background:#087f5b1a"></span>${L2("顯示所有案場半徑 500 m 緩衝區","Show 500 m radius buffers for all sites")}`;
   lab.querySelector("input").onchange=e=>{ bufOn=e.target.checked; siteLegend(); };
   const note=g.querySelector(":scope>.src"); g.insertBefore(lab,note||null); })();
 // ---------- 匯出 KML：把目前開啟的圖層存成 Google Earth 可以開啟的檔案 ----------
@@ -1038,7 +1048,7 @@ function exportKML(){
       const nm=isB?p.hole:isL?landTitle(p,c.kind):isS?p.company+(p.project?`（${p.project}）`:"")+L2(`・${p.status}`,` – ${st(p.status)}`):p.rockname||p.Site||p.sitename||p.name||p.SiteNo||p.siteid||p.No||p.Hole_No||p.SLine_ID||p.sectionName||c.name;
       const desc=isB?bhBody(p,true)+`<div>${bhSrc(p)}</div>`:isL?landBody(p,c.kind)+`<div>${LAND_SRC[c.kind]}</div>`:isS?siteBody(p)+`<div>${SITE_SRC}</div>`:/^kmz_/.test(c.src||c.key)?kwellBody(p):propTable(p,c.src||c.key);
       return `<Placemark><name>${xesc(nm)}</name><styleUrl>#s_${c.key}${isS&&isHollow(p.status)?"_p":""}</styleUrl><description><![CDATA[${desc}]]></description>${kgeom(f.geometry)}</Placemark>`;}).join("\n");
-    return `<Folder><name>${xesc(LAND_EN[c.kind]?L2("土地與保護區・","Land – ")+c.name:isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}${isS?bufKml(c):""}</Folder>`;}).join("\n");
+    return `<Folder><name>${xesc(LAND_EN[c.kind]?L2("土地與保護區・","Land – ")+c.name:isS?L2("現有地熱案場・","Existing projects – ")+c.name:c.well?c.name:c.region+"・"+c.name)}</name>${style}\n${pms}</Folder>`;}).join("\n")+bufKml();
   const srcs=[on.some(c=>!SITE_SHAPE[c.kind]&&!LAND_EN[c.kind]&&c.kind!=="wbor")?GEO_SRC:"",on.some(c=>c.kind==="wbor")?BH_SRC.replace(/<[^>]+>/g,""):"",...[...new Set(on.filter(c=>LAND_EN[c.kind]).map(c=>LAND_SRC[c.kind].replace(/<[^>]+>/g,"")))],on.some(c=>SITE_SHAPE[c.kind])?SITE_SRC.replace(/<[^>]+>/g,"")+L2("；有虛線圈（approx）的點為鄉鎮或縣市代表點，屬約略位置","; approximate points sit at township or county representative points"):""].filter(Boolean).join("\n");
   const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>臺灣地熱地圖匯出</name><description>${xesc(srcs)}</description>\n${folders}\n</Document></kml>`;
   const url=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"}));
@@ -1766,8 +1776,9 @@ map.on("click", async e=>{
 }
 
 if(APP==="geo"){
-// ---------- 地震與環境資料 ----------
-// 氣象署（地震報告、氣象測站）：瀏覽器直接呼叫開放資料 API，需要使用者自己的授權碼，只存在 localStorage。
+// ---------- 環境資料 ----------
+// 地震改用「地震目錄」圖層（使用者下載的氣象署地震目錄，geotex/quakes/），不再即時查 API。
+// 氣象署（氣象測站）：瀏覽器直接呼叫開放資料 API，需要使用者自己的授權碼，只存在 localStorage。
 // 溫泉露頭、土石流潛勢溪流、西南海域地熱流：已轉成 env/*.js 放在版本庫，勾選時才載入。
 const $e=id=>document.getElementById(id);
 const eesc=s=>String(s??"").replace(/[<>&"]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[ch]));
@@ -1780,26 +1791,13 @@ const ENV={cwaKey:"", layers:{}, data:{}};
 try{ ENV.cwaKey=localStorage.getItem("cwaKey")||""; }catch(e){}
 const CWA="https://opendata.cwa.gov.tw/api/v1/rest/datastore/";
 const SRC_CWA=L2("資料：交通部中央氣象署開放資料平臺（即時查詢）","Data: Central Weather Administration open data (live)");
-function cwaUI(){ const need=["envEqS","envEqL","envWst"].some(id=>$e(id).checked);
+function cwaUI(){ const need=$e("envWst").checked;
   $e("cwabox").hidden=!need||!!ENV.cwaKey; $e("cwainfo").hidden=!ENV.cwaKey; }
 async function cwaGet(ds){
   const r=await fetch(`${CWA}${ds}?Authorization=${encodeURIComponent(ENV.cwaKey)}`);
   if(r.status===401) throw new Error("key");
   if(!r.ok) throw new Error("http "+r.status);
   return r.json();
-}
-// 地震：圓的大小看規模，顏色看深度（淺層紅、中層橘、深層藍）
-const eqColor=d=>d<30?"#c0392b":d<70?"#e67e22":"#2e6da4";
-async function eqLayer(ds,label){
-  const j=await cwaGet(ds), list=j.records?.Earthquake||[];
-  return L.layerGroup(list.map(e=>{const i=e.EarthquakeInfo, ep=i.Epicenter, m=i.EarthquakeMagnitude?.MagnitudeValue, d=i.FocalDepth;
-    const ll=[ep.EpicenterLatitude,ep.EpicenterLongitude];
-    return L.circleMarker(ll,{renderer:envRd,radius:Math.max(4,(m||3)*2.6-4),color:"#fff",weight:1.2,fillColor:eqColor(d),fillOpacity:.8})
-      .bindTooltip(`M${m} ${i.OriginTime.slice(0,16).replace("T"," ")}`,{direction:"top"})
-      .bindPopup(()=>epop(`${L2("規模","M")} ${m}・${i.OriginTime.slice(0,16).replace("T"," ")}`,`${label}・${L2("編號","No.")} ${e.EarthquakeNo}`,
-        erow([[L2("位置","Location"),eesc(ep.Location)],[L2("深度","Depth"),`${d} km`],[L2("規模","Magnitude"),`${eesc(i.EarthquakeMagnitude?.MagnitudeType)} ${m}`],
-          [L2("內容","Report"),eesc(e.ReportContent)]])+
-        (e.Web?`<div style="margin-top:6px"><a href="${eesc(e.Web)}" target="_blank" rel="noopener">${L2("氣象署地震報告","CWA earthquake report")}</a></div>`:"")+eEarth(ll[0],ll[1],60000),SRC_CWA));}));
 }
 async function stationLayer(){
   const [a,b]=await Promise.all([cwaGet("C-B0074-001"),cwaGet("C-B0074-002")]);
@@ -1946,8 +1944,6 @@ map.on("click",async e=>{
 });
 const ENV_DEF={
   envZon:{make:zonLayer},
-  envEqS:{cwa:1,make:()=>eqLayer("E-A0015-001",L2("顯著有感地震","Notable felt earthquake"))},
-  envEqL:{cwa:1,make:()=>eqLayer("E-A0016-001",L2("小區域有感地震","Local felt earthquake"))},
   envWst:{cwa:1,make:stationLayer},
   envHsp:{make:hspLayer}, envDeb:{make:debLayer}, envHfl:{make:hflLayer},
   envFlt:{make:async()=>gsmmaWms("WMS/25K_Geomap_fault_2021")}, envFsa:{make:async()=>gsmmaWms("WMS/Sensitive_area_fault")},
@@ -1958,9 +1954,6 @@ function envLegend(msg){
   const on=id=>$e(id).checked, parts=[];
   if(on("envZon")) parts.push(`<div class="zl"><b>${L2("非都市土地使用分區","Non-urban land zoning")}</b>`+NU_CLASS.map(x=>`<span><i style="background:rgb(${x.c.join(",")})"></i>${L2(x.zh,x.en)}</span>`).join("")+
     `<div class="src">${L2("點地圖查該點的分區與定義；臺北市、新北市都市計畫區也查得到。分類依「圖3-1-1 非都市土地使用分區類別圖」。","Click the map for the zone and its definition; urban plan areas in Taipei and New Taipei are covered too.")}</div></div>`);
-  if(on("envEqS")||on("envEqL")) parts.push(`<div class="zl"><b>${L2("有感地震（最近各 16 筆）","Felt earthquakes (latest 16 each)")}</b>`+
-    [["#c0392b",L2("深度 &lt; 30 km","Depth &lt; 30 km")],["#e67e22","30–70 km"],["#2e6da4","&gt; 70 km"]].map(([c,t])=>`<span><i style="background:${c};border-radius:50%"></i>${t}</span>`).join("")+
-    `<div class="src">${L2("圓越大規模越大。","Larger circles mean larger magnitude.")}</div></div>`);
   if(on("envWst")) parts.push(`<div class="zl"><b>${L2("氣象測站（現存）","Weather stations (active)")}</b><span><i style="background:#1b6f8a;border-radius:50%"></i>${L2("有人站","Staffed")}</span><span><i style="background:#5fa8c4;border-radius:50%"></i>${L2("無人站","Automatic")}</span></div>`);
   if(on("envDeb")) parts.push(`<div class="zl"><b>${L2("土石流潛勢溪流","Debris-flow potential streams")}</b>`+Object.entries(DEB_COL).map(([k,c])=>`<span><i style="background:${c}"></i>${L2(k==="持續觀察"?"持續觀察":k+"潛勢",k==="持續觀察"?"Under observation":({"高":"High","中":"Medium","低":"Low"})[k])}</span>`).join("")+`</div>`);
   if(on("envHsp")) parts.push(`<div class="zl"><span><i style="background:#d35400;border-radius:50%"></i>${L2("溫泉露頭","Hot spring outcrop")}</span><div class="src">${L2("原住民族地區溫泉的法令與輔導資訊見","For rules and guidance on hot springs in indigenous areas, see the")} <a href="${APC_URL}" target="_blank" rel="noopener">${L2("原住民族地區溫泉服務網","indigenous-area hot spring service site")}</a>${L2("。",".")}</div></div>`);
@@ -2014,9 +2007,9 @@ $e("volhaz").onchange=()=>{ if(ENV.layers.envVol) map.removeLayer(ENV.layers.env
 $e("envVol").addEventListener("change",()=>{ if($e("envVol").checked&&map.getZoom()<10) map.flyTo([25.12,121.62],11,{duration:.6}); });
 $e("cwaform").onsubmit=e=>{e.preventDefault(); const v=$e("cwakey").value.trim(); if(!v) return;
   ENV.cwaKey=v; try{localStorage.setItem("cwaKey",v);}catch(err){} $e("cwakey").value="";
-  ["envEqS","envEqL","envWst"].forEach(id=>{ delete ENV.layers[id]; if($e(id).checked) envToggle(id); }); cwaUI(); };
+  ["envWst"].forEach(id=>{ delete ENV.layers[id]; if($e(id).checked) envToggle(id); }); cwaUI(); };
 $e("cwadel").onclick=()=>{ ENV.cwaKey=""; try{localStorage.removeItem("cwaKey");}catch(err){}
-  ["envEqS","envEqL","envWst"].forEach(id=>{ if(ENV.layers[id]) map.removeLayer(ENV.layers[id]); delete ENV.layers[id]; $e(id).checked=false; }); cwaUI(); envLegend(); };
+  ["envWst"].forEach(id=>{ if(ENV.layers[id]) map.removeLayer(ENV.layers[id]); delete ENV.layers[id]; $e(id).checked=false; }); cwaUI(); envLegend(); };
 cwaUI();
 }
 
