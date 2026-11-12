@@ -2971,6 +2971,8 @@ function buildChatPane(){
     <div class="src">${L2("拖曳框出範圍，顯示東西寬、南北長與面積。點量測框可刪除。","Drag a box to see its east–west width, north–south length and area. Click a box to delete it.")}</div>
     <button type="button" class="btn filebtn" id="distbtn" style="margin-top:6px">${L2("量測距離","Measure a distance")}</button>
     <div class="src">${L2("在地圖上逐點點選，雙擊或按「完成」結束。","Click points along the route; double-click or press Done to finish.")}</div>
+    ${APP==="geo"?`<a class="btn filebtn" id="resbtn" href="geo-resource.html" target="_blank" rel="noopener" style="margin-top:6px;text-decoration:none">${L2("地熱資源量評估（蒙地卡羅）","Resource assessment (Monte Carlo)")}</a>
+    <div class="src">${L2("體積法、可用熱能法、功率密度法。先框選量測面積，再從量測框的彈窗帶入面積。","Volumetric, exergy and power-density methods. Measure an area first, then send it from the box's popup.")}</div>`:""}
     <button type="button" class="linkbtn" id="measclear" hidden>${L2("清除全部量測","Clear all measurements")}</button>`;
   after.after(fs);
   const btn=fs.querySelector("#measbtn"), clr=fs.querySelector("#measclear"), mc=map.getContainer();
@@ -3025,8 +3027,9 @@ function buildChatPane(){
       el.innerHTML=`<h4>${L2("量測結果","Measurement")}</h4>${label(m)}
         <div class="m" style="margin-top:6px">TWD97 X ${x1.toFixed(0)}–${x2.toFixed(0)}<br>Y ${y2.toFixed(0)}–${y1.toFixed(0)}</div>
         <div class="src">${L2("以經緯度框計算：寬取中央緯度，面積為地球球面上的面積，與地籍面積可能略有差異。","Computed from the lat/long box: width at the middle latitude, area on the spherical Earth. May differ slightly from cadastral areas.")}</div>
+        ${APP==="geo"?`<div style="margin-top:8px"><a class="btn" style="display:inline-block;padding:5px 12px;text-decoration:none;color:#fff" target="_blank" rel="noopener" href="geo-resource.html?area=${(m.a/1e6).toPrecision(5)}&lat=${b.getCenter().lat.toFixed(5)}&lng=${b.getCenter().lng.toFixed(5)}">${L2("用這個面積評估資源量 →","Assess resources for this area →")}</a></div>`:""}
         <div class="mkrow"><button type="button" class="linkbtn">${L2("刪除這個量測","Delete this measurement")}</button></div>`;
-      el.querySelector("button").onclick=()=>{ map.closePopup(); drop(r); sync(); };
+      el.querySelector("button.linkbtn").onclick=()=>{ map.closePopup(); drop(r); sync(); };
       return el; });
     sync(); },true);
   mc.addEventListener("click",e=>{ if(eat){ e.stopPropagation(); e.preventDefault(); eat=false; } },true);

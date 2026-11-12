@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>地熱資源量評估</title>
+<meta name="description" content="以蒙地卡羅模擬評估地熱資源量：體積法、可用熱能（exergy）法與功率密度法。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版面：左側參數表、右側結果；手機時上下排列。工程計算工具，白底、深墨色、朱紅強調 */
+:root{
+  --bg:#f6f6f3; --card:#ffffff; --ink:#22313f; --muted:#5b6672; --rule:#d8dcdf; --accent:#c0392b; --a2:#1f6fb5; --a3:#2e8b57;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15191e; --card:#1d232a; --ink:#e6e9ec; --muted:#9aa5b1; --rule:#36404a; --accent:#f07a6a; --a2:#7fb2e5; --a3:#7cc49a; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15191e; --card:#1d232a; --ink:#e6e9ec; --muted:#9aa5b1; --rule:#36404a; --accent:#f07a6a; --a2:#7fb2e5; --a3:#7cc49a; color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 var(--sans);padding:20px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+header{max-width:1280px;margin:0 auto 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+h1{font-size:24px;margin:0;letter-spacing:.05em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+a{color:var(--a2)}
+.top a,.top button{font-size:13px}
+.langbtn{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:3px 10px;cursor:pointer;font:600 12px var(--sans)}
+main{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:minmax(0,520px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){ main{grid-template-columns:minmax(0,1fr)} }
+section{background:var(--card);border:1px solid var(--rule);padding:14px 16px;min-width:0}
+h2{font-size:15px;margin:0 0 8px;letter-spacing:.08em}
+h3{font-size:13px;margin:14px 0 6px;color:var(--muted);letter-spacing:.08em}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-weight:500;color:var(--muted);text-align:left;padding:4px 4px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.tbl td{padding:3px 4px;border-bottom:1px dotted var(--rule);vertical-align:middle}
+.tbl td.name{min-width:9em}
+.tbl td.name small{display:block;color:var(--muted);font-size:11px;line-height:1.3}
+.tbl input,.tbl select,.ctl input,.ctl select{font:13px var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--rule);padding:3px 5px;width:100%}
+.tbl select{font-family:var(--sans);min-width:5.5em}
+.tbl input{width:5.4em}
+.tbl input:disabled{opacity:.35}
+.scroll{overflow-x:auto}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:end;margin-top:10px}
+.ctl label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.ctl input{width:8em}
+.btn{background:var(--accent);color:#fff;border:0;padding:8px 18px;font:700 14px var(--sans);cursor:pointer;letter-spacing:.1em}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink);font-weight:500;letter-spacing:.02em;padding:6px 12px}
+.btn:focus-visible,.langbtn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--a2);outline-offset:1px}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}
+.formula{font:12.5px/1.7 var(--mono);background:var(--bg);border:1px solid var(--rule);padding:8px 10px;overflow-x:auto;white-space:pre}
+.res{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.res th,.res td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:right}
+.res th:first-child,.res td:first-child{text-align:left}
+.res td b{font-size:16px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:10px}
+.charts>div{min-width:0}
+.chartbox{position:relative;height:260px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.tabs button{border:1px solid var(--rule);background:transparent;color:var(--ink);padding:4px 10px;cursor:pointer;font:13px var(--sans)}
+.tabs button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+.empty{color:var(--muted);padding:30px 0;text-align:center}
+.status{font-size:12.5px;color:var(--muted);min-height:1.4em}
+.warn{color:var(--accent)}
+footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 data-en="Geothermal Resource Assessment">地熱資源量評估</h1>
+    <div class="sub" data-en="Monte Carlo simulation · volumetric (heat in place), exergy and power density methods">蒙地卡羅模擬・體積法（熱蓄量）、可用熱能（exergy）法、功率密度法</div>
+  </div>
+  <div class="top"><a href="taiwan-geothermal.html" id="back" data-en="← Back to Taiwan Geothermal Map">← 回臺灣地熱地圖</a> <button type="button" class="langbtn" id="langbtn">English</button></div>
+</header>
+<main>
+  <section>
+    <h2 data-en="Parameters">參數</h2>
+    <div class="status" id="areanote"></div>
+    <div class="scroll"><table class="tbl" id="ptbl"><thead><tr>
+      <th data-en="Parameter">參數</th><th data-en="Distribution">分布</th><th>a</th><th>b</th><th>c</th></tr></thead><tbody></tbody></table></div>
+    <p class="note" id="distnote"></p>
+    <div class="ctl">
+      <label><span data-en="Iterations">模擬次數</span><input id="n" type="number" min="1000" max="200000" step="1000" value="20000" inputmode="numeric"></label>
+      <label><span data-en="Random seed">亂數種子</span><input id="seed" type="number" value="20261112" inputmode="numeric"></label>
+      <button type="button" class="btn" id="run" data-en="Run">執行模擬</button>
+      <button type="button" class="btn ghost" id="reset" data-en="Reset defaults">還原預設值</button>
+    </div>
+    <h3 data-en="Formulas">計算式</h3>
+    <div class="formula" id="formula"></div>
+    <p class="note" data-en="Defaults are typical literature ranges for a liquid-dominated reservoir, not values for a specific site. Replace them with your own site data.">預設值是液態為主熱儲常見的文獻範圍，不是特定場址的數值，請依場址資料修改。</p>
+  </section>
+  <section>
+    <h2 data-en="Results">結果</h2>
+    <div class="status" id="status"></div>
+    <div id="results"><div class="empty" data-en="Set the parameters and press Run.">設定參數後按「執行模擬」。</div></div>
+    <div id="chartsec" hidden>
+      <div class="tabs" id="mtabs"></div>
+      <div class="charts">
+        <div><h3 data-en="Histogram">直方圖</h3><div class="chartbox"><canvas id="hist"></canvas></div></div>
+        <div><h3 data-en="Exceedance probability">超越機率曲線</h3><div class="chartbox"><canvas id="cdf"></canvas></div></div>
+        <div style="grid-column:1/-1"><h3 data-en="Sensitivity (tornado, input P90–P10 with others at P50)">敏感度（龍捲風圖：其他參數取 P50，單一參數取 P90 與 P10）</h3><div class="chartbox" style="height:300px"><canvas id="tornado"></canvas></div></div>
+      </div>
+      <div class="ctl">
+        <button type="button" class="btn ghost" id="csv" data-en="Export CSV">匯出 CSV</button>
+        <button type="button" class="btn ghost" id="png" data-en="Export report PNG">匯出報告圖 PNG</button>
+      </div>
+      <p class="note" data-en="P90 = 90% probability of being exceeded (10th percentile, conservative); P10 = 10% probability of being exceeded (90th percentile, optimistic). This follows the usual resource-reporting convention.">P90＝有 90% 機率超過的值（第 10 百分位，保守）；P10＝只有 10% 機率超過（第 90 百分位，樂觀），依資源量報告常用慣例。</p>
+    </div>
+  </section>
+</main>
+<footer data-en="Results are screening-level estimates for planning only and depend entirely on the inputs. They are not a reserve certification.">結果為規劃用的初估，完全取決於輸入參數，不構成蘊藏量認證。</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+// ---------- 語言 ----------
+const EN=(()=>{try{return localStorage.getItem("lang")==="en"}catch(e){return false}})();
+const L2=(z,e)=>EN?e:z;
+if(EN){ document.documentElement.lang="en"; document.title="Geothermal Resource Assessment";
+  document.querySelectorAll("[data-en]").forEach(el=>el.textContent=el.dataset.en); }
+document.getElementById("langbtn").textContent=EN?"中文":"English";
+document.getElementById("langbtn").onclick=()=>{try{localStorage.setItem("lang",EN?"zh":"en")}catch(e){} location.reload();};
+
+// ---------- 參數 ----------
+// 分布：fixed（a）、uniform（a 最小、b 最大）、tri（a 最小、b 最可能、c 最大）、normal（a 平均、b 標準差）、lognormal（a 平均、b 標準差）
+const Q=new URLSearchParams(location.search), AREA=+Q.get("area")||0;
+const DEF=[
+  {k:"A",  zh:"面積 A",en:"Area A",u:"km²",d:"tri",v:AREA?[+(AREA*0.8).toPrecision(4),+AREA.toPrecision(4),+(AREA*1.2).toPrecision(4)]:[2,4,6],lo:0},
+  {k:"h",  zh:"熱儲厚度 h",en:"Reservoir thickness h",u:"m",d:"tri",v:[500,1000,1500],lo:0},
+  {k:"Tr", zh:"熱儲溫度 Tr",en:"Reservoir temperature Tr",u:"°C",d:"tri",v:[180,220,260]},
+  {k:"Ta", zh:"廢棄溫度 Ta（體積法）",en:"Abandonment temperature Ta (volumetric)",u:"°C",d:"fixed",v:[100]},
+  {k:"T0", zh:"死態溫度 T0（可用熱能法）",en:"Dead-state temperature T0 (exergy)",u:"°C",d:"fixed",v:[15]},
+  {k:"phi",zh:"孔隙率 φ",en:"Porosity φ",u:"—",d:"tri",v:[0.05,0.10,0.15],lo:0,hi:1},
+  {k:"rr", zh:"岩石密度 ρr",en:"Rock density ρr",u:"kg/m³",d:"fixed",v:[2650],lo:0},
+  {k:"cr", zh:"岩石比熱 Cr",en:"Rock specific heat Cr",u:"J/kg·K",d:"fixed",v:[900],lo:0},
+  {k:"rf", zh:"流體密度 ρf",en:"Fluid density ρf",u:"kg/m³",d:"fixed",v:[850],lo:0},
+  {k:"cf", zh:"流體比熱 Cf",en:"Fluid specific heat Cf",u:"J/kg·K",d:"fixed",v:[4600],lo:0},
+  {k:"R",  zh:"回收率 R",en:"Recovery factor R",u:"—",d:"tri",v:[0.05,0.10,0.20],lo:0,hi:1},
+  {k:"ec", zh:"轉換效率 ηc（體積法）",en:"Conversion efficiency ηc (volumetric)",u:"—",d:"tri",v:[0.08,0.11,0.14],lo:0,hi:1},
+  {k:"eu", zh:"利用效率 ηu（可用熱能法）",en:"Utilization efficiency ηu (exergy)",u:"—",d:"tri",v:[0.35,0.40,0.45],lo:0,hi:1},
+  {k:"F",  zh:"容量因數 F",en:"Capacity factor F",u:"—",d:"fixed",v:[0.9],lo:0,hi:1},
+  {k:"t",  zh:"發電年限 t",en:"Plant life t",u:"yr",d:"fixed",v:[30],lo:0},
+  {k:"PD", zh:"功率密度 PD",en:"Power density PD",u:"MWe/km²",d:"tri",v:[5,10,15],lo:0},
+];
+const DN={fixed:L2("固定值","Fixed"),uniform:L2("均勻","Uniform"),tri:L2("三角","Triangular"),normal:L2("常態","Normal"),lognormal:L2("對數常態","Lognormal")};
+const SLOTS={fixed:["a"],uniform:["min","max"],tri:["min","mode","max"],normal:["mean","sd"],lognormal:["mean","sd"]};
+let P=JSON.parse(JSON.stringify(DEF));
+try{ const s=JSON.parse(localStorage.getItem("georesP")||"null"); if(s&&!AREA) s.forEach(x=>{const p=P.find(y=>y.k===x.k); if(p){p.d=x.d;p.v=x.v;}}); }catch(e){}
+const tb=document.querySelector("#ptbl tbody");
+function drawTable(){
+  tb.innerHTML=P.map((p,i)=>`<tr><td class="name">${EN?p.en:p.zh}<small>${p.u}</small></td>
+    <td><select data-i="${i}" aria-label="${L2("分布","Distribution")}">${Object.keys(DN).map(d=>`<option value="${d}" ${d===p.d?"selected":""}>${DN[d]}</option>`).join("")}</select></td>
+    ${[0,1,2].map(j=>`<td><input data-i="${i}" data-j="${j}" type="number" step="any" inputmode="decimal" value="${p.v[j]??""}" ${j<SLOTS[p.d].length?"":"disabled"} title="${SLOTS[p.d][j]||""}" aria-label="${(EN?p.en:p.zh)} ${SLOTS[p.d][j]||""}"></td>`).join("")}</tr>`).join("");
+  tb.querySelectorAll("select").forEach(s=>s.onchange=()=>{const p=P[+s.dataset.i]; p.d=s.value; const m=p.v.filter(x=>x!==""&&x!=null);
+    // 換分布時用現有數字推一組合理的值
+    const mid=m.length===3?m[1]:m.length===2?(m[0]+m[1])/2:m[0];
+    p.v=p.d==="fixed"?[mid]:p.d==="uniform"?[m[0]??mid,m[m.length-1]??mid]:p.d==="tri"?[m[0]??mid,mid,m[m.length-1]??mid]:[mid,+(Math.abs(mid)*0.15).toPrecision(3)];
+    drawTable();});
+  tb.querySelectorAll("input").forEach(inp=>inp.oninput=()=>{P[+inp.dataset.i].v[+inp.dataset.j]=inp.value===""?"":+inp.value;});
+}
+drawTable();
+document.getElementById("distnote").textContent=L2("分布參數：固定值 a；均勻 a 最小、b 最大；三角 a 最小、b 最可能、c 最大；常態與對數常態 a 平均、b 標準差。","Distribution inputs: Fixed a; Uniform a=min, b=max; Triangular a=min, b=mode, c=max; Normal and Lognormal a=mean, b=std dev.");
+document.getElementById("reset").onclick=()=>{P=JSON.parse(JSON.stringify(DEF)); try{localStorage.removeItem("georesP")}catch(e){} drawTable();};
+if(AREA){ const lat=Q.get("lat"), lng=Q.get("lng");
+  document.getElementById("areanote").innerHTML=L2(`面積由地圖框選帶入：<b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?`（中心 ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)}）`:""}，預設以 ±20% 的三角分布表示不確定性。`,
+    `Area from the map selection: <b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?` (centre ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)})`:""}; a ±20% triangular distribution is used by default.`);
+  const back=document.getElementById("back"); if(lat) back.href=`taiwan-geothermal.html#${(+lat).toFixed(4)},${(+lng).toFixed(4)}`; }
+document.getElementById("formula").textContent=L2(
+`Cv = ρr·Cr·(1−φ) + ρf·Cf·φ        （體積熱容，J/m³·K）
+V  = A·h
+體積法：     P = V·Cv·(Tr−Ta)·R·ηc ÷ (F·t·31,557,600 s)
+可用熱能法： Q0 = V·Cv·(Tr−T0)
+            W = Q0·R·[1 − T0·ln(Tr/T0)/(Tr−T0)]   （溫度用 K）
+            P = W·ηu ÷ (F·t·31,557,600 s)
+功率密度法： P = A·PD
+（P 以 MWe 表示）`,
+`Cv = ρr·Cr·(1−φ) + ρf·Cf·φ        (volumetric heat capacity, J/m³·K)
+V  = A·h
+Volumetric: P = V·Cv·(Tr−Ta)·R·ηc ÷ (F·t·31,557,600 s)
+Exergy:     Q0 = V·Cv·(Tr−T0)
+            W = Q0·R·[1 − T0·ln(Tr/T0)/(Tr−T0)]   (temperatures in K)
+            P = W·ηu ÷ (F·t·31,557,600 s)
+Power density: P = A·PD
+(P in MWe)`);
+
+// ---------- 亂數與分布 ----------
+function rng(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+function sampler(p,r){
+  const [a,b,c]=p.v.map(Number), lo=p.lo??-Infinity, hi=p.hi??Infinity;
+  let gauss=null; const nrm=()=>{ if(gauss!==null){const g=gauss;gauss=null;return g;} let u=0,v=0; while(u===0)u=r(); v=r(); const m=Math.sqrt(-2*Math.log(u)); gauss=m*Math.sin(2*Math.PI*v); return m*Math.cos(2*Math.PI*v); };
+  const clip=f=>()=>{ for(let k=0;k<50;k++){ const x=f(); if(x>=lo&&x<=hi) return x; } return Math.min(hi,Math.max(lo,f())); }; // 超出物理範圍時重抽（截尾）
+  switch(p.d){
+    case "fixed": return ()=>a;
+    case "uniform": return ()=>a+(b-a)*r();
+    case "tri": return ()=>{ const u=r(), f=(b-a)/(c-a||1); return u<f?a+Math.sqrt(u*(c-a)*(b-a)):c-Math.sqrt((1-u)*(c-a)*(c-b)); };
+    case "normal": return clip(()=>a+b*nrm());
+    case "lognormal": { const s2=Math.log(1+(b*b)/(a*a)), mu=Math.log(a)-s2/2, s=Math.sqrt(s2); return clip(()=>Math.exp(mu+s*nrm())); }
+  }
+}
+function validate(){
+  const bad=[];
+  P.forEach(p=>{ const v=p.v.slice(0,SLOTS[p.d].length).map(Number), nm=EN?p.en:p.zh;
+    if(v.some(x=>!isFinite(x))) return bad.push(L2(`${nm}：請填數字`,`${nm}: enter numbers`));
+    if(p.d==="uniform"&&!(v[0]<=v[1])) bad.push(L2(`${nm}：最小值要 ≤ 最大值`,`${nm}: min must be ≤ max`));
+    if(p.d==="tri"&&!(v[0]<=v[1]&&v[1]<=v[2])) bad.push(L2(`${nm}：需 最小 ≤ 最可能 ≤ 最大`,`${nm}: need min ≤ mode ≤ max`));
+    if((p.d==="normal"||p.d==="lognormal")&&!(v[1]>0)) bad.push(L2(`${nm}：標準差要大於 0`,`${nm}: std dev must be > 0`));
+    if(p.d==="lognormal"&&!(v[0]>0)) bad.push(L2(`${nm}：對數常態的平均要大於 0`,`${nm}: lognormal mean must be > 0`));
+    if(p.lo!=null&&v.some(x=>x<p.lo)) bad.push(L2(`${nm}：不能小於 ${p.lo}`,`${nm}: must be ≥ ${p.lo}`));
+    if(p.hi!=null&&v.slice(0,p.d==="normal"||p.d==="lognormal"?1:3).some(x=>x>p.hi)) bad.push(L2(`${nm}：不能大於 ${p.hi}`,`${nm}: must be ≤ ${p.hi}`));
+  });
+  const g=k=>P.find(p=>p.k===k);
+  return bad;
+}
+// ---------- 計算 ----------
+const YR=31557600; const K=273.15;
+function power(x){
+  const Cv=x.rr*x.cr*(1-x.phi)+x.rf*x.cf*x.phi, V=x.A*1e6*x.h, den=x.F*x.t*YR*1e6;
+  const vol=V*Cv*Math.max(0,x.Tr-x.Ta)*x.R*x.ec/den;
+  const Tr=x.Tr+K, T0=x.T0+K, Q0=V*Cv*Math.max(0,x.Tr-x.T0), frac=Tr>T0?1-T0*Math.log(Tr/T0)/(Tr-T0):0;
+  const exg=Q0*x.R*frac*x.eu/den;
+  return {vol,exg,pd:x.A*x.PD};
+}
+const METH=[{k:"vol",zh:"體積法",en:"Volumetric"},{k:"exg",zh:"可用熱能法",en:"Exergy"},{k:"pd",zh:"功率密度法",en:"Power density"}];
+const pct=(s,q)=>{ const i=(s.length-1)*q, lo=Math.floor(i), hi=Math.ceil(i); return s[lo]+(s[hi]-s[lo])*(i-lo); };
+let RES=null, cur="vol", charts={};
+const fmt=v=>!isFinite(v)?"—":Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);
+document.getElementById("run").onclick=()=>{
+  const st=document.getElementById("status"), bad=validate();
+  if(bad.length){ st.innerHTML=`<span class="warn">${bad.join("；")}</span>`; return; }
+  const N=Math.min(200000,Math.max(1000,Math.round(+document.getElementById("n").value||20000))), seed=+document.getElementById("seed").value||1;
+  try{localStorage.setItem("georesP",JSON.stringify(P.map(({k,d,v})=>({k,d,v}))))}catch(e){}
+  st.textContent=L2("計算中…","Running…");
+  setTimeout(()=>{
+    const r=rng(seed), S=Object.fromEntries(P.map(p=>[p.k,sampler(p,r)]));
+    const IN=Object.fromEntries(P.map(p=>[p.k,new Float64Array(N)])), OUT={vol:new Float64Array(N),exg:new Float64Array(N),pd:new Float64Array(N)};
+    for(let i=0;i<N;i++){ const x={}; for(const p of P){ x[p.k]=S[p.k](); IN[p.k][i]=x[p.k]; } const o=power(x); OUT.vol[i]=o.vol; OUT.exg[i]=o.exg; OUT.pd[i]=o.pd; }
+    const stats={}; METH.forEach(m=>{ const s=Float64Array.from(OUT[m.k]).sort(); let sum=0; for(const v of s) sum+=v;
+      stats[m.k]={sorted:s,mean:sum/N,P90:pct(s,.1),P50:pct(s,.5),P10:pct(s,.9),min:s[0],max:s[N-1]}; });
+    // 敏感度：其他參數取各自 P50（中位數），單一參數換成它的 P10/P90 分位值
+    const qIn=Object.fromEntries(P.map(p=>{ const s=Float64Array.from(IN[p.k]).sort(); return [p.k,{p10:pct(s,.1),p50:pct(s,.5),p90:pct(s,.9)}]; }));
+    const base=Object.fromEntries(P.map(p=>[p.k,qIn[p.k].p50])), b0=power(base);
+    const tor={}; METH.forEach(m=>{ tor[m.k]=P.filter(p=>p.d!=="fixed").map(p=>{ const lo=power({...base,[p.k]:qIn[p.k].p10})[m.k], hi=power({...base,[p.k]:qIn[p.k].p90})[m.k];
+      return {k:p.k,name:EN?p.en:p.zh,lo,hi,span:Math.abs(hi-lo)}; }).filter(t=>t.span>1e-12).sort((a,b)=>b.span-a.span); });
+    RES={N,seed,IN,OUT,stats,tor,base:b0,when:new Date()};
+    st.textContent=L2(`完成 ${N.toLocaleString()} 次模擬（種子 ${seed}）。`,`Finished ${N.toLocaleString()} iterations (seed ${seed}).`);
+    showResults();
+  },20);
+};
+function showResults(){
+  const s=RES.stats;
+  document.getElementById("results").innerHTML=`<div class="scroll"><table class="res"><thead><tr><th>${L2("方法（MWe）","Method (MWe)")}</th><th>P90</th><th>P50</th><th>P10</th><th>${L2("平均","Mean")}</th></tr></thead><tbody>
+    ${METH.map(m=>`<tr><td>${EN?m.en:m.zh}</td><td>${fmt(s[m.k].P90)}</td><td><b>${fmt(s[m.k].P50)}</b></td><td>${fmt(s[m.k].P10)}</td><td>${fmt(s[m.k].mean)}</td></tr>`).join("")}</tbody></table></div>`;
+  document.getElementById("chartsec").hidden=false;
+  const tabs=document.getElementById("mtabs");
+  tabs.innerHTML=METH.map(m=>`<button type="button" data-k="${m.k}" aria-pressed="${m.k===cur}">${EN?m.en:m.zh}</button>`).join("");
+  tabs.querySelectorAll("button").forEach(b=>b.onclick=()=>{cur=b.dataset.k; tabs.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); drawCharts();});
+  drawCharts();
+}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function drawCharts(){
+  const st=RES.stats[cur], s=st.sorted, N=s.length, ink=css("--ink"), mut=css("--muted"), rule=css("--rule"), acc=css("--accent"), a2=css("--a2");
+  Chart.defaults.color=mut; Chart.defaults.borderColor=rule; Chart.defaults.font.family=css("--sans");
+  Object.values(charts).forEach(c=>c.destroy());
+  // 直方圖：40 格，範圍取第 0.5～99.5 百分位，避免極端值把圖壓扁
+  const lo=pct(s,.005), hi=pct(s,.995), nb=40, w=(hi-lo)/nb||1, cnt=new Array(nb).fill(0);
+  for(const v of s){ if(v<lo||v>hi) continue; cnt[Math.min(nb-1,Math.floor((v-lo)/w))]++; }
+  const lines=[["P90",st.P90,a2],["P50",st.P50,acc],["P10",st.P10,a2]];
+  const vline={id:"vline",afterDatasetsDraw(c){ const {ctx,chartArea:a,scales:{x}}=c; ctx.save(); lines.forEach(([t,v,col])=>{ const px=x.getPixelForValue(v); if(px<a.left||px>a.right) return;
+    ctx.strokeStyle=col; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(px,a.top); ctx.lineTo(px,a.bottom); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=col; ctx.font="600 11px sans-serif"; ctx.textAlign="center"; ctx.fillText(t,px,a.top+10); }); ctx.restore(); }};
+  charts.h=new Chart(document.getElementById("hist"),{type:"bar",data:{datasets:[{data:cnt.map((c,i)=>({x:lo+(i+.5)*w,y:c/N*100})),backgroundColor:a2+"99",borderWidth:0,barPercentage:1,categoryPercentage:1}]},
+    options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>`${fmt(i[0].parsed.x-w/2)}–${fmt(i[0].parsed.x+w/2)} MWe`,label:i=>`${i.parsed.y.toFixed(2)} %`}}},
+      scales:{x:{type:"linear",min:lo,max:hi,ticks:{includeBounds:false},title:{display:true,text:"MWe"}},y:{title:{display:true,text:L2("機率 %","Probability %")}}}},plugins:[vline]});
+  // 超越機率曲線
+  const step=Math.max(1,Math.floor(N/400)), pts=[]; for(let i=0;i<N;i+=step) pts.push({x:s[i],y:(1-i/(N-1))*100}); pts.push({x:s[N-1],y:0});
+  charts.c=new Chart(document.getElementById("cdf"),{type:"line",data:{datasets:[{data:pts,borderColor:acc,borderWidth:2,pointRadius:0,fill:false,tension:0}]},
+    options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>`${fmt(i.parsed.x)} MWe：${L2("超越機率","exceedance")} ${i.parsed.y.toFixed(1)}%`}}},
+      scales:{x:{type:"linear",min:lo,max:hi,ticks:{includeBounds:false},title:{display:true,text:"MWe"}},y:{min:0,max:100,title:{display:true,text:L2("超越機率 %","Exceedance %")}}}},plugins:[vline]});
+  // 龍捲風圖
+  const T=RES.tor[cur], b=RES.base[cur];
+  charts.t=new Chart(document.getElementById("tornado"),{type:"bar",data:{labels:T.map(t=>t.name),datasets:[
+      {label:L2("取 P10 分位（低值）","Input P10 (low)"),data:T.map(t=>[b,t.lo]),backgroundColor:a2+"cc"},
+      {label:L2("取 P90 分位（高值）","Input P90 (high)"),data:T.map(t=>[b,t.hi]),backgroundColor:acc+"cc"}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,animation:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:i=>`${i.dataset.label}：${fmt(i.raw[1])} MWe`}}},
+      scales:{x:{title:{display:true,text:L2(`MWe（基準 ${fmt(b)}，參數皆取中位數）`,`MWe (base ${fmt(b)} with all inputs at median)`)}},y:{stacked:true}}}});
+}
+// ---------- 匯出 ----------
+const dl=(blob,name)=>{const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);};
+const stamp=()=>{const d=RES.when,p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;};
+document.getElementById("csv").onclick=()=>{ if(!RES) return; const q=v=>`"${String(v).replace(/"/g,'""')}"`, rows=[];
+  rows.push([L2("地熱資源量評估","Geothermal resource assessment"),RES.when.toISOString(),`N=${RES.N}`,`seed=${RES.seed}`].map(q).join(","));
+  rows.push([L2("參數","Parameter"),L2("單位","Unit"),L2("分布","Distribution"),"a","b","c"].map(q).join(","));
+  P.forEach(p=>rows.push([EN?p.en:p.zh,p.u,DN[p.d],...p.v.slice(0,SLOTS[p.d].length)].map(q).join(",")));
+  rows.push(""); rows.push([L2("方法（MWe）","Method (MWe)"),"P90","P50","P10",L2("平均","Mean"),"min","max"].map(q).join(","));
+  METH.forEach(m=>{const s=RES.stats[m.k]; rows.push([EN?m.en:m.zh,s.P90,s.P50,s.P10,s.mean,s.min,s.max].map(q).join(","));});
+  rows.push(""); rows.push(["#",...P.map(p=>p.k),"P_vol_MWe","P_exergy_MWe","P_pd_MWe"].map(q).join(","));
+  for(let i=0;i<RES.N;i++) rows.push([i+1,...P.map(p=>+RES.IN[p.k][i].toPrecision(6)),+RES.OUT.vol[i].toPrecision(6),+RES.OUT.exg[i].toPrecision(6),+RES.OUT.pd[i].toPrecision(6)].join(","));
+  dl(new Blob(["﻿"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"}),`geothermal-resource_${stamp()}.csv`); };
+document.getElementById("png").onclick=()=>{ if(!RES) return;
+  // 匯出時先把圖表固定成報告用的尺寸再擷取，避免手機或寬螢幕比例跑掉
+  const sc=2, W=1200, pad=30, iw=(W-pad*3)/2, ih=320, th=Math.max(260,60+RES.tor[cur].length*42), F=css("--sans");
+  const snap=(c,w,h)=>{ c.options.devicePixelRatio=sc; c.resize(w,h); const img=c.canvas; const cp=document.createElement("canvas"); cp.width=img.width; cp.height=img.height; cp.getContext("2d").drawImage(img,0,0); return cp; };
+  const ih1=snap(charts.h,iw,ih), ih2=snap(charts.c,iw,ih), it=snap(charts.t,W-pad*2,th);
+  [charts.h,charts.c,charts.t].forEach(c=>{ c.options.devicePixelRatio=window.devicePixelRatio; c.resize(); });
+  const H=pad+70+28*4+20+P.length*20+30+ih+40+th+pad;
+  const cv=document.createElement("canvas"); cv.width=W*sc; cv.height=H*sc; const g=cv.getContext("2d"); g.scale(sc,sc);
+  g.fillStyle="#fff"; g.fillRect(0,0,W,H); g.fillStyle="#111"; g.textBaseline="top";
+  g.font=`700 22px ${F}`; g.fillText(L2("地熱資源量評估（蒙地卡羅）","Geothermal resource assessment (Monte Carlo)"),pad,pad);
+  g.font=`13px ${F}`; g.fillStyle="#555"; g.fillText(`${RES.when.toLocaleString(EN?"en":"zh-TW",{hour12:false})}　N=${RES.N.toLocaleString()}　seed=${RES.seed}　${L2(`圖表：${METH.find(m=>m.k===cur).zh}`,`Charts: ${METH.find(m=>m.k===cur).en}`)}`,pad,pad+32);
+  let y=pad+70;
+  [[L2("方法（MWe）","Method (MWe)"),"P90","P50","P10",L2("平均","Mean")],...METH.map(m=>{const s=RES.stats[m.k];return [EN?m.en:m.zh,fmt(s.P90),fmt(s.P50),fmt(s.P10),fmt(s.mean)];})].forEach((r,i)=>{
+    g.fillStyle="#111"; g.font=`${i?400:600} 14px ${F}`; r.forEach((c,j)=>{ g.textAlign=j?"right":"left"; g.fillText(c,j?pad+260+j*120:pad,y); }); y+=28; });
+  g.textAlign="left"; y+=20; g.font=`12px ${F}`; g.fillStyle="#333";
+  P.forEach(p=>{ g.fillText(`${EN?p.en:p.zh}（${p.u}）：${DN[p.d]} ${p.v.slice(0,SLOTS[p.d].length).join(" / ")}`,pad,y); y+=20; });
+  y+=30; g.drawImage(ih1,pad,y,iw,ih); g.drawImage(ih2,pad*2+iw,y,iw,ih);
+  y+=ih+40; g.drawImage(it,pad,y,W-pad*2,th);
+  cv.toBlob(b=>dl(b,`geothermal-resource_${stamp()}.png`),"image/png"); };
+</script>
+</body>
+</html>
