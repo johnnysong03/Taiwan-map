@@ -81,6 +81,36 @@ select{padding:7px 10px;border:1px solid var(--rule);border-radius:4px;backgroun
 #plist .ar{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
 #plist .more{color:var(--muted);cursor:default;display:block;text-align:center}
 .clickpin{width:14px;height:14px;border:3px solid var(--accent);border-radius:50%;background:var(--sheet);box-shadow:0 0 0 2px var(--sheet)}
+/* Claude 對話欄 */
+#paneC{overflow-y:auto}
+.chatpane{display:flex;flex-direction:column;gap:8px}
+#chatkeybox{display:flex;flex-direction:column;gap:6px}
+#chatkey,#cwakey{flex:1;padding:8px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
+#chatkeyinfo{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+#chatlog{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.cm{padding:8px 11px;border-radius:6px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-width:92%}
+.cm.user{align-self:flex-end;background:var(--ink);color:var(--sheet)}
+.cm.assistant{align-self:flex-start;background:var(--paper);border:1px solid var(--rule)}
+.cm.pending{color:var(--muted);font-style:italic}
+.cm.err{border-color:var(--accent);color:var(--accent)}
+#chatform{display:flex;flex-direction:column;gap:6px}
+#chatin{width:100%;box-sizing:border-box;resize:vertical;padding:8px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:14px/1.5 var(--body)}
+#chatsend{align-self:flex-end;padding:7px 18px}
+#chatsend:disabled{opacity:.5;cursor:wait}
+.zdef{margin-top:6px;padding:6px 8px;background:var(--paper);border-left:3px solid var(--accent);font-size:12.5px;line-height:1.6}
+.zdef b{margin-right:2px}
+.zdef .cite{color:var(--muted);font-size:11.5px}
+.zonepop .zonebox{margin-top:6px}
+.zonebox{margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule)}
+.zonebox dl.zone{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}
+.zonebox dt{color:var(--muted)}
+.zonebox dt.h{grid-column:1/-1;color:var(--ink);font-weight:700}
+.zonebox dd{margin:0;font-weight:500}
+.zsw{display:inline-block;width:11px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px;margin-right:6px;vertical-align:-1px}
+#zonelegend,#envlegend{margin-top:6px}
+#zonelegend .zl,#envlegend .zl,#lxlegend .zl{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:4px}
+#zonelegend .zl b,#envlegend .zl b,#lxlegend .zl b{font-size:12px}
+#zonelegend .zl i,#envlegend .zl i,#lxlegend .zl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
 #ownlegend{margin-top:6px}
 #ownlegend .ramp{height:10px;border-radius:2px;border:1px solid var(--rule)}
 #ownlegend .ticks{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
@@ -160,35 +190,49 @@ body{background:var(--paper)}
   --f-over:sepia(.35) hue-rotate(-12deg) saturate(.9);
   --road-blend:multiply; --grain-blend:multiply; --grain-op:.28;
 }
-:root[data-tone="indigo"]{
-  --paper:#dfe4e6; --sheet:#eef1f1; --ink:#1b2c4a; --muted:#4a5a73; --rule:#a9b6c4; --accent:#1f4e8c;
-  --qing:#1f4e8c; --japan:#b3302a; --postwar:#2f6b5a; --modern:#7a5a1c;
-  --f-base:grayscale(1) sepia(1) hue-rotate(175deg) saturate(.55) contrast(1.3) brightness(1.05);
-  --f-road:brightness(0) invert(.3) sepia(1) saturate(4) hue-rotate(185deg);
-  --f-over:grayscale(.4) hue-rotate(180deg);
+:root[data-tone="natural"],:root[data-tone="gray"],:root[data-tone="warm"],:root[data-tone="dark"],:root[data-tone="contrast"]{
+  --display:"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif; --body:"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif;
+  --grain-op:0; --road-blend:normal; --f-over:none; --f-road:none; --f-base:none;
 }
-:root[data-tone="ink"]{
-  --paper:#ecebe4; --sheet:#f5f4ee; --ink:#1c1c1a; --muted:#55544e; --rule:#bcbab0; --accent:#b3302a;
-  --qing:#3b4a5c; --japan:#b3302a; --postwar:#4a5a3a; --modern:#7a6a4a;
-  --f-base:grayscale(1) contrast(1.35) brightness(1.06);
-  --f-road:brightness(0) invert(.18);
-  --f-over:grayscale(.6);
+/* 原色：底圖完全不加濾鏡 */
+:root[data-tone="natural"]{
+  --contour:#8a5a2b;
+  --paper:#f6f6f3; --sheet:#ffffff; --ink:#22313f; --muted:#5b6672; --rule:#d8dcdf; --accent:#c0392b;
+  --qing:#2f5d9a; --japan:#c0392b; --postwar:#3f7d3a; --modern:#b07a12;
 }
-:root[data-tone="cinnabar"]{
-  --paper:#efe3c8; --sheet:#f7eedb; --ink:#2e2015; --muted:#6e573f; --rule:#d3bb92; --accent:#c0392b;
-  --f-base:grayscale(1) sepia(.45) contrast(1.3) brightness(1.06);
-  --f-road:brightness(0) invert(.3) sepia(1) saturate(12) hue-rotate(-42deg) brightness(.85);
+/* 淡灰：底圖去飽和，讓點位、疊圖比較突出 */
+:root[data-tone="gray"]{
+  --contour:#5d6670;
+  --paper:#f2f3f4; --sheet:#ffffff; --ink:#1f2a33; --muted:#5c6670; --rule:#d5d9dd; --accent:#1f6fb5;
+  --qing:#2f5d9a; --japan:#c0392b; --postwar:#3f7d3a; --modern:#b07a12;
+  --f-base:grayscale(1) brightness(1.04); --f-road:grayscale(1);
 }
-:root[data-tone="night"]{
-  --paper:#1b1914; --sheet:#24211b; --ink:#eadfc6; --muted:#b3a68a; --rule:#4a4234; --accent:#e0a650;
-  --qing:#8fb0d8; --japan:#e07a5f; --postwar:#9cc48a; --modern:#e0c070;
-  --f-base:grayscale(1) invert(1) sepia(.5) contrast(1.15) brightness(.78);
-  --f-road:brightness(0) invert(1) sepia(1) saturate(2.5) hue-rotate(-8deg) brightness(.95);
-  --f-over:invert(1) hue-rotate(180deg) brightness(.9);
-  --road-blend:screen; --grain-blend:screen; --grain-op:.12;
+/* 暖白：極輕微暖色，道路水系保持原色 */
+:root[data-tone="warm"]{
+  --contour:#93582a;
+  --paper:#f7f2e8; --sheet:#fffaf1; --ink:#33291f; --muted:#6b5d4d; --rule:#e2d8c6; --accent:#b5542f;
+  --qing:#2f5d9a; --japan:#b5402f; --postwar:#4a7a35; --modern:#a8761a;
+  --f-base:sepia(.12) saturate(.95) brightness(1.02);
+}
+/* 深色：反相後轉回原本色相，水還是藍、綠地還是綠 */
+:root[data-tone="dark"]{
+  --contour:#d6a878;
+  --paper:#15191e; --sheet:#1d232a; --ink:#e6e9ec; --muted:#9aa5b1; --rule:#36404a; --accent:#f0a35e;
+  --qing:#8fb0d8; --japan:#e88a73; --postwar:#9cc48a; --modern:#e0c070;
+  --f-base:invert(1) hue-rotate(180deg) brightness(.92) contrast(.92); --f-road:invert(1) hue-rotate(180deg);
   color-scheme:dark;
 }
+/* 高對比：戶外強光下比較看得清楚 */
+:root[data-tone="contrast"]{
+  --contour:#6b3200;
+  --paper:#ffffff; --sheet:#ffffff; --ink:#000000; --muted:#2b2b2b; --rule:#7a7a7a; --accent:#c00000;
+  --qing:#0b4fa8; --japan:#c00000; --postwar:#1d6b1d; --modern:#8a5a00;
+  --f-base:contrast(1.25) saturate(1.15); --f-road:contrast(1.3);
+}
+:root[data-tone="natural"] #neat,:root[data-tone="gray"] #neat,:root[data-tone="warm"] #neat,:root[data-tone="dark"] #neat,:root[data-tone="contrast"] #neat{display:none}
+:root[data-tone="dark"] .leaflet-control-attribution{background:rgba(29,35,42,.85)!important}
 :root[data-tone="navy"]{
+  --contour:#8794a6;
   --paper:#f5f5f3; --sheet:#ffffff; --ink:#233042; --muted:#5a6473; --rule:#d9dce1; --accent:#e2765a;
   --qing:#3d6aa8; --japan:#b8325a; --postwar:#2f8f7a; --modern:#c99a1e;
   --display:"Noto Sans TC","Microsoft JhengHei",sans-serif; --body:"Noto Sans TC","Microsoft JhengHei",sans-serif;
@@ -263,14 +307,59 @@ body{background:var(--paper)}
 .clickpin{border-color:var(--accent);border-radius:0;transform:rotate(45deg)}
 .leaflet-tooltip.dlabel{font-family:var(--display);letter-spacing:.1em;text-shadow:0 0 3px var(--paper),0 0 3px var(--paper),0 0 2px var(--paper)}
 
+#grab{display:none}
+/* ===== 手機版：地圖全螢幕＋底部拉板（body[data-sheet] = peek／half／full） ===== */
 @media (max-width:760px){
-  body{grid-template-columns:1fr;grid-template-rows:55vh 1fr;overflow:auto}
-  #mapwrap{grid-row:1}
-  #side{grid-row:2;border-right:0;border-top:1px solid var(--rule)}
-  .titleblock,.controls,#list li,.foot{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-  #layers{width:200px}
-  #card{max-height:calc(100% - 24px)}
+  :root{--peek:calc(132px + env(safe-area-inset-bottom,0px));--gut-l:max(16px,env(safe-area-inset-left,0px));--gut-r:max(16px,env(safe-area-inset-right,0px))}
+  body{display:block;overflow:hidden}
+  #mapwrap{position:fixed;left:0;right:0;top:0;bottom:calc(var(--peek) - 14px)}
+  #neat{inset:6px 6px 20px}
+  #side{position:fixed;left:0;right:0;bottom:0;z-index:700;height:var(--peek);transition:height .28s cubic-bezier(.2,.8,.2,1);
+    border-top:2px solid var(--ink);box-shadow:0 -8px 24px rgba(40,28,14,.22)!important;padding-bottom:env(safe-area-inset-bottom,0px);overflow:hidden}
+  body[data-sheet="half"] #side{height:56%}
+  body[data-sheet="full"] #side{height:calc(100% - 52px - env(safe-area-inset-top,0px))}
+  #grab{display:flex;flex:none;height:26px;align-items:center;justify-content:center;touch-action:none;cursor:grab}
+  #grab span{width:44px;height:5px;border-radius:3px;background:var(--muted);opacity:.55}
+  #grab:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+  .titleblock{padding:0 var(--gut-r) 12px var(--gut-l)}
+  .titleblock::after{left:var(--gut-l);right:var(--gut-r)}
+  .titleblock h1{font-size:22px;letter-spacing:.12em}
+  html[lang="en"] .titleblock h1{font-size:19px}
+  .titleblock .sub{display:none}
+  .titleblock .switch{margin-top:4px;font-size:13px}
+  .langbtn{margin-top:0;padding:5px 10px}
+  .controls,.foot,.lhead{padding-left:var(--gut-l);padding-right:var(--gut-r)}
+  #list li,#plist li{padding-left:var(--gut-l);padding-right:var(--gut-r)}
+  .tabs button{padding:11px 0}
+  /* 整個拉板一起捲動，把手黏在頂端，資料來源說明放在最下面 */
+  #side{overflow-y:auto;overscroll-behavior:contain}
+  body[data-sheet="peek"] #side{overflow:hidden}
+  #side .pane,#side .geopane,#paneL{flex:none;overflow:visible;min-height:auto}
+  #paneB #list,#paneL #plist{overflow:visible;flex:none}
+  #grab{position:sticky;top:0;z-index:2;background:var(--sheet)}
+  /* 觸控尺寸：輸入框 16px 以上，iOS 才不會自動放大畫面 */
+  #q,select,#lno,#chatin,#chatkey{font-size:16px}
+  #paneC{flex:none;overflow:visible;min-height:auto}
+  .chip{padding:6px 12px}
+  #list li{padding-top:12px;padding-bottom:12px}
+  .geopane #geochecks label{padding:7px 0}
+  /* 圖層面板：右上角，預設收合 */
+  #layers{top:calc(14px + env(safe-area-inset-top,0px));right:max(14px,env(safe-area-inset-right,0px));width:min(300px,calc(100% - 28px));max-height:calc(100% - 40px - env(safe-area-inset-top,0px));padding:10px 12px}
+  #layers{z-index:1050}
+  #layers.min{width:auto}
+  #layers.min h2{gap:14px;border-bottom:0;padding-bottom:0}
+  #layers h2 button{font-size:13px;padding:4px 0 4px 8px}
+  /* 建築詳細卡片：從拉板上緣升起；拉板展開時先藏起來 */
+  #card{position:fixed;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));top:auto;bottom:calc(var(--peek) + 8px);
+    width:auto;max-width:none;max-height:min(46vh,calc(100% - var(--peek) - 72px - env(safe-area-inset-top,0px)));z-index:1100}
+  body:not([data-sheet="peek"]) #card{display:none}
+  #card h3{font-size:21px}
+  #card .links a{padding:7px 11px}
   #coord{display:none}
+  .leaflet-control-zoom{margin:0 14px 26px 0!important}
+  .leaflet-control-scale{margin:0 14px 8px 0!important}
+  .earthbtn{margin:0 14px 8px 0!important}
+  .leaflet-control-attribution{margin:0 8px 18px 0!important;font-size:10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
@@ -315,3 +404,197 @@ body{background:var(--paper)}
 html[lang="en"] .titleblock h1{font-size:24px;letter-spacing:.03em;line-height:1.15}
 html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 [hidden]{display:none!important}
+
+/* ===== 我的標示（地熱地圖） ===== */
+#markset .src{margin-top:2px}
+.markbtns{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px}
+.markbtns .linkbtn:disabled{opacity:.4;cursor:default;text-decoration:none}
+#marklist{display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto}
+.mkitem{display:flex;align-items:center;gap:8px;border:0;border-bottom:1px dotted var(--rule);background:none;color:var(--ink);font:13px var(--body);padding:4px 0;cursor:pointer;text-align:left;min-width:0}
+.mkitem .sw{width:10px;height:10px;border-radius:50%;flex:none}
+.mkitem .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkitem:hover{color:var(--accent)}
+#mkbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+#mkbanner .linkbtn{color:var(--sheet);font-size:13px}
+.mkform{display:flex;flex-direction:column;gap:8px}
+.mkform h4{margin:0}
+.mkform label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.mkform input,.mkform textarea{font:14px var(--body);color:var(--ink);background:var(--paper);border:1px solid var(--ink);padding:6px 8px;width:100%;resize:vertical}
+.mkl{font-size:12px;color:var(--muted)}
+.mkchoice{display:flex;flex-wrap:wrap;gap:6px}
+.mkchoice button{width:26px;height:26px;border:1px solid var(--ink);cursor:pointer;padding:0}
+.mkchoice button[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.mkshape button{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:var(--sheet)}
+.mkrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.mkrow .btn{padding:6px 16px}
+@media (max-width:760px){ .mkform input,.mkform textarea{font-size:16px} .mkchoice button{width:32px;height:32px} .mkshape button{width:40px;height:40px} }
+@media (max-width:760px){
+  #mkbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none}
+  /* 開著彈出視窗時，先藏起右下角的按鈕，避免蓋住內容 */
+  .popup-on .leaflet-bottom.leaflet-right,.popup-on #layers.min{opacity:0;pointer-events:none;transition:opacity .15s}
+}
+.mkg{font-size:11.5px;color:var(--muted);margin-top:2px}
+.mkshapename{font-size:12.5px;color:var(--ink);font-weight:600;margin-top:-2px}
+.mkshape{gap:5px}
+
+/* 地熱地圖：環境資料分組小標、井區塊 */
+#envset .esub{font-size:11.5px;color:var(--muted);letter-spacing:.06em;margin:8px 0 2px;padding-top:6px;border-top:1px dotted var(--rule)}
+#envset .esub:first-of-type{border-top:0;padding-top:0;margin-top:2px}
+.geopane .wlabel{margin-top:16px;margin-bottom:6px}
+:is(#wellchecks,#sitechecks,#landchecks){display:flex;flex-direction:column;gap:8px}
+:is(#wellchecks,#sitechecks,#landchecks) .wgroup{border:1px solid var(--rule);padding:6px 8px 4px}
+:is(#wellchecks,#sitechecks,#landchecks) label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px;padding:3px 0}
+:is(#wellchecks,#sitechecks,#landchecks) .whead{font-size:14.5px;border-bottom:1px solid var(--rule);padding-bottom:5px}
+:is(#wellchecks,#sitechecks,#landchecks) .witems{display:flex;flex-direction:column;padding-left:22px}
+:is(#wellchecks,#sitechecks,#landchecks) .witems label{font-size:13.5px;border-bottom:1px dotted var(--rule)}
+:is(#wellchecks,#sitechecks,#landchecks) .witems label:last-child{border-bottom:0}
+:is(#wellchecks,#sitechecks,#landchecks) .count{margin-left:auto;padding-left:6px;flex:none}
+:is(#wellchecks,#sitechecks,#landchecks) .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+:is(#wellchecks,#sitechecks,#landchecks) .wsym{display:inline-flex;width:12px;height:12px;align-items:center;justify-content:center;flex:none}
+:is(#wellchecks,#sitechecks,#landchecks) .wgroup>.src{font-size:12px;margin:4px 0 2px}
+:is(#welllegend,#sitelegend,#landlegend){margin-top:6px;display:flex;flex-direction:column;gap:6px}
+:is(#welllegend,#sitelegend,#landlegend) .row{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
+:is(#welllegend,#sitelegend,#landlegend) .k{display:inline-block;width:12px;height:12px;border:1px solid var(--ink);margin-right:4px;vertical-align:-2px}
+:is(#welllegend,#sitelegend,#landlegend) .wl{display:inline-flex;gap:6px;align-items:center}
+:is(#welllegend,#sitelegend,#landlegend) .zl{display:flex;flex-direction:column;gap:2px;font-size:12px}
+:is(#welllegend,#sitelegend,#landlegend) .zl i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
+@media (max-width:760px){ :is(#wellchecks,#sitechecks,#landchecks) label{padding:7px 0} }
+.hsopt{margin-top:4px;padding-top:6px;border-top:1px dotted var(--rule)}
+.hsopt.off{opacity:.45;cursor:default}
+/* 地熱地圖：現有地熱案場彈窗（欄位統一、值靠左、來源小字） */
+.geopop table.sitetab td{vertical-align:top}
+.geopop table.sitetab td:first-child{white-space:nowrap;color:var(--muted);padding-right:8px}
+.geopop table.sitetab td+td{text-align:left;font-family:var(--body);font-size:12.5px;padding-left:0}
+.geopop .fact{margin:0 0 3px}
+.geopop .fact .fsrc{display:block;font-size:11px;color:var(--muted)}
+.geopop mark.unc{background:#fff3bf;color:inherit;padding:0 2px}
+#landlegend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+
+/* ===== 框選範圍輸出圖片 ===== */
+.shotmode{cursor:crosshair!important;touch-action:none}
+.shotmode .leaflet-interactive{cursor:crosshair!important}
+#shotbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+#shotbanner .linkbtn{color:var(--sheet);font-size:13px}
+#shotdlg{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+#shotdlg[hidden]{display:none!important}
+.shotform{background:var(--sheet);color:var(--ink);border:1px solid var(--ink);width:min(380px,100%);max-height:calc(100% - 32px);overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.shotform h3{margin:0 0 4px;font:700 17px var(--display)}
+.shotform .opt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;cursor:pointer}
+.shotform .opt span{font:12px var(--mono);color:var(--muted)}
+.shotform .opt em{font-size:12px;color:var(--accent);font-style:normal}
+.shotform .opt.off{opacity:.5;cursor:default}
+.shotform select{width:auto;padding:2px 6px;font-size:13px}
+#shotbusy{position:fixed;inset:0;z-index:5000;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:600 15px var(--body);color:var(--ink)}
+#shotbusy[hidden]{display:none!important}
+#shotbusy .spin{display:inline-block;width:16px;height:16px;margin-right:10px;vertical-align:-2px;border:2px solid var(--rule);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (max-width:760px){ #shotbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} .shotform select{font-size:16px} }
+.geopop table.bhlay td:first-child{font-family:var(--mono);font-size:12px}
+/* 地熱地圖：地震目錄 */
+#quakebox,#feederbox{border:1px solid var(--rule);padding:6px 8px}
+#quakebox .qhead,#feederbox .qhead{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px}
+#quakebox .qhead .sw{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none}
+#quakebox .qhead .count{margin-left:auto}
+#qkpanel{display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:13px}
+#qkpanel[hidden]{display:none}
+#qkpanel .qrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#qkpanel .qrow>span:first-child{width:4.5em;color:var(--muted)}
+#qkpanel select,#qkpanel input[type=number]{width:5.2em;font:inherit;padding:2px 4px}
+#qkpanel .qleg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
+#qkpanel .qleg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+#qkpanel .qleg i.ramp{width:48px;border-radius:2px;background:linear-gradient(90deg,hsla(48,95%,58%,.3),hsla(24,95%,48%,.6),hsla(0,95%,38%,.85))}
+@media (max-width:760px){ #qkpanel select,#qkpanel input[type=number]{font-size:16px;width:5.6em} }
+#welllegend .zl .wdesc{display:flex;gap:6px;align-items:flex-start;line-height:1.45}
+#welllegend .zl .wdesc>i{flex:none;margin-top:4px}
+/* 地熱井彈窗：相關資料 */
+.geopop .wrel .wsame{margin:2px 0;font-size:12.5px}
+.geopop .wrel .wsame>summary{cursor:pointer;color:var(--ink)}
+.geopop .wrel .wsame[open]>summary{margin-bottom:4px}
+#sitechecks .bufopt{border-top:1px dotted var(--rule);margin-top:4px;padding-top:6px;font-size:13.5px}
+#feederbox .qhead{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px}
+#feederbox .qhead .sw{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none}
+#feederbox .qhead .count{margin-left:auto}
+#fdpanel{display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:13px}
+#fdpanel[hidden]{display:none}
+#fdpanel .fdmode{display:flex;gap:14px;font-size:13px}
+#fdpanel .fdmode label{display:flex;align-items:center;gap:4px;cursor:pointer}
+#fdpanel .qleg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
+#fdpanel .qleg i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+
+/* 土地圖層面板、編定原則表 */
+#landset label{display:block}
+#lxlegend{margin-top:6px}
+details.zrule{margin:6px 0 2px;font-size:12.5px}
+details.zrule summary{cursor:pointer;color:var(--accent,#a33);font-weight:600}
+details.zrule>div{margin:4px 0;line-height:1.6}
+
+/* ===== 框選量測 ===== */
+#measbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+#measbanner .linkbtn{color:var(--sheet);font-size:13px}
+#measclear{margin-top:2px;align-self:flex-start}
+.leaflet-tooltip.meastip{background:rgba(255,255,255,.92);border:1px solid #1f6fb5;box-shadow:0 2px 6px rgba(0,0,0,.18);padding:5px 8px;color:#1a2a3a}
+.leaflet-tooltip.meastip::before{display:none}
+.measlab{display:grid;gap:1px;font:12.5px/1.45 var(--body);font-variant-numeric:tabular-nums}
+.measlab>div{display:flex;justify-content:space-between;gap:12px}
+.measlab span{color:#5b6672}
+.measlab b{font-weight:700}
+.measlab .ha{justify-content:flex-end;color:#5b6672;font-size:11.5px}
+@media (max-width:760px){ #measbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} }
+#distbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100% - 28px)}
+#distbanner[hidden]{display:none!important}
+#distbanner .linkbtn{color:var(--sheet);font-size:13px}
+.distmode{cursor:crosshair!important}
+.leaflet-tooltip.distseg{background:rgba(255,255,255,.88);border:1px solid #c0392b;color:#7a1f16;box-shadow:none;padding:1px 5px;font:600 11.5px var(--body)}
+.leaflet-tooltip.distseg::before{display:none}
+@media (max-width:760px){ #distbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} }
+@media (max-width:760px){ #distbanner,#measbanner,#shotbanner{max-width:calc(100% - 200px);white-space:normal;flex-wrap:wrap;gap:4px 12px} }
+
+/* canvas 圖層不直接接收滑鼠事件，由 app.js 轉送（避免擋住下層的點） */
+.leaflet-pane > canvas{pointer-events:none!important}
+.leaflet-container.canvas-hover{cursor:pointer}
+.leaflet-tooltip.measedge{background:#1f6fb5;color:#fff;border:0;box-shadow:0 1px 4px rgba(0,0,0,.25);padding:2px 7px;font:700 12px var(--body);font-variant-numeric:tabular-nums;white-space:nowrap}
+.leaflet-tooltip-top.measedge::before{border-top-color:#1f6fb5}
+.leaflet-tooltip-right.measedge::before{border-right-color:#1f6fb5}
+.leaflet-tooltip.distlive{background:#c0392b;line-height:1.35}
+.leaflet-tooltip-right.distlive::before{border-right-color:#c0392b}
+
+/* 圖層依主題分組 */
+.lgroups{display:flex;flex-direction:column;gap:4px;margin-top:2px}
+details.lgrp{border:1px solid var(--rule);background:color-mix(in srgb,var(--paper,#fff) 70%,transparent)}
+details.lgrp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 8px;font-weight:600;font-size:13.5px}
+details.lgrp>summary::-webkit-details-marker{display:none}
+details.lgrp>summary::before{content:"▸";font-size:11px;color:var(--muted);transition:transform .15s}
+details.lgrp[open]>summary::before{transform:rotate(90deg)}
+details.lgrp .gcnt{margin-left:auto;font:500 11px var(--mono,monospace);color:var(--accent,#a33)}
+.lgbody{padding:2px 8px 8px 10px;display:flex;flex-direction:column;gap:1px}
+.lgbody label{display:flex;align-items:flex-start;gap:6px;line-height:1.4;padding:2px 0}
+.lgbody label input{margin-top:3px;flex:none}
+.lgbody .sw{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;margin-top:4px;border:1px solid rgba(0,0,0,.2)}
+.lgbody .gnote{margin:4px 0 0}
+.lgbody .gsub{font-weight:600;color:var(--ink);margin-top:8px}
+.plistbox{max-height:180px;overflow:auto;margin-top:6px;border-top:1px dotted var(--rule)}
+.plistbox .prow{padding:3px 0;border-bottom:1px dotted var(--rule);font-size:12px}
+#lxkml{margin-top:6px}
+@media (max-width:760px){ .lgbody label{padding:6px 0} details.lgrp>summary{padding:10px 8px} }
+
+/* 地震目錄：雙滑桿（樣式比照「疊加透明度」的拉條：灰色圓角軌道、藍色已選段、藍色圓鈕） */
+#qkpanel .qslide{display:flex;flex-direction:column;gap:2px}
+#qkpanel .qsl{display:flex;justify-content:space-between;font-size:12.5px}
+#qkpanel .qsl span{color:var(--muted)}
+#qkpanel .qsl b{font:600 12.5px var(--mono,monospace)}
+#qkpanel .dual{position:relative;height:24px;--rng:#2b5cc4}
+#qkpanel .dual::before{content:"";position:absolute;left:0;right:0;top:8px;height:8px;border-radius:5px;box-sizing:border-box;border:1px solid #9a9a9a;
+  background:linear-gradient(90deg,#e6e6e6 var(--a,0%),var(--rng) var(--a,0%),var(--rng) var(--b,100%),#e6e6e6 var(--b,100%))}
+#qkpanel .dual input[type=range]{position:absolute;left:0;right:0;top:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none;height:24px}
+#qkpanel .dual input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--rng);border:0;cursor:pointer}
+#qkpanel .dual input[type=range]::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:var(--rng);border:0;cursor:pointer}
+#qkpanel .dual input[type=range]::-webkit-slider-runnable-track{background:none}
+#qkpanel .dual input[type=range]::-moz-range-track{background:none}
+#qkpanel .dual input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:760px){ #qkpanel .dual{height:32px} #qkpanel .dual::before{top:12px} #qkpanel .dual input[type=range]{height:32px} #qkpanel .dual input[type=range]::-webkit-slider-thumb{width:26px;height:26px} }
+.leaflet-tooltip.tlabel{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:11px;text-shadow:0 0 3px rgba(0,0,0,.8);padding:0}
+.leaflet-tooltip.tlabel::before{display:none}
