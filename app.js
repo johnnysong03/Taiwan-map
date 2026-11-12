@@ -1092,7 +1092,8 @@ const QK=(()=>{
     s.onload=()=>{const cv=b64(window.QUAKE_CUBE); NC=cv.byteLength/8; C={cell:new Uint16Array(NC),yr:new Uint8Array(NC),md:new Uint8Array(NC),n:new Uint32Array(NC)};
       for(let i=0;i<NC;i++){C.cell[i]=cv.getUint16(i*8,true);C.yr[i]=cv.getUint8(i*8+2);C.md[i]=cv.getUint8(i*8+3);C.n[i]=cv.getUint32(i*8+4,true);}
       delete window.QUAKE_CUBE; ok();}; s.onerror=fail; document.head.appendChild(s);});
-  const F={y0:M.y0,y1:M.y1,m0:0,m1:Math.ceil(M.mMax*10)/10,d0:0,d1:Math.ceil(M.dMax)};
+  // 預設只顯示規模 4 以上：69 萬筆全開會把整張圖蓋滿（使用者回報）；要看全部再按「顯示全部規模」
+  const DEF={y0:M.y0,y1:M.y1,m0:4,m1:Math.ceil(M.mMax*10)/10,d0:0,d1:Math.ceil(M.dMax)}, F=Object.assign({},DEF);
   const DE=[0,...M.depEdges,1e9];
   let grid=null;
   function aggregate(){ grid=new Map();
@@ -1149,7 +1150,7 @@ const QK=(()=>{
   <div id="qkpanel" hidden><div class="qrow"><span>${L2("年份","Year")}</span><select id="qy0">${yrs}</select>–<select id="qy1">${yrs}</select></div>
   <div class="qrow"><span>${L2("規模","Magnitude")}</span><input id="qm0" type="number" step="0.5" min="0" max="8">–<input id="qm1" type="number" step="0.5" min="0" max="8"></div>
   <div class="qrow"><span>${L2("深度 km","Depth km")}</span><input id="qd0" type="number" step="5" min="0" max="400">–<input id="qd1" type="number" step="5" min="0" max="400"></div>
-  <div class="qrow"><button type="button" class="linkbtn" id="qreset">${L2("恢復全部","Reset")}</button><button type="button" class="linkbtn" id="qkml">${L2("匯出畫面內地震 KML","Export quakes in view (KML)")}</button></div>
+  <div class="qrow"><button type="button" class="linkbtn" id="qreset">${L2("恢復預設（規模 4 以上）","Reset (M4+)")}</button><button type="button" class="linkbtn" id="qall">${L2("顯示全部規模","All magnitudes")}</button><button type="button" class="linkbtn" id="qkml">${L2("匯出畫面內地震 KML","Export quakes in view (KML)")}</button></div>
   <div class="qleg">${[["#c0392b","<10"],["#e8590c","10–30"],["#e67e22","30–70"],["#2e6da4","≥70"]].map(([c,t])=>`<span><i style="background:${c}"></i>${t} km</span>`).join("")}</div>
   <div class="qleg"><span><i class="ramp"></i>${L2("縮小時：顏色越深、地震越多（對數尺度）","Zoomed out: darker = more earthquakes (log scale)")}</span></div></div>`;
   const $=id=>document.getElementById(id), panel=$("qkpanel"); panel.appendChild(status);
@@ -1162,7 +1163,8 @@ const QK=(()=>{
     F.m0=n("qm0",0);F.m1=n("qm1",9);if(F.m0>F.m1)[F.m0,F.m1]=[F.m1,F.m0];F.d0=n("qd0",0);F.d1=n("qd1",1e4);if(F.d0>F.d1)[F.d0,F.d1]=[F.d1,F.d0];
     grid=null; sync(); draw();};
   ["qy0","qy1","qm0","qm1","qd0","qd1"].forEach(id=>$(id).addEventListener("change",read));
-  $("qreset").onclick=()=>{Object.assign(F,{y0:M.y0,y1:M.y1,m0:0,m1:Math.ceil(M.mMax*10)/10,d0:0,d1:Math.ceil(M.dMax)});grid=null;sync();draw();};
+  $("qreset").onclick=()=>{Object.assign(F,DEF);grid=null;sync();draw();};
+  $("qall").onclick=()=>{F.m0=0;grid=null;sync();draw();};
   $("qkml").onclick=async()=>{ if(map.getZoom()<PZ){status.textContent=L2(`請先放大到縣市層級（縮放 ${PZ} 以上）再匯出。`,`Zoom in to level ${PZ}+ first.`);return;}
     const ks=tilesInView(); await Promise.all(ks.map(loadTile)); const b=map.getBounds(), ev=[];
     for(const k of ks){const t=T[k];for(let i=0;i<t.n;i++) if(pass(t,i)&&b.contains([t.lat[i],t.lng[i]])) ev.push([t,i]);}
