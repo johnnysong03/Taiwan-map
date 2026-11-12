@@ -556,3 +556,6 @@ details.zrule>div{margin:4px 0;line-height:1.6}
 /* canvas 圖層不直接接收滑鼠事件，由 app.js 轉送（避免擋住下層的點） */
 .leaflet-pane > canvas{pointer-events:none!important}
 .leaflet-container.canvas-hover{cursor:pointer}
+.leaflet-tooltip.measedge{background:#1f6fb5;color:#fff;border:0;box-shadow:0 1px 4px rgba(0,0,0,.25);padding:2px 7px;font:700 12px var(--body);font-variant-numeric:tabular-nums;white-space:nowrap}
+.leaflet-tooltip-top.measedge::before{border-top-color:#1f6fb5}
+.leaflet-tooltip-right.measedge::before{border-right-color:#1f6fb5}

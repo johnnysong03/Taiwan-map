@@ -2618,6 +2618,14 @@ function buildChatPane(){
     return {w,h,a};
   }
   const label=r=>`<div class="measlab"><div><span>${L2("東西寬","E–W width")}</span><b>${len(r.w)}</b></div><div><span>${L2("南北長","N–S length")}</span><b>${len(r.h)}</b></div><div><span>${L2("面積","Area")}</span><b>${area(r.a)}</b></div><div class="ha">${ha(r.a)}</div></div>`;
+  // 東西寬標在上邊框外、南北長標在右邊框外，面積留在框中央
+  const areaLab=r=>`<div class="measlab"><div><span>${L2("面積","Area")}</span><b>${area(r.a)}</b></div><div class="ha">${ha(r.a)}</div></div>`;
+  const edges=(rc,b,m)=>{ const n=b.getNorth(),so=b.getSouth(),w=b.getWest(),e=b.getEast();
+    rc._tw??=L.tooltip({permanent:true,direction:"top",offset:[0,-3],className:"measedge",interactive:false}).setLatLng([n,(w+e)/2]).addTo(group);
+    rc._th??=L.tooltip({permanent:true,direction:"right",offset:[4,0],className:"measedge",interactive:false}).setLatLng([(n+so)/2,e]).addTo(group);
+    rc._tw.setLatLng([n,(w+e)/2]).setContent(`${L2("寬","W")} ${len(m.w)}`); rc._th.setLatLng([(n+so)/2,e]).setContent(`${L2("長","L")} ${len(m.h)}`);
+    rc.setTooltipContent(areaLab(m)); rc.openTooltip(b.getCenter()); };
+  const drop=rc=>{ [rc,rc._tw,rc._th].forEach(l=>l&&group.removeLayer(l)); };
   const group=L.layerGroup().addTo(map);
   const sync=()=>{ clr.hidden=!group.getLayers().length; };
   clr.onclick=()=>{ group.clearLayers(); sync(); };
@@ -2631,26 +2639,26 @@ function buildChatPane(){
       if(MOBILE.matches){ if(!lay.classList.contains("min")) document.getElementById("lmin").click(); sheet("peek"); } }
     else map.dragging.enable(); };
   btn.onclick=()=>setMode(!mode);
-  banner.querySelector("button").onclick=()=>{ if(cur){ group.removeLayer(cur); cur=null; } start=null; setMode(false); };
+  banner.querySelector("button").onclick=()=>{ if(cur){ drop(cur); cur=null; } start=null; setMode(false); };
   mc.addEventListener("pointerdown",e=>{ if(!mode||e.target.closest(".leaflet-control")) return;
     e.preventDefault(); e.stopPropagation(); start=map.mouseEventToLatLng(e);
     cur=L.rectangle([start,start],{color:"#1f6fb5",weight:2,fillOpacity:.12,dashArray:"5 4"}).addTo(group);
     cur.bindTooltip("",{permanent:true,direction:"center",className:"meastip",interactive:false});
     try{ mc.setPointerCapture(e.pointerId); }catch(_){} },true);
   mc.addEventListener("pointermove",e=>{ if(!mode||!start) return; e.preventDefault(); e.stopPropagation();
-    const b=L.latLngBounds(start,map.mouseEventToLatLng(e)); cur.setBounds(b); cur.setTooltipContent(label(measure(b))); cur.openTooltip(b.getCenter()); },true);
+    const b=L.latLngBounds(start,map.mouseEventToLatLng(e)); cur.setBounds(b); edges(cur,b,measure(b)); },true);
   mc.addEventListener("pointerup",e=>{ if(!mode||!start) return; e.stopPropagation(); eat=true; setTimeout(()=>eat=false,400);
     const b=cur.getBounds(), r=cur, a=map.latLngToContainerPoint(b.getNorthWest()), c=map.latLngToContainerPoint(b.getSouthEast());
     start=null; cur=null; setMode(false);
-    if(c.x-a.x<6||c.y-a.y<6){ group.removeLayer(r); sync(); return; }
-    const m=measure(b); r.setStyle({dashArray:null}); r.setTooltipContent(label(m)); r.openTooltip(b.getCenter());
+    if(c.x-a.x<6||c.y-a.y<6){ drop(r); sync(); return; }
+    const m=measure(b); r.setStyle({dashArray:null}); edges(r,b,m);
     const [x1,y1]=toTM2(b.getNorth(),b.getWest()),[x2,y2]=toTM2(b.getSouth(),b.getEast());
     r.bindPopup(()=>{ const el=document.createElement("div"); el.className="geopop";
       el.innerHTML=`<h4>${L2("量測結果","Measurement")}</h4>${label(m)}
         <div class="m" style="margin-top:6px">TWD97 X ${x1.toFixed(0)}–${x2.toFixed(0)}<br>Y ${y2.toFixed(0)}–${y1.toFixed(0)}</div>
         <div class="src">${L2("以經緯度框計算：寬取中央緯度，面積為地球球面上的面積，與地籍面積可能略有差異。","Computed from the lat/long box: width at the middle latitude, area on the spherical Earth. May differ slightly from cadastral areas.")}</div>
         <div class="mkrow"><button type="button" class="linkbtn">${L2("刪除這個量測","Delete this measurement")}</button></div>`;
-      el.querySelector("button").onclick=()=>{ map.closePopup(); group.removeLayer(r); sync(); };
+      el.querySelector("button").onclick=()=>{ map.closePopup(); drop(r); sync(); };
       return el; });
     sync(); },true);
   mc.addEventListener("click",e=>{ if(eat){ e.stopPropagation(); e.preventDefault(); eat=false; } },true);
