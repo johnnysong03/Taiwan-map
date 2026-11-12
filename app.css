@@ -580,3 +580,17 @@ details.lgrp .gcnt{margin-left:auto;font:500 11px var(--mono,monospace);color:va
 .plistbox .prow{padding:3px 0;border-bottom:1px dotted var(--rule);font-size:12px}
 #lxkml{margin-top:6px}
 @media (max-width:760px){ .lgbody label{padding:6px 0} details.lgrp>summary{padding:10px 8px} }
+
+/* 地震目錄：雙滑桿 */
+#qkpanel .qslide{display:flex;flex-direction:column;gap:0}
+#qkpanel .qsl{display:flex;justify-content:space-between;font-size:12.5px}
+#qkpanel .qsl span{color:var(--muted)}
+#qkpanel .qsl b{font:600 12.5px var(--mono,monospace)}
+#qkpanel .dual{position:relative;height:26px}
+#qkpanel .dual::before{content:"";position:absolute;left:0;right:0;top:12px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--rule) var(--a,0%),var(--accent,#b3372a) var(--a,0%),var(--accent,#b3372a) var(--b,100%),var(--rule) var(--b,100%))}
+#qkpanel .dual input[type=range]{position:absolute;left:0;right:0;top:3px;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none;height:20px}
+#qkpanel .dual input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent,#b3372a);border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);cursor:pointer}
+#qkpanel .dual input[type=range]::-moz-range-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:var(--accent,#b3372a);border:2px solid #fff;cursor:pointer}
+#qkpanel .dual input[type=range]::-webkit-slider-runnable-track{background:none}
+#qkpanel .dual input[type=range]::-moz-range-track{background:none}
+@media (max-width:760px){ #qkpanel .dual::before{top:15px} #qkpanel .dual{height:34px} #qkpanel .dual input[type=range]{height:28px} #qkpanel .dual input[type=range]::-webkit-slider-thumb{width:24px;height:24px} }

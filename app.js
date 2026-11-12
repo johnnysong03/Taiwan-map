@@ -1145,11 +1145,10 @@ const QK=(()=>{
       `<table class="sitetab"><tr><td>${L2("時間","Time")}</td><td>${fmtT(t.ts[i])}</td></tr><tr><td>${L2("規模","Magnitude")}</td><td>${t.m[i].toFixed(2)}</td></tr><tr><td>${L2("深度","Depth")}</td><td>${t.d[i].toFixed(2)} km</td></tr><tr><td>${L2("震央","Epicentre")}</td><td>${t.lat[i].toFixed(2)}°N, ${t.lng[i].toFixed(2)}°E</td></tr></table>`+
       `<div style="margin-top:6px"><a href="${earthUrl(ll[0],ll[1],40000)}" target="_blank" rel="noopener">${L2("在 Google Earth 開啟這裡","Open here in Google Earth")}</a></div><div class="src">${SRC}</div></div>`).openOn(map); }
   // 介面：開關、篩選、圖例、匯出
-  const yrs=Array.from({length:M.y1-M.y0+1},(_,k)=>M.y0+k).map(y=>`<option>${y}</option>`).join("");
+  // 雙滑桿：兩個疊在一起的 range，拖動時即時更新數字，放開才重畫
+  const dual=(id,lab,mn,mx,st)=>`<div class="qslide"><div class="qsl"><span>${lab}</span><b id="${id}v"></b></div><div class="dual"><input type="range" id="${id}0" min="${mn}" max="${mx}" step="${st}" aria-label="${lab} min"><input type="range" id="${id}1" min="${mn}" max="${mx}" step="${st}" aria-label="${lab} max"></div></div>`;
   box.innerHTML=`<label class="qhead"><input type="checkbox" id="qkon"> <span class="sw" style="background:conic-gradient(#c0392b 0 25%,#e67e22 0 50%,#2e6da4 0 75%,#f5c542 0)"></span>${L2("地震目錄（氣象署）","Earthquake catalogue (CWA)")}<span class="count">${M.n.toLocaleString()}</span></label>
-  <div id="qkpanel" hidden><div class="qrow"><span>${L2("年份","Year")}</span><select id="qy0">${yrs}</select>–<select id="qy1">${yrs}</select></div>
-  <div class="qrow"><span>${L2("規模","Magnitude")}</span><input id="qm0" type="number" step="0.5" min="0" max="8">–<input id="qm1" type="number" step="0.5" min="0" max="8"></div>
-  <div class="qrow"><span>${L2("深度 km","Depth km")}</span><input id="qd0" type="number" step="5" min="0" max="400">–<input id="qd1" type="number" step="5" min="0" max="400"></div>
+  <div id="qkpanel" hidden>${dual("qy",L2("年份","Year"),M.y0,M.y1,1)}${dual("qm",L2("規模","Magnitude"),0,Math.ceil(M.mMax*10)/10,.1)}${dual("qd",L2("深度 km","Depth km"),0,Math.ceil(M.dMax),1)}
   <div class="qrow"><button type="button" class="linkbtn" id="qreset">${L2("恢復預設（規模 4 以上）","Reset (M4+)")}</button><button type="button" class="linkbtn" id="qall">${L2("顯示全部規模","All magnitudes")}</button><button type="button" class="linkbtn" id="qkml">${L2("匯出畫面內地震 KML","Export quakes in view (KML)")}</button></div>
   <div class="qleg">${[["#c0392b","<10"],["#e8590c","10–30"],["#e67e22","30–70"],["#2e6da4","≥70"]].map(([c,t])=>`<span><i style="background:${c}"></i>${t} km</span>`).join("")}</div>
   <div class="qleg"><span><i class="ramp"></i>${L2("縮小時：顏色越深、地震越多（對數尺度）","Zoomed out: darker = more earthquakes (log scale)")}</span></div></div>`;
@@ -1157,12 +1156,16 @@ const QK=(()=>{
   const note=document.createElement("div"); note.className="src"; note.textContent=L2("縮小時的篩選以整數規模級（例如 2.0–2.99）與深度級（<10、10–30、30–70、≥70 km）計算；放大後的點是精確篩選。",
     "When zoomed out, filters snap to whole-magnitude and depth classes; dots shown when zoomed in are filtered exactly."); panel.appendChild(note);
   const src=document.createElement("div"); src.className="src"; src.textContent=SRC; panel.appendChild(src);
-  const sync=()=>{$("qy0").value=F.y0;$("qy1").value=F.y1;$("qm0").value=F.m0;$("qm1").value=F.m1;$("qd0").value=F.d0;$("qd1").value=F.d1;};
+  const lbl=()=>{const v=id=>+$(id).value, a=(x,y)=>[Math.min(x,y),Math.max(x,y)];
+    const [y0,y1]=a(v("qy0"),v("qy1")),[m0,m1]=a(v("qm0"),v("qm1")),[d0,d1]=a(v("qd0"),v("qd1"));
+    $("qyv").textContent=y0===y1?`${y0}`:`${y0}–${y1}`; $("qmv").textContent=`${m0.toFixed(1)}–${m1.toFixed(1)}`; $("qdv").textContent=`${d0}–${d1} km`;
+    for(const id of ["qy","qm","qd"]){const a0=$(id+"0"),mn=+a0.min,mx=+a0.max,p=x=>((x-mn)/(mx-mn)*100).toFixed(1)+"%",x0=+a0.value,x1=+$(id+"1").value; a0.style.zIndex=x0>(mn+mx)/2?3:1; /* 兩個鈕都推到右端時，左鈕要在上層才拉得回來 */ const box=a0.parentElement; box.style.setProperty("--a",p(Math.min(x0,x1))); box.style.setProperty("--b",p(Math.max(x0,x1)));}};
+  const sync=()=>{$("qy0").value=F.y0;$("qy1").value=F.y1;$("qm0").value=F.m0;$("qm1").value=F.m1;$("qd0").value=F.d0;$("qd1").value=F.d1;lbl();};
   const read=()=>{const n=(id,def)=>{const v=parseFloat($(id).value);return isNaN(v)?def:v;};
     F.y0=+$("qy0").value;F.y1=+$("qy1").value;if(F.y0>F.y1)[F.y0,F.y1]=[F.y1,F.y0];
     F.m0=n("qm0",0);F.m1=n("qm1",9);if(F.m0>F.m1)[F.m0,F.m1]=[F.m1,F.m0];F.d0=n("qd0",0);F.d1=n("qd1",1e4);if(F.d0>F.d1)[F.d0,F.d1]=[F.d1,F.d0];
     grid=null; sync(); draw();};
-  ["qy0","qy1","qm0","qm1","qd0","qd1"].forEach(id=>$(id).addEventListener("change",read));
+  ["qy0","qy1","qm0","qm1","qd0","qd1"].forEach(id=>{$(id).addEventListener("change",read);$(id).addEventListener("input",lbl);});
   $("qreset").onclick=()=>{Object.assign(F,DEF);grid=null;sync();draw();};
   $("qall").onclick=()=>{F.m0=0;grid=null;sync();draw();};
   $("qkml").onclick=async()=>{ if(map.getZoom()<PZ){status.textContent=L2(`請先放大到縣市層級（縮放 ${PZ} 以上）再匯出。`,`Zoom in to level ${PZ}+ first.`);return;}
