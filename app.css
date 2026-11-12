@@ -598,3 +598,21 @@ details.lgrp .gcnt{margin-left:auto;font:500 11px var(--mono,monospace);color:va
 @media (max-width:760px){ #qkpanel .dual{height:32px} #qkpanel .dual::before{top:12px} #qkpanel .dual input[type=range]{height:32px} #qkpanel .dual input[type=range]::-webkit-slider-thumb{width:26px;height:26px} }
 .leaflet-tooltip.tlabel{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:11px;text-shadow:0 0 3px rgba(0,0,0,.8);padding:0}
 .leaflet-tooltip.tlabel::before{display:none}
+
+/* 卡車路線 */
+#truckset .trk{display:flex;flex-direction:column;gap:6px;font-size:13px}
+#truckset .trow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#truckset .trow label{display:flex;align-items:center;gap:4px}
+#truckset input[type=number]{width:4.6em;font:inherit;padding:2px 4px}
+#truckset .btn{padding:4px 10px;font-size:12.5px}
+#truckset .btn.on{outline:2px solid var(--ink);outline-offset:1px}
+.tkpin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);color:#fff;font:700 13px/26px sans-serif;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.tkpin{display:flex;align-items:center;justify-content:center}
+.tkres{border:1px solid var(--rule);padding:6px 8px;font-size:12.5px;line-height:1.5}
+.tkres.ok{border-left:4px solid #1a73e8}.tkres.bad{border-left:4px solid #d93025}
+.tkstat{font-weight:600;margin:2px 0 4px}
+.tkh{font-weight:700;margin-top:6px}.tkh.bad{color:#d93025}.tkh.warn{color:#b06000}
+.tki{font-size:12px}
+.tksteps{margin:2px 0 4px 1.2em;padding:0;max-height:180px;overflow:auto}
+.tkleg{display:flex;gap:10px;font-size:12px;color:var(--muted)}.tkleg i{display:inline-block;width:14px;height:5px;margin-right:4px;vertical-align:2px;border-radius:2px}
+@media (max-width:760px){ #truckset input[type=number]{font-size:16px} }

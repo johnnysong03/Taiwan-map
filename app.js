@@ -2055,6 +2055,156 @@ const _leg=legend; legend=function(msg){_leg(msg); kbtn.hidden=!LX.some(x=>on[x.
 ov.addEventListener("change",()=>setTimeout(()=>{ if(luiOver&&map.hasLayer(luiOver)) loadLUI().then(()=>legend()).catch(()=>{}); else legend(); },0));
 })();
 
+// ---------- 卡車路線（宜蘭，測試版）：OSM 道路由使用者的瀏覽器即時向 Overpass 取得，路寬依標記或道路等級推估，坡度用 AWS Terrain Tiles 高程，彎道用道路幾何算轉彎半徑 ----------
+if(APP==="geo"){(()=>{
+const ov=document.getElementById("overs"); if(!ov) return;
+const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
+const HW="motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|service|track|living_street|road";
+// 沒有寬度標記時，依道路等級推估路面寬度（公尺）；有車道數時用車道數 × 3.2 m
+const W_CLASS={motorway:10.5,motorway_link:6,trunk:10,trunk_link:6,primary:8,primary_link:5.5,secondary:7,secondary_link:5,tertiary:6,tertiary_link:5,unclassified:5,residential:5,road:5,living_street:4,service:3.5,track:3};
+const COST={motorway:1,motorway_link:1.1,trunk:1,trunk_link:1.1,primary:1.05,primary_link:1.1,secondary:1.1,secondary_link:1.15,tertiary:1.25,tertiary_link:1.3,unclassified:1.5,residential:1.6,road:1.6,living_street:2.2,service:2.2,track:3.5};
+const SPD={motorway:80,motorway_link:40,trunk:60,trunk_link:35,primary:50,primary_link:30,secondary:40,secondary_link:30,tertiary:35,tertiary_link:25,unclassified:30,residential:25,road:25,living_street:15,service:15,track:10};
+const HW_ZH={motorway:"國道",trunk:"快速／主要幹道",primary:"省道等主要道路",secondary:"縣道等次要道路",tertiary:"鄉道等道路",unclassified:"一般道路",residential:"巷弄道路",service:"服務道路",track:"產業道路／便道",living_street:"生活道路",road:"道路"};
+const fs=document.createElement("fieldset"); fs.id="truckset";
+fs.innerHTML=`<legend class="label">${L2("卡車路線（宜蘭，測試版）","Truck route (Yilan, beta)")}</legend>
+<div class="trk"><div class="trow"><label>${L2("車長","Length")} <input id="tkL" type="number" min="4" max="30" step="0.5" value="12"> m</label><label>${L2("車寬","Width")} <input id="tkW" type="number" min="1.5" max="4" step="0.1" value="2.5"> m</label></div>
+<div class="trow"><label>${L2("坡度上限","Max grade")} <input id="tkS" type="number" min="3" max="30" step="1" value="12"> %</label><label>${L2("最小轉彎半徑","Min. turn radius")} <input id="tkR" type="number" min="3" max="40" step="0.5" placeholder="${L2("自動","auto")}"> m</label></div>
+<div class="trow"><button type="button" class="btn tkpick" id="tkA">${L2("起點：蘇澳港","Start: Su'ao Port")}</button><button type="button" class="btn tkpick" id="tkB">${L2("點地圖設定終點","Click map for end")}</button></div>
+<div class="trow"><button type="button" class="btn" id="tkGo" disabled>${L2("規劃路線","Plan route")}</button><button type="button" class="linkbtn" id="tkX">${L2("清除","Clear")}</button></div>
+<div id="tkOut"></div>
+<div class="src">${L2("道路：OpenStreetMap（© OSM 貢獻者，ODbL），由你的瀏覽器即時向 Overpass API 取得；路寬有標記就用，否則依道路等級或車道數推估。坡度：AWS Terrain Tiles 高程（約 20 公尺解析度），橋梁與隧道不計坡度。彎道：依道路幾何估算轉彎半徑與內輪差。以上都是估算，出車前請實地勘查，並向道路主管機關確認限高、限重與管制。",
+  "Roads: OpenStreetMap (© contributors, ODbL) fetched live by your browser; widths from tags or estimated by road class. Grades: AWS Terrain Tiles (~20 m). Curves: radius and off-tracking from road geometry. All estimates — survey the route and check restrictions before driving.")}</div></div>`;
+const after=document.getElementById("landset")||ov; after.after(fs);
+const $=id=>document.getElementById(id), out=$("tkOut");
+let A=null,B=null,mode=null,mkA=null,mkB=null,routeLayer=null;
+const pin=(t,c)=>L.divIcon({className:"",iconSize:[26,26],iconAnchor:[13,26],html:`<div class="tkpin" style="background:${c}">${t}</div>`});
+const setA=ll=>{A=ll; if(mkA) mkA.setLatLng(ll); else { mkA=L.marker(ll,{icon:pin("A","#1a73e8"),draggable:true,zIndexOffset:900}).addTo(map); mkA.on("dragend",()=>{A=mkA.getLatLng();}); }
+  $("tkA").textContent=L2(`起點：${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`,`Start: ${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`); $("tkGo").disabled=!(A&&B);};
+const setB=ll=>{B=ll; if(!mkA&&A){ mkA=L.marker(A,{icon:pin("A","#1a73e8"),draggable:true,zIndexOffset:900}).addTo(map); mkA.on("dragend",()=>{A=mkA.getLatLng();}); } if(mkB) mkB.setLatLng(ll); else { mkB=L.marker(ll,{icon:pin("B","#d93025"),draggable:true,zIndexOffset:900}).addTo(map); mkB.on("dragend",()=>{B=mkB.getLatLng();}); }
+  $("tkB").textContent=L2(`終點：${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`,`End: ${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`); $("tkGo").disabled=!(A&&B);};
+const pick=m=>{mode=mode===m?null:m; map.getContainer().style.cursor=mode?"crosshair":""; $("tkA").classList.toggle("on",mode==="A"); $("tkB").classList.toggle("on",mode==="B");
+  out.innerHTML=mode?`<div class="src">${L2(mode==="A"?"點地圖設定起點":"點地圖設定終點","Click the map")}</div>`:"";};
+$("tkA").onclick=()=>pick("A"); $("tkB").onclick=()=>pick("B");
+map.on("click",e=>{ if(!mode) return; (mode==="A"?setA:setB)(e.latlng); mode=null; map.getContainer().style.cursor=""; $("tkA").classList.remove("on"); $("tkB").classList.remove("on"); out.innerHTML=""; });
+// 預設起點：蘇澳港（位置依國土利用圖磚商港範圍判讀，見「國際商港」圖層）
+A=L.latLng(24.59209,121.86327);  // 起點標記等設定終點時才畫，免得一開地圖就多一個圖釘
+$("tkX").onclick=()=>{ if(routeLayer) map.removeLayer(routeLayer); routeLayer=null; if(mkB) map.removeLayer(mkB); mkB=null; B=null; if(mkA) map.removeLayer(mkA); mkA=null;
+  A=L.latLng(24.59209,121.86327); $("tkA").textContent=L2("起點：蘇澳港","Start: Su'ao Port"); $("tkB").textContent=L2("點地圖設定終點","Click map for end"); $("tkGo").disabled=true; out.innerHTML=""; };
+// ---- 資料 ----
+const hav=(a,b)=>{const R=6371000,t=Math.PI/180,dl=(b[0]-a[0])*t,dn=(b[1]-a[1])*t,x=Math.sin(dl/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(x));};
+const roadCache=new Map();
+async function fetchRoads(bb){ const key=bb.map(v=>v.toFixed(3)).join(","); if(roadCache.has(key)) return roadCache.get(key);
+  const q=`[out:json][timeout:90];way["highway"~"^(${HW})$"](${bb.join(",")});(._;>;);out body qt;`;
+  let err=null;
+  for(const ep of EPS){ try{ const r=await fetch(ep,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}}); if(!r.ok) throw new Error(r.status); const j=await r.json(); roadCache.set(key,j); return j; }catch(e){ err=e; } }
+  throw err||new Error("overpass"); }
+const demCache=new Map();
+async function demTile(z,x,y){ const k=`${z}/${x}/${y}`; if(demCache.has(k)) return demCache.get(k);
+  const p=fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`).then(r=>r.ok?r.blob():null).then(async b=>{ if(!b) return null; const bmp=await createImageBitmap(b), c=document.createElement("canvas"); c.width=c.height=256; const g=c.getContext("2d",{willReadFrequently:true}); g.drawImage(bmp,0,0); return g.getImageData(0,0,256,256).data; }).catch(()=>null);
+  demCache.set(k,p); return p; }
+async function elevations(pts){ const z=13,n=2**z, need=new Map();
+  const tp=pts.map(([la,lo])=>{const x=(lo+180)/360*n, r=la*Math.PI/180, y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n; const k=`${Math.floor(x)},${Math.floor(y)}`; need.set(k,1); return [x,y,k];});
+  const T={}; await Promise.all([...need.keys()].map(async k=>{const [x,y]=k.split(",").map(Number); T[k]=await demTile(z,x,y);}));
+  return tp.map(([x,y,k])=>{const d=T[k]; if(!d) return null; const i=((Math.floor((y%1)*256))*256+Math.floor((x%1)*256))*4; return d[i]*256+d[i+1]+d[i+2]/256-32768;}); }
+const parseW=v=>{ if(!v) return null; const m=String(v).replace(",",".").match(/[\d.]+/); if(!m) return null; let x=parseFloat(m[0]); if(/'|ft/.test(v)) x*=0.3048; return x>0.5&&x<60?x:null; };
+// ---- 路網與檢查 ----
+async function buildGraph(J,P){
+  const N=new Map(); J.elements.forEach(e=>{ if(e.type==="node") N.set(e.id,[e.lat,e.lon]); });
+  const ways=J.elements.filter(e=>e.type==="way"&&e.nodes?.length>1);
+  const used=[...new Set(ways.flatMap(w=>w.nodes))].filter(id=>N.has(id)), H=await elevations(used.map(id=>N.get(id))), elev=new Map(); used.forEach((id,i)=>elev.set(id,H[i]));
+  const adj=new Map(), add=(a,b,e)=>{ if(!adj.has(a)) adj.set(a,[]); adj.get(a).push([b,e]); };
+  const wb=0.6*P.L, Rmin=P.R||Math.max(8,0.9*P.L);
+  const edges=[];
+  ways.forEach(w=>{ const t=w.tags||{}, hw=t.highway, ids=w.nodes.filter(id=>N.has(id)); if(ids.length<2) return;
+    const pts=ids.map(id=>N.get(id));
+    let width=parseW(t.width)||parseW(t["width:carriageway"]), wsrc="tag";
+    if(!width&&t.lanes){ const ln=parseInt(t.lanes); if(ln>0){ width=ln*3.2; wsrc="lanes"; } }
+    if(!width){ width=W_CLASS[hw]||5; wsrc="class"; }
+    const maxw=parseW(t.maxwidth);
+    const ban=["no","private"].includes(t.access)&&!["yes","designated"].includes(t.hgv)||t.motor_vehicle==="no"||t.hgv==="no"||t.goods==="no";
+    const flat=t.bridge&&t.bridge!=="no"||t.tunnel&&t.tunnel!=="no";
+    const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+hav(pts[i-1],pts[i]));
+    // 每個頂點的轉彎半徑：取前後各至少 10 m 的點算外接圓半徑
+    const rad=pts.map((p,i)=>{ let a=i,b=i; while(a>0&&cum[i]-cum[a]<10) a--; while(b<pts.length-1&&cum[b]-cum[i]<10) b++; if(a===i||b===i) return Infinity;
+      const ax=hav(pts[a],p), bx=hav(p,pts[b]), cx=hav(pts[a],pts[b]), s=(ax+bx+cx)/2, ar=Math.sqrt(Math.max(0,s*(s-ax)*(s-bx)*(s-cx))); return ar<1e-6?Infinity:ax*bx*cx/(4*ar); });
+    // 每段的坡度：往前取至少 40 m 的距離算高差（橋梁、隧道不計）
+    const slope=new Array(pts.length).fill(0);
+    if(!flat) for(let i=0;i<pts.length-1;i++){ let j=i+1; while(j<pts.length-1&&cum[j]-cum[i]<40) j++; const h0=elev.get(ids[i]),h1=elev.get(ids[j]); if(h0==null||h1==null) continue; const d=cum[j]-cum[i]; if(d<20) continue;
+      const g=Math.abs(h1-h0)/d*100; for(let k=i;k<j;k++) slope[k]=Math.max(slope[k],g); }
+    const ow=t.oneway==="yes"||t.oneway==="1"||t.oneway==="true"||hw==="motorway"||t.junction==="roundabout", rev=t.oneway==="-1";
+    const name=t.name||t.ref||HW_ZH[hw.replace("_link","")]||hw;
+    for(let i=0;i<ids.length-1;i++){
+      const R=Math.min(rad[i],rad[i+1]), off=R===Infinity?0:R<wb?99:R-Math.sqrt(R*R-wb*wb), need=P.W+off+0.6;
+      const probs=[];
+      if(ban) probs.push(L2("禁止大貨車或私人道路","No HGV / private"));
+      if(maxw&&maxw<P.W+0.2) probs.push(L2(`限寬 ${maxw} m`,`max width ${maxw} m`));
+      if(width<P.W+0.6) probs.push(L2(`路寬約 ${width.toFixed(1)} m${wsrc==="tag"?"":"（推估）"}，太窄`,`width ~${width.toFixed(1)} m too narrow`));
+      else if(R<Rmin||width<need) probs.push(L2(`急彎：轉彎半徑約 ${R.toFixed(0)} m，需路寬約 ${need.toFixed(1)} m`,`sharp curve: radius ~${R.toFixed(0)} m, needs ~${need.toFixed(1)} m`));
+      if(slope[i]>P.S) probs.push(L2(`坡度約 ${slope[i].toFixed(0)}%`,`grade ~${slope[i].toFixed(0)}%`));
+      const warn=!probs.length&&(width<P.W+1.5||slope[i]>P.S*0.8||R<Rmin*1.4)?[width<P.W+1.5?L2(`路寬約 ${width.toFixed(1)} m，餘裕小`,`width ~${width.toFixed(1)} m, tight`):"",slope[i]>P.S*0.8?L2(`坡度約 ${slope[i].toFixed(0)}%`,`grade ~${slope[i].toFixed(0)}%`):"",R<Rmin*1.4?L2(`彎道半徑約 ${R.toFixed(0)} m`,`curve ~${R.toFixed(0)} m`):""].filter(Boolean):[];
+      const cat=new Set(); if(ban) cat.add("ban"); if(maxw&&maxw<P.W+0.2) cat.add("maxw"); if(width<P.W+0.6) cat.add("narrow"); else if(R<Rmin||width<need) cat.add("curve"); if(slope[i]>P.S) cat.add("slope");
+      const wcat=new Set(); if(!cat.size){ if(width<P.W+1.5) wcat.add("narrow"); if(slope[i]>P.S*0.8) wcat.add("slope"); if(R<Rmin*1.4) wcat.add("curve"); }
+      const len=cum[i+1]-cum[i], e={a:ids[i],b:ids[i+1],len,hw,name,width,wsrc,maxw,slope:slope[i],R,need,probs,warn,cat,wcat,cost:len*(COST[hw]||2)}; edges.push(e);
+      if(!rev) add(ids[i],ids[i+1],e); if(!ow||rev) add(ids[i+1],ids[i],e); } });
+  return {N,adj,edges,Rmin};
+}
+function nearest(G,ll){ let best=null,bd=1e18; for(const [id,adjs] of G.adj){ const p=G.N.get(id); if(!adjs.length) continue; const d=(p[0]-ll.lat)**2+((p[1]-ll.lng)*Math.cos(ll.lat*Math.PI/180))**2; if(d<bd){bd=d;best=id;} } return best; }
+function dijkstra(G,s,t,relax){
+  const dist=new Map([[s,0]]), prev=new Map(), H=[[0,s]], up=(i)=>{while(i>0){const p=(i-1)>>1; if(H[p][0]<=H[i][0]) break; [H[p],H[i]]=[H[i],H[p]]; i=p;}},
+    down=(i)=>{for(;;){let l=2*i+1,r=l+1,m=i; if(l<H.length&&H[l][0]<H[m][0]) m=l; if(r<H.length&&H[r][0]<H[m][0]) m=r; if(m===i) break; [H[m],H[i]]=[H[i],H[m]]; i=m;}};
+  while(H.length){ const [d,u]=H[0]; const last=H.pop(); if(H.length){H[0]=last; down(0);} if(u===t) break; if(d>(dist.get(u)??Infinity)) continue;
+    for(const [v,e] of G.adj.get(u)||[]){ if(e.probs.length&&!relax) continue; const nd=d+e.cost*(e.probs.length?25:1); if(nd<(dist.get(v)??Infinity)){ dist.set(v,nd); prev.set(v,[u,e]); H.push([nd,v]); up(H.length-1); } } }
+  if(!prev.has(t)) return null; const path=[]; let v=t; while(v!==s){ const [u,e]=prev.get(v); path.push([u,v,e]); v=u; } return path.reverse();
+}
+$("tkGo").onclick=async()=>{
+  const P={L:+$("tkL").value||12,W:+$("tkW").value||2.5,S:+$("tkS").value||12,R:+$("tkR").value||0};
+  const pad=.03, bb=[Math.min(A.lat,B.lat)-pad,Math.min(A.lng,B.lng)-pad,Math.max(A.lat,B.lat)+pad,Math.max(A.lng,B.lng)+pad];
+  if(bb[2]-bb[0]>0.9||bb[3]-bb[1]>0.9){ out.innerHTML=`<div class="src">${L2("起訖點相距太遠（測試版限約 80 公里內），請拉近一點。","Points too far apart for the beta (~80 km max).")}</div>`; return; }
+  $("tkGo").disabled=true; const say=t=>out.innerHTML=`<div class="src"><span class="spin"></span>${t}</div>`;
+  try{
+    say(L2("向 OpenStreetMap 取得道路資料…（第一次約 10–40 秒）","Fetching OpenStreetMap roads… (10–40 s the first time)"));
+    const J=await fetchRoads(bb);
+    say(L2("讀取地形高程、計算路寬與彎道…","Reading elevation, checking widths and curves…"));
+    const G=await buildGraph(J,P), s=nearest(G,A), t=nearest(G,B);
+    if(!s||!t) throw new Error("nonode");
+    let path=dijkstra(G,s,t,false), strict=!!path; if(!path) path=dijkstra(G,s,t,true);
+    if(!path){ out.innerHTML=`<div class="tkres bad">${L2("這兩點之間找不到連通的道路（可能有一端在路網外）。","No connected road between these points.")}</div>`; return; }
+    draw(G,path,strict,P);
+  }catch(e){ console.error(e); out.innerHTML=`<div class="tkres bad">${L2("道路資料取得失敗：Overpass API 可能忙線或被網路阻擋，請稍後再試。","Could not fetch road data; Overpass may be busy or blocked. Try again later.")}</div>`; }
+  finally{ $("tkGo").disabled=!(A&&B); }
+};
+function draw(G,path,strict,P){
+  if(routeLayer) map.removeLayer(routeLayer); routeLayer=L.layerGroup().addTo(map);
+  const ll=path.map(([u])=>G.N.get(u)).concat([G.N.get(path[path.length-1][1])]);
+  L.polyline(ll,{color:"#fff",weight:10,opacity:.95,lineCap:"round",lineJoin:"round"}).addTo(routeLayer);
+  L.polyline(ll,{color:"#1a73e8",weight:6,opacity:.95,lineCap:"round",lineJoin:"round"}).addTo(routeLayer);
+  let dist=0,time=0; const issues=[], warns=[], steps=[];
+  path.forEach(([u,v,e])=>{ const seg=[G.N.get(u),G.N.get(v)];
+    if(e.probs.length){ issues.push([dist,e]); L.polyline(seg,{color:"#d93025",weight:7,opacity:1}).bindTooltip(e.probs.join("；")).addTo(routeLayer); }
+    else if(e.warn.length){ warns.push([dist,e]); L.polyline(seg,{color:"#f9ab00",weight:7,opacity:1}).bindTooltip(e.warn.join("；")).addTo(routeLayer); }
+    const last=steps[steps.length-1]; if(last&&last.name===e.name) last.d+=e.len; else steps.push({name:e.name,hw:e.hw,d:e.len,at:dist});
+    dist+=e.len; time+=e.len/1000/(Math.min(SPD[e.hw]||25,60))*60; });
+  // 同一條路上相鄰（間隔 200 m 內）的問題段合併成一則，列出最嚴重的數值
+  const merge=(list,key)=>{const outL=[]; list.forEach(([at,e])=>{const p=outL[outL.length-1];
+      if(p&&p.name===e.name&&at-p.end<200){ p.end=at+e.len; e[key].forEach(c=>p.cat.add(c)); p.minW=Math.min(p.minW,e.width); p.maxS=Math.max(p.maxS,e.slope); p.minR=Math.min(p.minR,e.R); p.est=p.est||e.wsrc!=="tag"; p.ban=p.ban||e.cat.has("ban"); p.maxw=e.maxw||p.maxw; }
+      else outL.push({name:e.name,at,end:at+e.len,cat:new Set(e[key]),minW:e.width,maxS:e.slope,minR:e.R,est:e.wsrc!=="tag",maxw:e.maxw}); }); 
+    return outL.map(x=>{const t=[]; if(x.cat.has("ban")) t.push(L2("禁止大貨車或私人道路","No HGV / private")); if(x.cat.has("maxw")) t.push(L2(`限寬 ${x.maxw} m`,`max width ${x.maxw} m`));
+      if(x.cat.has("narrow")) t.push(L2(`路寬最窄約 ${x.minW.toFixed(1)} m${x.est?"（推估）":""}`,`narrowest ~${x.minW.toFixed(1)} m${x.est?" (est.)":""}`));
+      if(x.cat.has("slope")) t.push(L2(`坡度最高約 ${x.maxS.toFixed(0)}%`,`max grade ~${x.maxS.toFixed(0)}%`));
+      if(x.cat.has("curve")) t.push(L2(`急彎，轉彎半徑最小約 ${x.minR.toFixed(0)} m`,`sharp curve, min radius ~${x.minR.toFixed(0)} m`));
+      return {...x,k:t.join("；")};});};
+  const iss=merge(issues,"cat"), wrn=merge(warns,"wcat"), km=m=>(m/1000).toFixed(m<10000?2:1), rng=x=>x.end-x.at>150?`${km(x.at)}–${km(x.end)} km`:`${km(x.at)} km`;
+  const stepsM=steps.filter(s=>s.d>=40).reduce((a,s)=>{const p=a[a.length-1]; if(p&&p.name===s.name) p.d+=s.d; else a.push({...s}); return a;},[]);
+  out.innerHTML=`<div class="tkres ${strict?"ok":"bad"}"><b>${strict?L2("找到符合條件的路線","Route found within limits"):L2("找不到完全符合條件的路線，以下是問題最少的路線","No route within all limits; showing the least-problem route")}</b>
+    <div class="tkstat">${km(dist)} km・${L2("約","~")} ${Math.max(1,Math.round(time))} ${L2("分鐘","min")}　${L2(`（車長 ${P.L} m、車寬 ${P.W} m、坡度 ≤ ${P.S}%、轉彎半徑 ≥ ${(P.R||G.Rmin).toFixed(1)} m）`,`(L ${P.L} m, W ${P.W} m, grade ≤ ${P.S}%, radius ≥ ${(P.R||G.Rmin).toFixed(1)} m)`)}</div>
+    ${iss.length?`<div class="tkh bad">${L2("不建議通行的路段","Problem segments")}</div>`+iss.map(x=>`<div class="tki">● ${rng(x)}　${hesc2(x.name)}：${hesc2(x.k)}</div>`).join(""):""}
+    ${wrn.length?`<div class="tkh warn">${L2("需注意的路段","Caution")}</div>`+wrn.slice(0,12).map(x=>`<div class="tki">● ${rng(x)}　${hesc2(x.name)}：${hesc2(x.k)}</div>`).join("")+(wrn.length>12?`<div class="tki">${L2(`另有 ${wrn.length-12} 處`,`${wrn.length-12} more`)}</div>`:""):""}
+    <div class="tkh">${L2("行駛路線","Directions")}</div><ol class="tksteps">${stepsM.map(s=>`<li>${L2(`沿 ${hesc2(s.name)} 行駛 ${km(s.d)} 公里`,`Follow ${hesc2(s.name)} for ${km(s.d)} km`)}</li>`).join("")}</ol>
+    <div class="tkleg"><span><i style="background:#1a73e8"></i>${L2("可通行","OK")}</span><span><i style="background:#f9ab00"></i>${L2("需注意","Caution")}</span><span><i style="background:#d93025"></i>${L2("不建議","Problem")}</span></div></div>`;
+  map.fitBounds(L.latLngBounds(ll).pad(.15),{paddingBottomRight:[innerWidth>760?300:20,20]});
+}
+})();}
+
 if(APP==="arch"){
 // ---------- 地號查詢 ----------
 const LQ = {mode:false, loaded:null, sect:"", pin:null};
