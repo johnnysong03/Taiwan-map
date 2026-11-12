@@ -1527,13 +1527,13 @@ const urbanDefHTML=name=>{const d=URBAN_DEF.find(x=>x[0].test(name)); return d?z
 // 資料都放在 zoning/ 資料夾，點到哪個縣市才載入該縣市的檔案：
 //   tpe.js   臺北市都市計畫使用分區（細部計畫，臺北市政府都市發展局）
 //   ntpc.js  新北市都市計畫土地使用分區（新北市政府城鄉發展局）
-//   nu-?.js  非都市土地使用分區圖（112年，內政部；? 是縣市代碼，與國土測繪中心地段查詢的 ctyCode 相同）
+//   nu-?.js  非都市土地使用分區圖（112年，內政部國土管理署；? 是縣市代碼，與國土測繪中心地段查詢的 ctyCode 相同）
 // 使用地類別沒有向量資料，讀國土測繪中心 WMTS 圖磚 nURBAN2 在該點的顏色；嘉義市、金門、連江沒有非都市向量檔，使用分區也改讀 nURBAN1。
 // 都是以點位判斷，不是逐筆地號的邊界。
 const ZSRC={
   tpe:{zh:"臺北市政府都市發展局「臺北市都市計畫使用分區圖」（細部計畫）",en:"Taipei City Urban Development Dept., urban plan zoning map (detailed plans)"},
   ntpc:{zh:"新北市政府城鄉發展局「新北市都市計畫土地使用分區及範圍圖」",en:"New Taipei City Urban and Rural Development Dept., urban plan zoning map"},
-  nu:{zh:"內政部「非都市土地使用分區圖（112年）」",en:"Ministry of the Interior, non-urban land zoning map (2023)"},
+  nu:{zh:"內政部國土管理署「非都市土地使用分區圖（112年）」",en:"National Land Management Agency (MOI), non-urban land zoning map (2023)"},
   tile:{zh:"內政部國土測繪中心 WMTS「非都市土地使用分區圖」「非都市土地使用地類別圖」",en:"NLSC WMTS layers: non-urban land zoning and land-use type"},
 };
 const zSrc=k=>L2(ZSRC[k].zh,ZSRC[k].en);
@@ -1841,7 +1841,7 @@ const SRC={
   slope:L2('資料：農業部農村發展及水土保持署<a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">115 年度山坡地範圍圖（水保法、不含六都）</a>（檔案日期 115-07-08，簡化 15 公尺）。六都的山坡地範圍由各市政府公告，這裡沒有',
     'Data: ARDSWC <a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">2026 slopeland map (Soil and Water Conservation Act, excluding the six special municipalities)</a>, file dated 2026-07-08, simplified 15 m'),
   pforest:L2('資料：農業部林業及自然保育署<a href="https://data.gov.tw/dataset/9928" target="_blank" rel="noopener">全臺保安林分布概略圖</a>（1151 版，簡化 8 公尺）。概略圖僅供參考，實際範圍以公告為準',
-    'Data: Forestry and Nature Conservation Agency <a href="https://data.gov.tw/dataset/9928" target="_blank" rel="noopener">protection forest overview</a> (May 2026 edition, simplified 8 m). Indicative only'),
+    'Data: Forestry and Nature Conservation Agency <a href="https://data.gov.tw/dataset/9928" target="_blank" rel="noopener">protection forest overview</a> (edition 1151, released May 2026, simplified 8 m). Indicative only'),
   lres:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">原住民保留地範圍資訊</a>（SHP 2022-08-22 上架，2026-11-09 下載，以地段為單位）',
     'Data: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">reserved land extent</a> (listed 2022-08-22, downloaded 2026-11-09; by land section)'),
   ltrad:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">歷年原住民族傳統領域調查成果範圍（91–98 年）</a>。這是調查成果，不是依法公告的傳統領域範圍',

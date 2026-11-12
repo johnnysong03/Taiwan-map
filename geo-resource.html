@@ -62,6 +62,11 @@ h3{font-size:13px;margin:14px 0 6px;color:var(--muted);letter-spacing:.08em}
 .typetabs button{padding:7px 18px;font-size:15px;background:var(--card)}
 .status{font-size:12.5px;color:var(--muted);min-height:1.4em}
 .warn{color:var(--accent)}
+.refs{margin:4px 0 0;padding-left:1.4em;font-size:12.5px;line-height:1.55}
+.refs li{margin:0 0 6px}
+.refs .for{display:block;color:var(--muted);font-size:11.5px}
+.refs a{word-break:break-all}
+.refs .unv{color:var(--accent);font-size:11.5px}
 footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
 </style>
 </head>
@@ -71,7 +76,7 @@ footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
     <h1 data-en="Geothermal Resource Assessment">地熱資源量評估</h1>
     <div class="sub" data-en="Monte Carlo simulation · porous, fractured, EGS and AGS (closed-loop) systems">蒙地卡羅模擬・孔隙型、裂隙型、EGS（增強型地熱）、AGS（封閉迴路）</div>
   </div>
-  <div class="top"><a href="taiwan-geothermal.html" id="back" data-en="← Back to Taiwan Geothermal Map">← 回臺灣地熱地圖</a> <button type="button" class="langbtn" id="langbtn">English</button></div>
+  <div class="top"><a href="taiwan-geothermal.html" id="back" data-en="← Back to Taiwan Geothermal Map">← 回臺灣地熱地圖</a> <a href="sources.html" data-en="Sources">資料來源</a> <button type="button" class="langbtn" id="langbtn">English</button></div>
 </header>
 <nav class="tabs typetabs" id="ttabs" aria-label="熱儲類型"></nav>
 <main>
@@ -90,6 +95,9 @@ footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
     <h3 data-en="Formulas">計算式</h3>
     <div class="formula" id="formula"></div>
     <p class="note" id="typenote"></p>
+    <h3 data-en="References">參考文獻</h3>
+    <ol class="refs" id="refs"></ol>
+    <p class="note" id="refnote"></p>
   </section>
   <section>
     <h2 data-en="Results">結果</h2>
@@ -110,7 +118,7 @@ footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
     </div>
   </section>
 </main>
-<footer data-en="Results are screening-level estimates for planning only and depend entirely on the inputs. They are not a reserve certification.">結果為規劃用的初估，完全取決於輸入參數，不構成蘊藏量認證。</footer>
+<footer><span data-en="Results are screening-level estimates for planning only and depend entirely on the inputs. They are not a reserve certification.">結果為規劃用的初估，完全取決於輸入參數，不構成蘊藏量認證。</span> <a href="sources.html" data-en="All sources and references">全部資料來源與參考文獻</a></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script>
@@ -165,7 +173,7 @@ Power density: P = A·PD
 const TYPES={
   porous:{zh:"孔隙型",en:"Porous",hasA:true,
     def:volParams("孔隙率 φ","Porosity φ",[0.05,0.10,0.15],[0.05,0.10,0.20],[5,10,15]),calc:volCalc,meth:volMeth,formula:()=>volFormula("φ"),
-    note:L2("孔隙型熱儲：熱存在岩石與孔隙流體中，以體積法計算。預設值為液態為主熱儲常見的文獻範圍，請依場址資料修改。","Porous reservoir: heat stored in rock and pore fluid, volumetric method. Defaults are typical literature ranges for a liquid-dominated reservoir; replace them with site data.")},
+    note:L2("孔隙型熱儲：熱存在岩石與孔隙流體中，以體積法計算。預設值為液態為主熱儲常用的示意範圍（未逐一對應下列文獻），請依場址資料修改。","Porous reservoir: heat stored in rock and pore fluid, volumetric method. Defaults are illustrative ranges for a liquid-dominated reservoir (not tied to a specific reference below); replace them with site data.")},
   fractured:{zh:"裂隙型",en:"Fractured",hasA:true,
     def:volParams("裂隙孔隙率 φf","Fracture porosity φf",[0.01,0.03,0.05],[0.03,0.07,0.12],[3,6,10]),calc:volCalc,meth:volMeth,formula:()=>volFormula("φf"),
     note:L2("裂隙型熱儲：流體只在裂隙中，孔隙率低、可回收比例通常較低；計算式同孔隙型，預設值改成低裂隙孔隙率與較低回收率（示意值，請依場址資料修改）。","Fractured reservoir: fluid only in fractures, so porosity and recovery are usually lower. Same formulas as porous; defaults use low fracture porosity and lower recovery (illustrative; replace with site data).")},
@@ -197,6 +205,33 @@ P = N·L·q·ηc ÷ 10⁶      （MWe，長期平均）`,
 P = N·L·q·ηc ÷ 10⁶      (MWe, long-term average)`),
     note:L2("AGS（先進地熱／封閉迴路）：流體在密閉井管中循環，靠岩石傳導取熱，不需熱儲滲透率。取熱率會隨時間衰減且依岩性與溫度而異，預設值只是範例，請提供場址或模擬結果。","AGS (closed loop): fluid circulates in sealed wellbores and heat is conducted from the rock, so no reservoir permeability is needed. The extraction rate declines over time and depends on rock and temperature; defaults are only examples, so use site or modelling values.")},
 };
+// ---------- 參考文獻（2026-11-12 查證，清單與查證結果見 docs/sources.json） ----------
+// u：未能直接取得全文核對（存在性以搜尋或目錄確認）
+const REF={
+  muffler1978:{c:"Muffler, P., & Cataldi, R. (1978). Methods for regional assessment of geothermal resources. Geothermics, 7(2–4), 53–89.",url:"https://doi.org/10.1016/0375-6505(78)90002-0"},
+  muffler1979:{c:"Muffler, L.J.P. (Ed.) (1979). Assessment of geothermal resources of the United States—1978. U.S. Geological Survey Circular 790.",url:"https://doi.org/10.3133/cir790"},
+  williams2008:{c:"Williams, C.F., Reed, M.J., & Mariner, R.H. (2008). A review of methods applied by the U.S. Geological Survey in the assessment of identified geothermal resources. USGS Open-File Report 2008-1296.",url:"https://doi.org/10.3133/ofr20081296"},
+  garg2015:{c:"Garg, S.K., & Combs, J. (2015). A reformulation of USGS volumetric “heat in place” resource estimation method. Geothermics, 55, 150–158.",url:"https://doi.org/10.1016/j.geothermics.2015.02.004"},
+  wilmarth2015:{c:"Wilmarth, M., & Stimac, J. (2015). Power density in geothermal fields. Proceedings World Geothermal Congress 2015, Melbourne, Australia.",url:"https://pangea.stanford.edu/ERE/db/WGC/papers/WGC/2015/16020.pdf",u:1},
+  zarrouk2014:{c:"Zarrouk, S.J., & Moon, H. (2014). Efficiency of geothermal power plants: A worldwide review. Geothermics, 51, 142–153.",url:"https://doi.org/10.1016/j.geothermics.2013.11.001"},
+  mit2006:{c:"Massachusetts Institute of Technology (2006). The Future of Geothermal Energy: Impact of Enhanced Geothermal Systems (EGS) on the United States in the 21st Century.",url:"https://doi.org/10.2172/1220063"},
+  sanyal2005:{c:"Sanyal, S.K., Granados, E.E., Butler, S.J., & Horne, R.N. (2005). An analysis of power generation prospects from enhanced geothermal systems. Geothermal Resources Council Transactions, 29.",url:"",u:1},
+  beckers2022:{c:"Beckers, K.F., Rangel-Jurado, N., Chandrasekar, H., Hawkins, A.J., Fulton, P.M., & Tester, J.W. (2022). Techno-economic performance of closed-loop geothermal systems for heat production and electricity generation. Geothermics, 100, 102318.",url:"https://doi.org/10.1016/j.geothermics.2021.102318"},
+  malek2022:{c:"Malek, A.E., Adams, B.M., Rossi, E., Schiegg, H.O., & Saar, M.O. (2022). Techno-economic analysis of Advanced Geothermal Systems (AGS). Renewable Energy, 186, 927–943.",url:"https://doi.org/10.1016/j.renene.2022.01.012"},
+};
+// 各類型：[文獻, 用在哪個計算式（中, 英）]
+const VOL_REFS=[["muffler1978","體積法（熱蓄量 heat in place）","Volumetric (heat in place)"],["muffler1979","體積法與回收率 R","Volumetric method and recovery factor R"],
+  ["williams2008","可用熱能法、利用效率 ηu 與蒙地卡羅","Exergy, utilization efficiency ηu and Monte Carlo"],["garg2015","以可用熱能改寫的體積法","Exergy-based reformulation of the volumetric method"],
+  ["wilmarth2015","功率密度法 PD","Power density PD"],["zarrouk2014","轉換效率 ηc","Conversion efficiency ηc"]];
+const TYPE_REFS={porous:VOL_REFS,fractured:VOL_REFS,
+  egs:[["mit2006","增產體積的熱回收與溫降","Heat recovery and drawdown in the stimulated volume"],["sanyal2005","可回收熱量比例（掃熱比例 R）","Recoverable heat fraction (swept fraction R)"],["zarrouk2014","轉換效率 ηc","Conversion efficiency ηc"]],
+  ags:[["beckers2022","封閉迴路取熱與發電","Closed-loop heat extraction and power"],["malek2022","AGS 單位長度取熱與發電","AGS heat per unit length and power"],["zarrouk2014","轉換效率 ηc","Conversion efficiency ηc"]]};
+function drawRefs(){
+  document.getElementById("refs").innerHTML=TYPE_REFS[TY].map(([k,zh,en])=>{const r=REF[k];
+    return `<li><span class="for">${L2("用於：","For: ")}${EN?en:zh}</span>${r.c}${r.url?` <a href="${r.url}" target="_blank" rel="noopener">${r.url.replace(/^https:\/\/(doi\.org\/)?/,r.url.includes("doi.org")?"doi:":"")}</a>`:""}${r.u?` <span class="unv">${L2("（全文未能於查證時取得，依目錄與引用確認存在）","(full text not retrieved; existence confirmed from indexes and citations)")}</span>`:""}</li>`;}).join("");
+  document.getElementById("refnote").innerHTML=L2(`文獻是計算式的方法依據；可用熱能法假設比熱固定，熱量可轉成功的比例取 1 − T0·ln(Tr/T0)/(Tr−T0)。各參數預設值是示意，不是取自這些文獻。查證紀錄見<a href="sources.html#lit">資料來源與參考文獻</a>。`,
+    `References are the basis of the methods. The exergy method assumes constant heat capacity, so the convertible fraction of heat is 1 − T0·ln(Tr/T0)/(Tr−T0). Default parameter values are illustrative and not taken from these references. See <a href="sources.html#lit">Sources and references</a> for the verification record.`);
+}
 const DN={fixed:L2("固定值","Fixed"),uniform:L2("均勻","Uniform"),tri:L2("三角","Triangular"),normal:L2("常態","Normal"),lognormal:L2("對數常態","Lognormal")};
 const SLOTS={fixed:["a"],uniform:["min","max"],tri:["min","mode","max"],normal:["mean","sd"],lognormal:["mean","sd"]};
 let TY=(()=>{ const h=location.hash.slice(1); if(TYPES[h]) return h; try{ const t=localStorage.getItem("georesType"); if(TYPES[t]) return t; }catch(e){} return "porous"; })();
@@ -232,6 +267,7 @@ function setType(k){
   loadP(); drawTable();
   document.getElementById("formula").textContent=T.formula();
   document.getElementById("typenote").textContent=T.note;
+  drawRefs();
   document.getElementById("areanote").innerHTML=AREA&&T.hasA?L2(`面積由地圖框選帶入：<b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?`（中心 ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)}）`:""}，預設以 ±20% 的三角分布表示不確定性。`,
     `Area from the map selection: <b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?` (centre ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)})`:""}; a ±20% triangular distribution is used by default.`)
     :AREA?L2(`這個類型不用面積（地圖帶入的 ${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km² 只用在孔隙型與裂隙型）。`,`This type does not use area (the ${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km² from the map applies to porous and fractured only).`):"";

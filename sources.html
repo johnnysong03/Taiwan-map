@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>資料來源與參考文獻</title>
+<meta name="description" content="臺灣建築地圖、臺灣地熱地圖與地熱資源量評估所用的底圖、圖層、開放資料、法規、文獻與報導，附逐筆查證結果。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 風格比照 geo-resource.html：白底卡片、深墨色、朱紅強調 */
+:root{
+  --bg:#f6f6f3; --card:#ffffff; --ink:#22313f; --muted:#5b6672; --rule:#d8dcdf; --accent:#c0392b; --a2:#1f6fb5; --ok:#2e7d4f; --warn:#b26a00;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#15191e; --card:#1d232a; --ink:#e6e9ec; --muted:#9aa5b1; --rule:#36404a; --accent:#f07a6a; --a2:#7fb2e5; --ok:#7cc49a; --warn:#e0b060; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#15191e; --card:#1d232a; --ink:#e6e9ec; --muted:#9aa5b1; --rule:#36404a; --accent:#f07a6a; --a2:#7fb2e5; --ok:#7cc49a; --warn:#e0b060; color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 var(--sans);padding:20px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+header,main,footer,.bar{max-width:1100px;margin-left:auto;margin-right:auto}
+header{margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+h1{font-size:24px;margin:0;letter-spacing:.05em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+a{color:var(--a2)}
+.top{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:13px}
+.langbtn{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:3px 10px;cursor:pointer;font:600 12px var(--sans)}
+.langbtn:focus-visible,.chips button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--a2);outline-offset:1px}
+section.card{background:var(--card);border:1px solid var(--rule);padding:14px 16px;margin-bottom:14px;min-width:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:4px 0 10px}
+.stat{border-left:3px solid var(--rule);padding:2px 10px}
+.stat b{display:block;font:500 22px var(--mono)}
+.stat span{font-size:12px;color:var(--muted)}
+.stat.ok{border-color:var(--ok)} .stat.partial{border-color:var(--warn)} .stat.fail{border-color:var(--accent)}
+.note{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px}
+.bar input,.bar select{font:13px var(--sans);color:var(--ink);background:var(--card);border:1px solid var(--rule);padding:6px 8px}
+.bar input{flex:1 1 220px;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;max-width:1100px;margin:0 auto 12px}
+.chips button{border:1px solid var(--rule);background:var(--card);color:var(--ink);padding:4px 10px;cursor:pointer;font:13px var(--sans)}
+.chips button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+h2{font-size:16px;margin:0 0 8px;letter-spacing:.08em;display:flex;gap:8px;align-items:baseline}
+h2 small{font-weight:400;color:var(--muted);font-size:12px}
+.item{border-top:1px solid var(--rule);padding:10px 0;display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:2px 10px}
+.item:first-of-type{border-top:0}
+.id{font:12px var(--mono);color:var(--muted);padding-top:2px}
+.nm{font-weight:700;overflow-wrap:anywhere}
+.meta{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.meta b{font-weight:500;color:var(--ink)}
+.url{font:12px var(--mono);overflow-wrap:anywhere}
+.badge{display:inline-block;font:600 11px var(--sans);padding:0 6px;border:1px solid currentColor;margin-left:6px;vertical-align:1px;white-space:nowrap}
+.badge.ok{color:var(--ok)} .badge.partial{color:var(--warn)} .badge.fail{color:var(--accent)} .badge.user{color:var(--muted)}
+.chk{font-size:12px;color:var(--muted);margin-top:2px}
+.chk.bad{color:var(--accent)}
+.empty{color:var(--muted);padding:20px 0;text-align:center}
+footer{font-size:12px;color:var(--muted);margin-top:18px}
+@media (max-width:560px){ .item{grid-template-columns:minmax(0,1fr)} .id{padding:0} h1{font-size:21px} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 data-en="Sources and References">資料來源與參考文獻</h1>
+    <div class="sub" data-en="Basemaps, layers, open data, regulations, literature and news used by the Taiwan Map Atlas, each with a verification result">臺灣地圖集用到的底圖、圖層、開放資料、法規、文獻與報導，逐筆附查證結果</div>
+  </div>
+  <div class="top">
+    <a href="index.html" data-en="Home">首頁</a>
+    <a href="taiwan-architecture.html" data-en="Architecture map">建築地圖</a>
+    <a href="taiwan-geothermal.html" data-en="Geothermal map">地熱地圖</a>
+    <a href="geo-resource.html" data-en="Resource assessment">資源量評估</a>
+    <button type="button" class="langbtn" id="langbtn">English</button>
+  </div>
+</header>
+<main>
+  <section class="card" aria-labelledby="sumh">
+    <h2 id="sumh" data-en="Verification summary">查證摘要</h2>
+    <div class="stats" id="stats"></div>
+    <p class="note" id="method"></p>
+    <p class="note" id="files"></p>
+  </section>
+  <div class="bar">
+    <input id="q" type="search" placeholder="搜尋名稱、機關、網址、用途…" data-en-ph="Search name, agency, URL, use…" aria-label="搜尋">
+    <select id="st" aria-label="查證狀態"></select>
+  </div>
+  <nav class="chips" id="cats" aria-label="類別"></nav>
+  <div id="list"></div>
+</main>
+<footer data-en="Verification was done from a cloud environment outside Taiwan; some government sites only accept Taiwanese IP addresses, so “not accessible” here does not always mean the source is gone.">查證是在臺灣以外的雲端環境進行，部分政府網站只接受臺灣 IP，這裡標「無法存取」不一定代表來源已經消失。</footer>
+<script src="sources-data.js"></script>
+<script>
+const EN=(()=>{try{return localStorage.getItem("lang")==="en"}catch(e){return false}})();
+const L2=(z,e)=>EN?e:z;
+if(EN){ document.documentElement.lang="en"; document.title="Sources and References";
+  document.querySelectorAll("[data-en]").forEach(el=>el.textContent=el.dataset.en);
+  document.querySelectorAll("[data-en-ph]").forEach(el=>el.placeholder=el.dataset.enPh); }
+const lb=document.getElementById("langbtn"); lb.textContent=EN?"中文":"English";
+lb.onclick=()=>{try{localStorage.setItem("lang",EN?"zh":"en")}catch(e){} location.reload();};
+
+const D=window.SOURCES, M=D.meta, ALL=D.sources;
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const GH="https://github.com/johnnysong03/Taiwan-map/blob/main-uddpjm/";
+document.getElementById("stats").innerHTML=[["",M.total,L2("全部來源","All sources")],...["ok","partial","fail","user"].map(k=>[k,M.count[k],L2(M.status[k].zh,M.status[k].en)])]
+  .map(([k,n,t])=>`<div class="stat ${k}"><b>${n}</b><span>${t}</span></div>`).join("");
+document.getElementById("method").textContent=L2(
+  `查證日期 ${M.checked}。網址實際連線測試（HTTP 狀態與頁面標題）；data.gov.tw 資料集以官方 API 比對名稱、提供機關與授權；文獻以 Crossref 比對 DOI、作者與卷頁，沒有 DOI 的會議論文以網路搜尋交叉確認。查不到的標「未能確認」，不自行補寫。`,
+  `Checked on ${M.checked}. URLs were requested directly (HTTP status and page title); data.gov.tw datasets were matched by name, publisher and licence through the official API; literature was matched by DOI, authors and pages via Crossref, and conference papers without a DOI were cross-checked by web search. Anything not found is marked “unconfirmed” rather than filled in.`);
+document.getElementById("files").innerHTML=L2(
+  `下載：<a href="${GH}docs/reference/無法存取的參考資料.xlsx">無法存取的參考資料（Excel）</a>・<a href="${GH}docs/reference/無法存取的參考資料.csv">同內容 CSV</a>・<a href="docs/sources.json">完整清單 JSON</a>`,
+  `Downloads: <a href="${GH}docs/reference/無法存取的參考資料.xlsx">inaccessible sources (Excel)</a> · <a href="${GH}docs/reference/無法存取的參考資料.csv">same as CSV</a> · <a href="docs/sources.json">full list (JSON)</a>`);
+
+const stSel=document.getElementById("st");
+stSel.innerHTML=`<option value="">${L2("全部狀態","All statuses")}</option>`+["ok","partial","fail","user"].map(k=>`<option value="${k}">${L2(M.status[k].zh,M.status[k].en)}</option>`).join("");
+let cat=(location.hash.slice(1)&&M.cats.some(c=>c.k===location.hash.slice(1)))?location.hash.slice(1):"";
+const cats=document.getElementById("cats");
+function drawCats(){
+  cats.innerHTML=[{k:"",zh:"全部",en:"All"},...M.cats].map(c=>`<button type="button" data-k="${c.k}" aria-pressed="${c.k===cat}">${EN?c.en:c.zh} <small>${c.k?ALL.filter(s=>s.cat===c.k).length:ALL.length}</small></button>`).join("");
+  cats.querySelectorAll("button").forEach(b=>b.onclick=()=>{cat=b.dataset.k; history.replaceState(null,"",cat?"#"+cat:location.pathname); drawCats(); draw();});
+}
+const link=u=>!u?"":u.includes("{")||u.endsWith("/+esm")?`<span class="url">${esc(u)}</span>`:`<a class="url" href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`;
+function item(s){
+  const st=M.status[s.status], bad=s.status==="partial"||s.status==="fail";
+  const rows=[[L2("機關／作者","Agency / author"),EN?s.org_en:s.org],[L2("日期","Date"),s.date],[L2("授權","Licence"),s.license],[L2("用在","Used in"),EN?s.used_en:s.used]]
+    .filter(r=>r[1]).map(([k,v])=>`<b>${k}</b> ${esc(v)}`).join("　");
+  return `<div class="item" id="${s.id}"><div class="id">${s.id}</div><div>
+    <div class="nm">${esc(EN?s.name_en:s.name)}<span class="badge ${s.status}">${EN?st.en:st.zh}</span></div>
+    ${rows?`<div class="meta">${rows}</div>`:""}${link(s.url)}
+    ${s.check?`<div class="chk${bad?" bad":""}">${L2("查證：","Check (in Chinese): ")}${esc(s.check)}</div>`:""}
+    ${s.fail?`<div class="chk bad">${L2("原因：","Reason: ")}${esc(s.fail)}${s.suggest?L2("；建議：","; suggestion: ")+esc(s.suggest):""}</div>`:""}
+    ${s.note?`<div class="chk">${L2("備註：","Note: ")}${esc(s.note)}</div>`:""}</div></div>`;
+}
+const q=document.getElementById("q");
+function draw(){
+  const t=q.value.trim().toLowerCase(), sv=stSel.value;
+  const hit=ALL.filter(s=>(!cat||s.cat===cat)&&(!sv||s.status===sv)&&(!t||[s.name,s.name_en,s.org,s.org_en,s.url,s.used,s.used_en,s.check,s.id].join(" ").toLowerCase().includes(t)));
+  const html=M.cats.map(c=>{const xs=hit.filter(s=>s.cat===c.k); if(!xs.length) return "";
+    return `<section class="card" id="${c.k}"><h2>${EN?c.en:c.zh}<small>${xs.length}</small></h2>${xs.map(item).join("")}</section>`;}).join("");
+  document.getElementById("list").innerHTML=html||`<div class="empty">${L2("沒有符合的來源。","No matching sources.")}</div>`;
+}
+q.oninput=draw; stSel.onchange=draw;
+drawCats(); draw();
+if(location.hash&&!cat){ const el=document.getElementById(location.hash.slice(1)); if(el) el.scrollIntoView(); }
+</script>
+</body>
+</html>
