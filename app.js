@@ -1830,6 +1830,8 @@ const geoJ=(key,style,pop)=>loadOnce(`geotex/${key}.js`,()=>!!window.GEOTEX_D?.[
 const SRC={
   indig:L2('名單：原住民族委員會公布之「原住民地區」55 個鄉（鎮、市、區），行政院 91 年 4 月 16 日院臺疆字第 0910017300 號函核定。邊界：內政部<a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">鄉鎮市區界線</a>（官方下載站無法連線，改用 taiwan-atlas 套件 2021.9.20 版的 1:10,000 簡化轉檔）',
     'List: the 55 indigenous areas published by the Council of Indigenous Peoples (Executive Yuan approval, 16 Apr 2002). Boundaries: MOI <a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">township boundaries</a> via the taiwan-atlas 2021.9.20 package (1:10,000, simplified)'),
+  tribes:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/7093" target="_blank" rel="noopener">核定部落結果</a>（737 個，資料日期 2026-09-18）與<a href="https://data.gov.tw/dataset/156632" target="_blank" rel="noopener">原住民族部落位置GIS點位表</a>（2022-07-25 版）。圓點是部落代表點；核定範圍以村里與鄰為單位，鄰界沒有公開圖資，點開部落時只能框出所在村里',
+    'Data: Council of Indigenous Peoples approved tribes (737, 2026-09-18) and tribe locations (2022-07-25). Dots are reference points; approved extents are given by village and neighbourhood, so only the village is outlined.'),
   indigEth:L2('族別人口：原住民族委員會<a href="https://data.gov.tw/dataset/145512" target="_blank" rel="noopener">台閩縣市鄉鎮市區原住民族人口－按性別族別</a>（資料日期 2026-10-28，為前一個月底結算，不分平地山地、男女合計）',
     'Population by group: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/145512" target="_blank" rel="noopener">indigenous population by township and group</a> (data date 2026-10-28)'),
   slope:L2('資料：農業部農村發展及水土保持署<a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">115 年度山坡地範圍圖（水保法、不含六都）</a>（檔案日期 115-07-08，簡化 15 公尺）。六都的山坡地範圍由各市政府公告，這裡沒有',
@@ -1852,7 +1854,32 @@ const ST={indig:a=>({color:a[1]==="山地"?"#c92a2a":"#e67700",weight:1.4,fillCo
   slope:{color:"#795548",weight:.8,fillColor:"#a1887f",fillOpacity:.28},pforest:{color:"#1b5e20",weight:.8,fillColor:"#43a047",fillOpacity:.38},
   ind:{color:"#5f3dc4",weight:1.4,fillColor:"#7950f2",fillOpacity:.3},indo:{color:"#ae3ec9",weight:1.4,dashArray:"5 3",fillColor:"#cc5de8",fillOpacity:.22},
   sale:{color:"#fff",weight:1.2,fillColor:"#1971c2",fillOpacity:.85},cft:{color:"#fff",weight:1.2,fillColor:"#e8590c",fillOpacity:.85},rent:{color:"#fff",weight:1.2,fillColor:"#2f9e44",fillOpacity:.85},
-  tsc:{color:"#fff",weight:1.2,fillColor:"#c2255c",fillOpacity:.8}};
+  tsc:{color:"#fff",weight:1.2,fillColor:"#c2255c",fillOpacity:.8},tribes:{color:"#fff",weight:1.2,fillColor:"#9c36b5",fillOpacity:.95}};
+// 原住民族部落：顏色依族別；點開時框出所在村里（核定範圍以鄰為單位，鄰界無公開圖資）
+const TRIBE_COL={阿美族:"#e03131",泰雅族:"#1971c2",排灣族:"#9c36b5",布農族:"#2f9e44",魯凱族:"#e8590c",卑南族:"#c2255c",鄒族:"#0c8599",賽夏族:"#5c940d",雅美族:"#1864ab",
+  邵族:"#d6336c",噶瑪蘭族:"#0b7285",太魯閣族:"#5f3dc4",撒奇萊雅族:"#f08c00",賽德克族:"#364fc7",拉阿魯哇族:"#a61e4d",卡那卡那富族:"#087f5b"};
+// 族名欄有「泰雅族、賽夏族」「雅美族(達悟族)」等寫法：上色取第一個出現的族名
+const tribeMain=e=>{let best=null,bi=1e9; for(const k of Object.keys(TRIBE_COL)){const i=e.indexOf(k); if(i>=0&&i<bi){bi=i;best=k;}} return best;};
+let tribeHi=null;
+function tribeLayer(D){
+  const g=L.layerGroup(), V={}; D.vil.forEach(([k,ps])=>V[k]=ps);
+  const fixV=(c,t,v)=>{const k=c+t+v; return D.fix?.[k]||k;};
+  D.pts.forEach(([lat,lng,nm,lang,eth,c,t,vs,lin,yr,spot])=>{
+    const m=L.circleMarker([lat,lng],{renderer:rd,radius:5.5,color:"#fff",weight:1.2,fillColor:TRIBE_COL[tribeMain(eth)]||"#555",fillOpacity:.95});
+    m.bindTooltip(`${hesc2(nm)}${lang?`（${hesc2(lang)}）`:""}`,{direction:"top"});
+    const vils=vs.split(/[、,，及與\/]/).map(v=>v.trim()).filter(Boolean), vk=vils.map(v=>fixV(c,t,v));
+    const vtxt=vk.map(k=>k.slice((c+t).length)).join("、");
+    m.bindPopup(()=>lpop(`${hesc2(nm)}${lang?` <span class="m">${hesc2(lang)}</span>`:""}`,`${hesc2(eth)}・${hesc2(c+t)}`,
+      tab([[L2("核定範圍","Approved extent"),`${hesc2(vtxt)}${lin?` ${hesc2(lin)} ${L2("鄰","neighbourhoods")}`:""}`],[L2("核定年","Approved"),yr?L2(`民國 ${yr} 年`,`${yr+1911}`):""],[L2("代表點","Reference point"),hesc2(spot)]])+
+      `<div class="m" style="margin-top:6px">${L2("虛線框是部落所在的村里；核定範圍只到其中幾鄰，鄰界沒有公開圖資，實際範圍比框線小。","The dashed outline is the village; the approved extent covers only some neighbourhoods within it.")}</div>`,SRC.tribes));
+    m.on("popupopen",()=>{ if(tribeHi) map.removeLayer(tribeHi); tribeHi=L.layerGroup();
+      vk.forEach(k=>(V[k]||[]).forEach(rings=>L.polygon(rings.map(dec5r),{renderer:rd,color:TRIBE_COL[tribeMain(eth)]||"#555",weight:2.2,dashArray:"6 4",fill:true,fillOpacity:.08,interactive:false}).addTo(tribeHi)));
+      tribeHi.addTo(map); });
+    m.on("popupclose",()=>{ if(tribeHi){ map.removeLayer(tribeHi); tribeHi=null; } });
+    m._kml={name:nm,desc:`${eth} ${c}${t}${vtxt} ${lin}鄰 ${lang}`};
+    m.addTo(g); });
+  return g;
+}
 // 只有地段地號的清單：依鄉鎮彙總成圓點（面積越大圓越大），點開列出清單
 const NPA_SET={sale:["擬讓售房地","Negotiated sale"],cft:["預告標售","Upcoming tender sale"],rent:["標租","Tender lease"]};
 const fmtA=m=>m>=1e4?L2(`${(m/1e4).toFixed(2)} 公頃`,`${(m/1e4).toFixed(2)} ha`):L2(`${Math.round(m).toLocaleString()} 平方公尺`,`${Math.round(m).toLocaleString()} m²`);
@@ -1880,6 +1907,8 @@ const LX=[
       `<div class="m" style="margin-top:6px">${L2("依設籍人口統計，人數最多的族群不代表傳統領域的歸屬；各族傳統領域請參考「原住民傳統領域」圖層。","Counts are registered residents; the largest group does not determine traditional territory.")}</div>`:"";
       return lpop(a[0],a[1]==="山地"?L2("山地原住民鄉（區）","Mountain indigenous township"):L2("平地原住民鄉（鎮、市）","Plains indigenous township"),body,SRC.indig+"<br>"+SRC.indigEth);});},
     leg:[[ST.indig(["","山地"]),L2("山地原住民鄉（區），30 個","Mountain indigenous townships (30)")],[ST.indig(["","平地"]),L2("平地原住民鄉（鎮、市），25 個","Plains indigenous townships (25)")]]},
+  {k:"tribes",zh:"原住民族部落（核定 737 個）",en:"Indigenous tribes (737 approved)",make:async()=>tribeLayer(await loadLand("tribes")),
+    leg:[[{color:"#fff",fillColor:"#555"},L2("部落代表點，顏色依族別（滑過看名稱，點開看核定範圍）","Tribe reference points, coloured by people")]]},
   {k:"lres",zh:"原住民保留地",en:"Indigenous reserved land",geo:1,make:()=>geoJ("land_reserve",ST.lres,p=>lpop(hesc2(p.sect),`${hesc2(p.county)}${hesc2(p.town)}・${hesc2(p.code)}`,
     `<div class="m">${L2("範圍以地段為單位；個別土地是否為原住民保留地，以地政機關的土地登記為準。","Grouped by land section; the land register is authoritative.")}</div>`,SRC.lres)),
     leg:[[ST.lres,L2("原住民保留地（點地圖可查是否在範圍內）","Reserved land (click the map to check a point)")]]},
@@ -1908,7 +1937,10 @@ const LX=[
 const on={}, layers={}, rows=fs.querySelector("#lxrows"), lg=fs.querySelector("#lxlegend");
 const luiOver=OVERS["國土利用現況調查"];
 let legend=function(msg){
-  const parts=LX.filter(x=>on[x.k]).map(x=>`<div class="zl"><b>${L2(x.zh,x.en)}</b>${x.leg.map(([st,t])=>`<span><i style="background:${st.fillColor}${st.color==="#fff"?"":"55"};border:1.5px ${st.dashArray?"dashed":"solid"} ${st.color==="#fff"?st.fillColor:st.color}"></i>${t}</span>`).join("")}<div class="src">${SRC[x.src||x.k]}</div></div>`);
+  const parts=LX.filter(x=>on[x.k]).map(x=>x.k==="tribes"&&window.LANDDATA?.tribes?`<div class="zl"><b>${L2(x.zh,x.en)}</b>`+
+    Object.keys(TRIBE_COL).filter(e=>window.LANDDATA.tribes.pts.some(p=>tribeMain(p[4])===e)).map(e=>`<span><i style="background:${TRIBE_COL[e]};border-radius:50%"></i>${e}</span>`).join("")+
+    `<div class="src">${L2("多族部落以第一個列名的族別著色。","Multi-people tribes use the first listed people's colour.")}${SRC.tribes}。${L2(`另有 ${window.LANDDATA.tribes.nopt.length} 個部落在點位表裡找不到座標，沒有畫出：`,`${window.LANDDATA.tribes.nopt.length} tribes have no coordinates and are not shown: `)}${window.LANDDATA.tribes.nopt.map(r=>r[0]).join("、")}</div></div>`
+    :`<div class="zl"><b>${L2(x.zh,x.en)}</b>${x.leg.map(([st,t])=>`<span><i style="background:${st.fillColor}${st.color==="#fff"?"":"55"};border:1.5px ${st.dashArray?"dashed":"solid"} ${st.color==="#fff"?st.fillColor:st.color}"></i>${t}</span>`).join("")}<div class="src">${SRC[x.src||x.k]}</div></div>`);
   if(luiOver&&map.hasLayer(luiOver)&&window.LUI) parts.push(`<div class="zl"><b>${L2("國土利用現況調查（第一級）","Land-use survey (level 1)")}</b>`+Object.entries(window.LUI.l1).map(([c,[n,rgb]])=>`<span><i style="background:rgb(${rgb.join(",")})"></i>${c} ${n}</span>`).join("")+
     `<div class="src">${L2("圖磚用第三級 93 類各自的顏色，這裡只列第一級的代表色；點地圖可查該點的第三級類別與分類說明。","Tiles use 93 level-3 colours; only level-1 colours are listed. Click the map for the level-3 class and its definition.")}</div></div>`);
   if(msg) parts.push(`<div class="src">${msg}</div>`);
@@ -1936,7 +1968,7 @@ const GROUPS=[
   {id:"terrain",zh:"地形",en:"Terrain",overs:["地形陰影","等高線","等高線（國土測繪中心圖磚）"]},
   {id:"use",zh:"土地使用與分區",en:"Land use & zoning",overs:["國土利用現況調查"],lx:["slope"],move:["#zoning","#own"],
     notes:[L2("點地圖可查國土利用類別、土地使用分區與原住民保留地（地熱地圖要先勾「環境資料」裡的「土地使用分區」）。","Click the map for the land-use class, zoning and reserved land (on the geothermal map, turn on zoning under Environment first).")]},
-  {id:"indig",zh:"原住民族",en:"Indigenous lands",lx:["indig","lres","ltrad","g_land_reserve","g_land_trad","g_land_tradname"]},
+  {id:"indig",zh:"原住民族",en:"Indigenous lands",lx:["indig","tribes","lres","ltrad","g_land_reserve","g_land_trad","g_land_tradname"]},
   {id:"cons",zh:"保育與災害",en:"Conservation & hazards",overs:["地質敏感區（山崩與地滑）","土壤液化潛勢"],lx:["g_land_np","pforest"]},
   {id:"prop",zh:"產業與國公有地",en:"Industry & public land",lx:["ind","indo","npa_sale","npa_cft","npa_rent","tsc"],
     notes:[L2("國產署、台糖只公布地段地號，圓點畫在鄉鎮代表點，點開可看清單。國產署沒有公開「閒置土地」清單，這裡用擬讓售、預告標售、標租三份資料代替。","National property and Taiwan Sugar publish only section and lot numbers; dots sit at township reference points. Open a dot for the list.")]},
