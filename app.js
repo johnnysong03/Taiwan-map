@@ -2676,18 +2676,26 @@ function buildChatPane(){
   banner.innerHTML=`<span class="t">${L2("點選起點","Click the starting point")}</span><button type="button" class="linkbtn" data-a="done">${L2("完成","Done")}</button><button type="button" class="linkbtn" data-a="undo">${L2("復原","Undo")}</button><button type="button" class="linkbtn" data-a="x">${L2("取消","Cancel")}</button>`;
   document.getElementById("mapwrap").appendChild(banner);
   const bt=banner.querySelector(".t");
-  let mode=false, pts=[], line=null, rubber=null, dots=null, down=null;
+  let mode=false, pts=[], line=null, rubber=null, dots=null, down=null, live=null, tip=null;
   const total=a=>a.reduce((s,p,i)=>i?s+map.distance(a[i-1],p):0,0);
-  const refresh=()=>{ line.setLatLngs(pts); dots.clearLayers();
+  // 畫的過程中：每段中點即時標段長，最後一點標目前總長
+  const liveLabels=()=>{ live.clearLayers();
+    for(let i=1;i<pts.length;i++) L.tooltip({permanent:true,direction:"center",className:"distseg",interactive:false})
+      .setLatLng(L.latLngBounds(pts[i-1],pts[i]).getCenter()).setContent(len(map.distance(pts[i-1],pts[i]))).addTo(live);
+    if(pts.length>1) L.tooltip({permanent:true,direction:"right",offset:[8,0],className:"measedge",interactive:false})
+      .setLatLng(pts[pts.length-1]).setContent(`${L2("總長","Total")} ${len(total(pts))}`).addTo(live); };
+  const refresh=()=>{ line.setLatLngs(pts); dots.clearLayers(); liveLabels();
     pts.forEach((p,i)=>L.circleMarker(p,{radius:4,color:"#fff",weight:2,fillColor:"#c0392b",fillOpacity:1,interactive:false}).addTo(dots));
     bt.textContent=pts.length<2?L2(pts.length?"點下一個點":"點選起點",pts.length?"Click the next point":"Click the starting point")
       :`${L2("總長","Total")} ${len(total(pts))}${L2("（雙擊或按完成結束）"," (double-click or Done)")}`; };
   const start=()=>{ mode=true; pts=[]; banner.hidden=false; mc.classList.add("distmode"); map.doubleClickZoom.disable(); map.closePopup();
     line=L.polyline([],{color:"#c0392b",weight:3,interactive:false}).addTo(group); rubber=L.polyline([],{color:"#c0392b",weight:2,dashArray:"4 5",interactive:false}).addTo(group);
-    dots=L.layerGroup().addTo(group); btn.textContent=L2("取消量測","Cancel"); refresh();
+    dots=L.layerGroup().addTo(group); live=L.layerGroup().addTo(group);
+    tip=L.tooltip({permanent:true,direction:"right",offset:[14,0],className:"measedge distlive",interactive:false});
+    btn.textContent=L2("取消量測","Cancel"); refresh();
     if(MOBILE.matches){ if(!lay.classList.contains("min")) document.getElementById("lmin").click(); sheet("peek"); } };
   const stop=keep=>{ pts=pts.filter((p,i)=>!i||map.distance(pts[i-1],p)>0.5); line?.setLatLngs(pts); /* 雙擊會多點兩次同一點，去掉重複 */ mode=false; banner.hidden=true; mc.classList.remove("distmode"); setTimeout(()=>map.doubleClickZoom.enable(),300);
-    btn.textContent=L2("量測距離","Measure a distance"); group.removeLayer(rubber);
+    btn.textContent=L2("量測距離","Measure a distance"); group.removeLayer(rubber); group.removeLayer(live); if(tip) map.removeLayer(tip);
     if(!keep||pts.length<2){ group.removeLayer(line); group.removeLayer(dots); return; }
     const fin=pts.slice(), segs=fin.slice(1).map((p,i)=>map.distance(fin[i],p)), tot=segs.reduce((a,b)=>a+b,0);
     line.setStyle({interactive:true}); line.options.interactive=true; group.removeLayer(line); line.addTo(group);
@@ -2708,10 +2716,13 @@ function buildChatPane(){
   btn.onclick=()=>mode?stop(false):start();
   banner.querySelector('[data-a="done"]').onclick=()=>stop(true);
   banner.querySelector('[data-a="x"]').onclick=()=>stop(false);
-  banner.querySelector('[data-a="undo"]').onclick=()=>{ pts.pop(); refresh(); rubber.setLatLngs([]); };
+  banner.querySelector('[data-a="undo"]').onclick=()=>{ pts.pop(); refresh(); rubber.setLatLngs([]); if(tip) map.removeLayer(tip); };
   document.addEventListener("keydown",e=>{ if(!mode) return; if(e.key==="Escape") stop(false); if(e.key==="Enter") stop(true); });
   mc.addEventListener("pointerdown",e=>{ if(mode) down=[e.clientX,e.clientY]; },true);
-  mc.addEventListener("pointermove",e=>{ if(!mode||!pts.length||e.pointerType!=="mouse") return; rubber.setLatLngs([pts[pts.length-1],map.mouseEventToLatLng(e)]); },true);
+  mc.addEventListener("pointermove",e=>{ if(!mode||!pts.length||e.pointerType!=="mouse") return;
+    const ll=map.mouseEventToLatLng(e), seg=map.distance(pts[pts.length-1],ll); rubber.setLatLngs([pts[pts.length-1],ll]);
+    tip.setLatLng(ll).setContent(`${L2("本段","This leg")} ${len(seg)}<br>${L2("總長","Total")} ${len(total(pts)+seg)}`); if(!map.hasLayer(tip)) tip.addTo(map); },true);
+  mc.addEventListener("mouseleave",()=>{ if(mode&&tip) map.removeLayer(tip); });
   mc.addEventListener("click",e=>{ if(!mode||e.target.closest(".leaflet-control")) return; e.stopPropagation(); e.preventDefault();
     if(down&&Math.hypot(e.clientX-down[0],e.clientY-down[1])>6) return; // 拖曳地圖不算點
     pts.push(map.mouseEventToLatLng(e)); refresh(); },true);

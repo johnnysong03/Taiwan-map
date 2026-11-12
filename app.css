@@ -559,3 +559,5 @@ details.zrule>div{margin:4px 0;line-height:1.6}
 .leaflet-tooltip.measedge{background:#1f6fb5;color:#fff;border:0;box-shadow:0 1px 4px rgba(0,0,0,.25);padding:2px 7px;font:700 12px var(--body);font-variant-numeric:tabular-nums;white-space:nowrap}
 .leaflet-tooltip-top.measedge::before{border-top-color:#1f6fb5}
 .leaflet-tooltip-right.measedge::before{border-right-color:#1f6fb5}
+.leaflet-tooltip.distlive{background:#c0392b;line-height:1.35}
+.leaflet-tooltip-right.distlive::before{border-right-color:#c0392b}
