@@ -596,3 +596,5 @@ details.lgrp .gcnt{margin-left:auto;font:500 11px var(--mono,monospace);color:va
 #qkpanel .dual input[type=range]::-moz-range-track{background:none}
 #qkpanel .dual input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--ink);outline-offset:2px}
 @media (max-width:760px){ #qkpanel .dual{height:32px} #qkpanel .dual::before{top:12px} #qkpanel .dual input[type=range]{height:32px} #qkpanel .dual input[type=range]::-webkit-slider-thumb{width:26px;height:26px} }
+.leaflet-tooltip.tlabel{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:11px;text-shadow:0 0 3px rgba(0,0,0,.8);padding:0}
+.leaflet-tooltip.tlabel::before{display:none}

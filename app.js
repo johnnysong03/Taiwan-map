@@ -1832,6 +1832,10 @@ const SRC={
     'List: the 55 indigenous areas published by the Council of Indigenous Peoples (Executive Yuan approval, 16 Apr 2002). Boundaries: MOI <a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">township boundaries</a> via the taiwan-atlas 2021.9.20 package (1:10,000, simplified)'),
   tribes:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/7093" target="_blank" rel="noopener">核定部落結果</a>（737 個，資料日期 2026-09-18）與<a href="https://data.gov.tw/dataset/156632" target="_blank" rel="noopener">原住民族部落位置GIS點位表</a>（2022-07-25 版）。圓點是部落代表點；核定範圍以村里與鄰為單位，鄰界沒有公開圖資，點開部落時只能框出所在村里',
     'Data: Council of Indigenous Peoples approved tribes (737, 2026-09-18) and tribe locations (2022-07-25). Dots are reference points; approved extents are given by village and neighbourhood, so only the village is outlined.'),
+  port:L2('資料：臺灣港務公司<a href="https://data.gov.tw/dataset/8367" target="_blank" rel="noopener">國際商港貨物裝卸量</a>與<a href="https://data.gov.tw/dataset/8368" target="_blank" rel="noopener">貨櫃裝卸量</a>（2026-11-12 下載，最新到 2026 年 9 月）。開放資料沒有港口座標，位置是依國土測繪中心國土利用現況調查圖磚的「商港」範圍判讀，圓點落在港區內',
+    'Data: Taiwan International Ports Corp. cargo and container throughput (to Sep 2026). Positions read from the "commercial port" class of the NLSC land-use survey tiles.'),
+  air:L2('資料：交通部民用航空局<a href="https://data.gov.tw/dataset/31915" target="_blank" rel="noopener">民航運輸各機場營運量</a>（115 年 9 月版）；位置（機場基準點）與跑道取自民航局<a href="https://ais.caa.gov.tw/eaip/" target="_blank" rel="noopener">飛航指南 eAIP</a>（2026-10-29 生效版）。屏東、新竹機場近年沒有民航運量，未列',
+    'Data: Civil Aeronautics Administration airport traffic (Sep 2026 edition); reference points and runways from the CAA eAIP (effective 2026-10-29).'),
   indigEth:L2('族別人口：原住民族委員會<a href="https://data.gov.tw/dataset/145512" target="_blank" rel="noopener">台閩縣市鄉鎮市區原住民族人口－按性別族別</a>（資料日期 2026-10-28，為前一個月底結算，不分平地山地、男女合計）',
     'Population by group: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/145512" target="_blank" rel="noopener">indigenous population by township and group</a> (data date 2026-10-28)'),
   slope:L2('資料：農業部農村發展及水土保持署<a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">115 年度山坡地範圍圖（水保法、不含六都）</a>（檔案日期 115-07-08，簡化 15 公尺）。六都的山坡地範圍由各市政府公告，這裡沒有',
@@ -1854,7 +1858,7 @@ const ST={indig:a=>({color:a[1]==="山地"?"#c92a2a":"#e67700",weight:1.4,fillCo
   slope:{color:"#795548",weight:.8,fillColor:"#a1887f",fillOpacity:.28},pforest:{color:"#1b5e20",weight:.8,fillColor:"#43a047",fillOpacity:.38},
   ind:{color:"#5f3dc4",weight:1.4,fillColor:"#7950f2",fillOpacity:.3},indo:{color:"#ae3ec9",weight:1.4,dashArray:"5 3",fillColor:"#cc5de8",fillOpacity:.22},
   sale:{color:"#fff",weight:1.2,fillColor:"#1971c2",fillOpacity:.85},cft:{color:"#fff",weight:1.2,fillColor:"#e8590c",fillOpacity:.85},rent:{color:"#fff",weight:1.2,fillColor:"#2f9e44",fillOpacity:.85},
-  tsc:{color:"#fff",weight:1.2,fillColor:"#c2255c",fillOpacity:.8},tribes:{color:"#fff",weight:1.2,fillColor:"#9c36b5",fillOpacity:.95}};
+  tsc:{color:"#fff",weight:1.2,fillColor:"#c2255c",fillOpacity:.8},port:{color:"#fff",weight:1.2,fillColor:"#1c4e80",fillOpacity:.8},air:{color:"#fff",weight:1.2,fillColor:"#c92a2a",fillOpacity:.8},tribes:{color:"#fff",weight:1.2,fillColor:"#9c36b5",fillOpacity:.95}};
 // 原住民族部落：顏色依族別；點開時框出所在村里（核定範圍以鄰為單位，鄰界無公開圖資）
 const TRIBE_COL={阿美族:"#e03131",泰雅族:"#1971c2",排灣族:"#9c36b5",布農族:"#2f9e44",魯凱族:"#e8590c",卑南族:"#c2255c",鄒族:"#0c8599",賽夏族:"#5c940d",雅美族:"#1864ab",
   邵族:"#d6336c",噶瑪蘭族:"#0b7285",太魯閣族:"#5f3dc4",撒奇萊雅族:"#f08c00",賽德克族:"#364fc7",拉阿魯哇族:"#a61e4d",卡那卡那富族:"#087f5b"};
@@ -1878,6 +1882,28 @@ function tribeLayer(D){
     m.on("popupclose",()=>{ if(tribeHi){ map.removeLayer(tribeHi); tribeHi=null; } });
     m._kml={name:nm,desc:`${eth} ${c}${t}${vtxt} ${lin}鄰 ${lang}`};
     m.addTo(g); });
+  return g;
+}
+// 國際商港與民用機場：圓點大小依貨運量（平方根比例）
+function transportLayer(D,kind){
+  const g=L.layerGroup(), list=kind==="port"?D.ports:D.air, val=x=>kind==="port"?x.tot:x.cargo, mx=Math.max(...list.map(val)), col=kind==="port"?"#1c4e80":"#c92a2a";
+  const fmt=n=>Math.round(n).toLocaleString();
+  list.forEach(x=>{ const r=6+Math.sqrt(val(x)/mx)*24;
+    const m=L.circleMarker(x.ll,{renderer:rd,radius:r,color:"#fff",weight:1.5,fillColor:col,fillOpacity:.75});
+    m.bindTooltip(kind==="port"?L2(`${x.n}：${(x.tot/1e6).toFixed(1)} 百萬計費噸`,`${x.n}: ${(x.tot/1e6).toFixed(1)} M revenue tons`):L2(`${x.n}：貨運 ${fmt(x.cargo)} 公噸`,`${x.n}: ${fmt(x.cargo)} t cargo`),{direction:"top"});
+    m.bindPopup(()=>kind==="port"?lpop(hesc2(x.n),L2("國際商港","International commercial port"),tab([
+        [L2(`${x.y} 年貨物裝卸量`,`${x.y} cargo throughput`),L2(`${fmt(x.tot)} 計費噸`,`${fmt(x.tot)} revenue tons`)],
+        [L2("　貨櫃貨","  Container"),fmt(x.box)],[L2("　散雜貨","  Bulk/general"),fmt(x.bulk)],[L2("　管道貨","  Pipeline"),fmt(x.pipe)],
+        [L2(`${x.y} 年貨櫃裝卸量`,`${x.y} containers`),`${fmt(x.teu)} TEU`],
+        [L2(`最新月份（${x.last.slice(0,4)}-${x.last.slice(4)}）`,`Latest month (${x.last.slice(0,4)}-${x.last.slice(4)})`),L2(`${fmt(x.lastTot)} 計費噸`,`${fmt(x.lastTot)} revenue tons`)],
+        [L2("判讀到的商港面積","Commercial port area (from tiles)"),L2(`約 ${x.ha} 公頃`,`~${x.ha} ha`)]])+
+        `<div class="m" style="margin-top:6px">${L2("計費噸：貨物以重量噸或體積噸計，取較大者。","Revenue ton: the larger of weight or volume tonnage.")}</div>`,SRC.port)
+      :lpop(hesc2(x.n),`${x.icao}`,tab([[L2(`${x.y} 年貨運`,`${x.y+1911} cargo`),L2(`${fmt(x.cargo)} 公噸`,`${fmt(x.cargo)} t`)],[L2("旅客","Passengers"),L2(`${fmt(x.pax)} 人次`,fmt(x.pax))],
+        [L2("起降架次","Aircraft movements"),fmt(x.mv)],[L2("跑道","Runway"),`${x.rwy} × ${x.rww} m`]])+
+        `<div class="m" style="margin-top:6px">${L2("跑道為 eAIP AD 2.12 所列第一條跑道的長寬；有兩條跑道的機場只列其中一條。","Runway is the first one listed in eAIP AD 2.12.")}</div>`,SRC.air));
+    m._kml={name:x.n,desc:kind==="port"?`${x.y} 年貨物裝卸量 ${fmt(x.tot)} 計費噸，貨櫃 ${fmt(x.teu)} TEU`:`${x.y} 年貨運 ${fmt(x.cargo)} 公噸，旅客 ${fmt(x.pax)} 人次`};
+    m.addTo(g);
+    if(r>12) L.tooltip({permanent:true,direction:"center",className:"tlabel"}).setLatLng(x.ll).setContent(hesc2(x.n.replace(/國際機場|機場/,""))).addTo(g); });
   return g;
 }
 // 只有地段地號的清單：依鄉鎮彙總成圓點（面積越大圓越大），點開列出清單
@@ -1929,6 +1955,10 @@ const LX=[
     make:async()=>{const D=await loadLand("npa"); const rows=D.rows.filter(r=>r[0]===k).map(r=>({c:r[1],t:r[2],s:r[3],no:r[4],area:r[5],use:r[6],x:r[7]}));
       return townDots(D,rows,r=>r.c+r.t,ST[k],L2(`國產署${zh}`,en),r=>`<div class="prow"><b>${hesc2(r.s)} ${hesc2(r.no)}</b>　${fmtA(r.area)}${r.use?`・${hesc2(r.use)}`:""}${r.x?`<br><span class="m">${hesc2(r.x)}</span>`:""}</div>`,SRC.npa);},
     leg:[[ST[k],L2(`國產署${zh}：圓點位置為鄉鎮代表點，圓越大筆數越多`,`${en}: township reference points; larger = more parcels`)]]})),
+  {k:"port",zh:"國際商港（圓點大小依貨物裝卸量）",en:"International ports (sized by cargo)",make:async()=>transportLayer(await loadLand("transport"),"port"),
+    leg:[[{color:"#fff",fillColor:"#1c4e80"},L2("國際商港：圓越大，2025 年貨物裝卸量（計費噸）越多","Ports: larger = more 2025 cargo")]]},
+  {k:"air",zh:"民用機場（圓點大小依貨運量）",en:"Civil airports (sized by cargo)",make:async()=>transportLayer(await loadLand("transport"),"air"),
+    leg:[[{color:"#fff",fillColor:"#c92a2a"},L2("民用機場：圓越大，114 年貨運噸數越多","Airports: larger = more 2025 cargo")]]},
   {k:"tsc",zh:"台糖可供出租土地（依鄉鎮彙總）",en:"Taiwan Sugar land for lease (by township)",src:"tsc",
     make:async()=>{const D=await loadLand("tsc"); const rows=D.rows.map(r=>({c:r[0],t:r[1],s:r[2],no:r[3],area:r[4],z:r[5],u:r[6],unit:r[7]}));
       return townDots(D,rows,r=>r.c+r.t,ST.tsc,L2("台糖可供出租土地","Taiwan Sugar land for lease"),r=>`<div class="prow"><b>${hesc2(r.s)} ${hesc2(r.no)}</b>　${fmtA(r.area)}・${hesc2(r.z)}${r.u&&r.u!=="無"?`／${hesc2(r.u)}`:""}<br><span class="m">${L2("經管","Unit")}：${hesc2(r.unit)}</span></div>`,SRC.tsc);},
@@ -1970,6 +2000,7 @@ const GROUPS=[
     notes:[L2("點地圖可查國土利用類別、土地使用分區與原住民保留地（地熱地圖要先勾「環境資料」裡的「土地使用分區」）。","Click the map for the land-use class, zoning and reserved land (on the geothermal map, turn on zoning under Environment first).")]},
   {id:"indig",zh:"原住民族",en:"Indigenous lands",lx:["indig","tribes","lres","ltrad","g_land_reserve","g_land_trad","g_land_tradname"]},
   {id:"cons",zh:"保育與災害",en:"Conservation & hazards",overs:["地質敏感區（山崩與地滑）","土壤液化潛勢"],lx:["g_land_np","pforest"]},
+  {id:"trans",zh:"港口與機場",en:"Ports & airports",lx:["port","air"]},
   {id:"prop",zh:"產業與國公有地",en:"Industry & public land",lx:["ind","indo","npa_sale","npa_cft","npa_rent","tsc"],
     notes:[L2("國產署、台糖只公布地段地號，圓點畫在鄉鎮代表點，點開可看清單。國產署沒有公開「閒置土地」清單，這裡用擬讓售、預告標售、標租三份資料代替。","National property and Taiwan Sugar publish only section and lot numbers; dots sit at township reference points. Open a dot for the list.")]},
 ];
