@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>地熱資源量評估</title>
-<meta name="description" content="以蒙地卡羅模擬評估地熱資源量：體積法、可用熱能（exergy）法與功率密度法。">
+<meta name="description" content="以蒙地卡羅模擬評估地熱資源量：孔隙型、裂隙型、EGS 與 AGS。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -58,6 +58,8 @@ h3{font-size:13px;margin:14px 0 6px;color:var(--muted);letter-spacing:.08em}
 .tabs button{border:1px solid var(--rule);background:transparent;color:var(--ink);padding:4px 10px;cursor:pointer;font:13px var(--sans)}
 .tabs button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
 .empty{color:var(--muted);padding:30px 0;text-align:center}
+.typetabs{max-width:1280px;margin:0 auto 12px}
+.typetabs button{padding:7px 18px;font-size:15px;background:var(--card)}
 .status{font-size:12.5px;color:var(--muted);min-height:1.4em}
 .warn{color:var(--accent)}
 footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
@@ -67,10 +69,11 @@ footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
 <header>
   <div>
     <h1 data-en="Geothermal Resource Assessment">地熱資源量評估</h1>
-    <div class="sub" data-en="Monte Carlo simulation · volumetric (heat in place), exergy and power density methods">蒙地卡羅模擬・體積法（熱蓄量）、可用熱能（exergy）法、功率密度法</div>
+    <div class="sub" data-en="Monte Carlo simulation · porous, fractured, EGS and AGS (closed-loop) systems">蒙地卡羅模擬・孔隙型、裂隙型、EGS（增強型地熱）、AGS（封閉迴路）</div>
   </div>
   <div class="top"><a href="taiwan-geothermal.html" id="back" data-en="← Back to Taiwan Geothermal Map">← 回臺灣地熱地圖</a> <button type="button" class="langbtn" id="langbtn">English</button></div>
 </header>
+<nav class="tabs typetabs" id="ttabs" aria-label="熱儲類型"></nav>
 <main>
   <section>
     <h2 data-en="Parameters">參數</h2>
@@ -86,7 +89,7 @@ footer{max-width:1280px;margin:18px auto 0;font-size:12px;color:var(--muted)}
     </div>
     <h3 data-en="Formulas">計算式</h3>
     <div class="formula" id="formula"></div>
-    <p class="note" data-en="Defaults are typical literature ranges for a liquid-dominated reservoir, not values for a specific site. Replace them with your own site data.">預設值是液態為主熱儲常見的文獻範圍，不是特定場址的數值，請依場址資料修改。</p>
+    <p class="note" id="typenote"></p>
   </section>
   <section>
     <h2 data-en="Results">結果</h2>
@@ -119,31 +122,89 @@ if(EN){ document.documentElement.lang="en"; document.title="Geothermal Resource 
 document.getElementById("langbtn").textContent=EN?"中文":"English";
 document.getElementById("langbtn").onclick=()=>{try{localStorage.setItem("lang",EN?"zh":"en")}catch(e){} location.reload();};
 
-// ---------- 參數 ----------
+// ---------- 熱儲類型與參數 ----------
 // 分布：fixed（a）、uniform（a 最小、b 最大）、tri（a 最小、b 最可能、c 最大）、normal（a 平均、b 標準差）、lognormal（a 平均、b 標準差）
 const Q=new URLSearchParams(location.search), AREA=+Q.get("area")||0;
-const DEF=[
-  {k:"A",  zh:"面積 A",en:"Area A",u:"km²",d:"tri",v:AREA?[+(AREA*0.8).toPrecision(4),+AREA.toPrecision(4),+(AREA*1.2).toPrecision(4)]:[2,4,6],lo:0},
-  {k:"h",  zh:"熱儲厚度 h",en:"Reservoir thickness h",u:"m",d:"tri",v:[500,1000,1500],lo:0},
-  {k:"Tr", zh:"熱儲溫度 Tr",en:"Reservoir temperature Tr",u:"°C",d:"tri",v:[180,220,260]},
-  {k:"Ta", zh:"廢棄溫度 Ta（體積法）",en:"Abandonment temperature Ta (volumetric)",u:"°C",d:"fixed",v:[100]},
-  {k:"T0", zh:"死態溫度 T0（可用熱能法）",en:"Dead-state temperature T0 (exergy)",u:"°C",d:"fixed",v:[15]},
-  {k:"phi",zh:"孔隙率 φ",en:"Porosity φ",u:"—",d:"tri",v:[0.05,0.10,0.15],lo:0,hi:1},
-  {k:"rr", zh:"岩石密度 ρr",en:"Rock density ρr",u:"kg/m³",d:"fixed",v:[2650],lo:0},
-  {k:"cr", zh:"岩石比熱 Cr",en:"Rock specific heat Cr",u:"J/kg·K",d:"fixed",v:[900],lo:0},
-  {k:"rf", zh:"流體密度 ρf",en:"Fluid density ρf",u:"kg/m³",d:"fixed",v:[850],lo:0},
-  {k:"cf", zh:"流體比熱 Cf",en:"Fluid specific heat Cf",u:"J/kg·K",d:"fixed",v:[4600],lo:0},
-  {k:"R",  zh:"回收率 R",en:"Recovery factor R",u:"—",d:"tri",v:[0.05,0.10,0.20],lo:0,hi:1},
-  {k:"ec", zh:"轉換效率 ηc（體積法）",en:"Conversion efficiency ηc (volumetric)",u:"—",d:"tri",v:[0.08,0.11,0.14],lo:0,hi:1},
-  {k:"eu", zh:"利用效率 ηu（可用熱能法）",en:"Utilization efficiency ηu (exergy)",u:"—",d:"tri",v:[0.35,0.40,0.45],lo:0,hi:1},
-  {k:"F",  zh:"容量因數 F",en:"Capacity factor F",u:"—",d:"fixed",v:[0.9],lo:0,hi:1},
-  {k:"t",  zh:"發電年限 t",en:"Plant life t",u:"yr",d:"fixed",v:[30],lo:0},
-  {k:"PD", zh:"功率密度 PD",en:"Power density PD",u:"MWe/km²",d:"tri",v:[5,10,15],lo:0},
-];
+const YR=31557600, K=273.15;
+const AREA_P={k:"A",zh:"面積 A",en:"Area A",u:"km²",d:"tri",v:AREA?[+(AREA*0.8).toPrecision(4),+AREA.toPrecision(4),+(AREA*1.2).toPrecision(4)]:[2,4,6],lo:0};
+const rock=[{k:"rr",zh:"岩石密度 ρr",en:"Rock density ρr",u:"kg/m³",d:"fixed",v:[2650],lo:0},{k:"cr",zh:"岩石比熱 Cr",en:"Rock specific heat Cr",u:"J/kg·K",d:"fixed",v:[900],lo:0}];
+const fluid=[{k:"rf",zh:"流體密度 ρf",en:"Fluid density ρf",u:"kg/m³",d:"fixed",v:[850],lo:0},{k:"cf",zh:"流體比熱 Cf",en:"Fluid specific heat Cf",u:"J/kg·K",d:"fixed",v:[4600],lo:0}];
+const life=[{k:"F",zh:"容量因數 F",en:"Capacity factor F",u:"—",d:"fixed",v:[0.9],lo:0,hi:1},{k:"t",zh:"發電年限 t",en:"Plant life t",u:"yr",d:"fixed",v:[30],lo:0}];
+// 孔隙型與裂隙型共用體積法／可用熱能法／功率密度法，差在孔隙（裂隙）率與回收率的預設
+const volParams=(phiZh,phiEn,phi,R,PD)=>[AREA_P,
+  {k:"h",zh:"熱儲厚度 h",en:"Reservoir thickness h",u:"m",d:"tri",v:[500,1000,1500],lo:0},
+  {k:"Tr",zh:"熱儲溫度 Tr",en:"Reservoir temperature Tr",u:"°C",d:"tri",v:[180,220,260]},
+  {k:"Ta",zh:"廢棄溫度 Ta（體積法）",en:"Abandonment temperature Ta (volumetric)",u:"°C",d:"fixed",v:[100]},
+  {k:"T0",zh:"死態溫度 T0（可用熱能法）",en:"Dead-state temperature T0 (exergy)",u:"°C",d:"fixed",v:[15]},
+  {k:"phi",zh:phiZh,en:phiEn,u:"—",d:"tri",v:phi,lo:0,hi:1},...rock,...fluid,
+  {k:"R",zh:"回收率 R",en:"Recovery factor R",u:"—",d:"tri",v:R,lo:0,hi:1},
+  {k:"ec",zh:"轉換效率 ηc（體積法）",en:"Conversion efficiency ηc (volumetric)",u:"—",d:"tri",v:[0.08,0.11,0.14],lo:0,hi:1},
+  {k:"eu",zh:"利用效率 ηu（可用熱能法）",en:"Utilization efficiency ηu (exergy)",u:"—",d:"tri",v:[0.35,0.40,0.45],lo:0,hi:1},...life,
+  {k:"PD",zh:"功率密度 PD",en:"Power density PD",u:"MWe/km²",d:"tri",v:PD,lo:0}];
+const volCalc=x=>{ const Cv=x.rr*x.cr*(1-x.phi)+x.rf*x.cf*x.phi, V=x.A*1e6*x.h, den=x.F*x.t*YR*1e6;
+  const Tr=x.Tr+K, T0=x.T0+K, Q0=V*Cv*Math.max(0,x.Tr-x.T0), frac=Tr>T0?1-T0*Math.log(Tr/T0)/(Tr-T0):0;
+  return {vol:V*Cv*Math.max(0,x.Tr-x.Ta)*x.R*x.ec/den, exg:Q0*x.R*frac*x.eu/den, pd:x.A*x.PD}; };
+const volMeth=[{k:"vol",zh:"體積法",en:"Volumetric",u:"MWe"},{k:"exg",zh:"可用熱能法",en:"Exergy",u:"MWe"},{k:"pd",zh:"功率密度法",en:"Power density",u:"MWe"}];
+const volFormula=(phi)=>L2(
+`Cv = ρr·Cr·(1−${phi}) + ρf·Cf·${phi}        （體積熱容，J/m³·K）
+V  = A·h
+體積法：     P = V·Cv·(Tr−Ta)·R·ηc ÷ (F·t·31,557,600 s)
+可用熱能法： Q0 = V·Cv·(Tr−T0)
+            W = Q0·R·[1 − T0·ln(Tr/T0)/(Tr−T0)]   （溫度用 K）
+            P = W·ηu ÷ (F·t·31,557,600 s)
+功率密度法： P = A·PD
+（P 以 MWe 表示）`,
+`Cv = ρr·Cr·(1−${phi}) + ρf·Cf·${phi}        (volumetric heat capacity, J/m³·K)
+V  = A·h
+Volumetric: P = V·Cv·(Tr−Ta)·R·ηc ÷ (F·t·31,557,600 s)
+Exergy:     Q0 = V·Cv·(Tr−T0)
+            W = Q0·R·[1 − T0·ln(Tr/T0)/(Tr−T0)]   (temperatures in K)
+            P = W·ηu ÷ (F·t·31,557,600 s)
+Power density: P = A·PD
+(P in MWe)`);
+const TYPES={
+  porous:{zh:"孔隙型",en:"Porous",hasA:true,
+    def:volParams("孔隙率 φ","Porosity φ",[0.05,0.10,0.15],[0.05,0.10,0.20],[5,10,15]),calc:volCalc,meth:volMeth,formula:()=>volFormula("φ"),
+    note:L2("孔隙型熱儲：熱存在岩石與孔隙流體中，以體積法計算。預設值為液態為主熱儲常見的文獻範圍，請依場址資料修改。","Porous reservoir: heat stored in rock and pore fluid, volumetric method. Defaults are typical literature ranges for a liquid-dominated reservoir; replace them with site data.")},
+  fractured:{zh:"裂隙型",en:"Fractured",hasA:true,
+    def:volParams("裂隙孔隙率 φf","Fracture porosity φf",[0.01,0.03,0.05],[0.03,0.07,0.12],[3,6,10]),calc:volCalc,meth:volMeth,formula:()=>volFormula("φf"),
+    note:L2("裂隙型熱儲：流體只在裂隙中，孔隙率低、可回收比例通常較低；計算式同孔隙型，預設值改成低裂隙孔隙率與較低回收率（示意值，請依場址資料修改）。","Fractured reservoir: fluid only in fractures, so porosity and recovery are usually lower. Same formulas as porous; defaults use low fracture porosity and lower recovery (illustrative; replace with site data).")},
+  egs:{zh:"EGS",en:"EGS",hasA:false,
+    def:[{k:"N",zh:"對井數 N",en:"Well pairs N",u:"對",d:"fixed",v:[1],lo:0},
+      {k:"Vs",zh:"每對增產體積 Vs",en:"Stimulated volume per pair Vs",u:"km³",d:"tri",v:[0.05,0.15,0.30],lo:0},...rock,
+      {k:"dT",zh:"容許溫降 ΔT",en:"Allowed temperature drawdown ΔT",u:"°C",d:"tri",v:[20,40,60],lo:0},
+      {k:"R",zh:"熱回收率 R（掃熱比例）",en:"Heat recovery R (swept fraction)",u:"—",d:"tri",v:[0.3,0.5,0.7],lo:0,hi:1},
+      {k:"ec",zh:"轉換效率 ηc",en:"Conversion efficiency ηc",u:"—",d:"tri",v:[0.08,0.11,0.14],lo:0,hi:1},...life],
+    calc:x=>{ const E=x.N*x.Vs*1e9*x.rr*x.cr*x.dT*x.R; return {egs:E*x.ec/(x.F*x.t*YR*1e6), egst:E/(x.F*x.t*YR*1e6)}; },
+    meth:[{k:"egs",zh:"增產體積熱降法（電）",en:"Stimulated volume (electric)",u:"MWe"},{k:"egst",zh:"可取熱量",en:"Extractable heat",u:"MWth"}],
+    formula:()=>L2(`E = N·Vs·ρr·Cr·ΔT·R            （可取熱量，J；Vs 以 m³ 計）
+P = E·ηc ÷ (F·t·31,557,600 s)   （MWe）
+熱功率 = E ÷ (F·t·31,557,600 s)  （MWth）`,
+`E = N·Vs·ρr·Cr·ΔT·R            (extractable heat, J; Vs in m³)
+P = E·ηc ÷ (F·t·31,557,600 s)   (MWe)
+Thermal = E ÷ (F·t·31,557,600 s) (MWth)`),
+    note:L2("EGS（增強型地熱）：以水力增產的岩體體積計算，熱幾乎全來自岩石。增產體積、容許溫降與掃熱比例的預設值為示意，請依場址或文獻修改。","EGS: heat from the hydraulically stimulated rock volume. Defaults for stimulated volume, drawdown and swept fraction are illustrative; replace with site or literature values.")},
+  ags:{zh:"AGS",en:"AGS",hasA:false,
+    def:[{k:"N",zh:"井（迴路）數 N",en:"Wells / loops N",u:"口",d:"fixed",v:[1],lo:0},
+      {k:"Lh",zh:"每口水平段長度 L",en:"Lateral length per well L",u:"m",d:"tri",v:[10000,20000,40000],lo:0},
+      {k:"q",zh:"長期平均取熱率 q",en:"Long-term heat extraction rate q",u:"W/m",d:"tri",v:[30,60,100],lo:0},
+      {k:"ec",zh:"轉換效率 ηc",en:"Conversion efficiency ηc",u:"—",d:"tri",v:[0.08,0.10,0.12],lo:0,hi:1}],
+    calc:x=>{ const th=x.N*x.Lh*x.q/1e6; return {ags:th*x.ec, agst:th}; },
+    meth:[{k:"ags",zh:"單位長度取熱（電）",en:"Heat per unit length (electric)",u:"MWe"},{k:"agst",zh:"熱輸出",en:"Thermal output",u:"MWth"}],
+    formula:()=>L2(`熱輸出 = N·L·q ÷ 10⁶     （MWth）
+P = N·L·q·ηc ÷ 10⁶      （MWe，長期平均）`,
+`Thermal = N·L·q ÷ 10⁶     (MWth)
+P = N·L·q·ηc ÷ 10⁶      (MWe, long-term average)`),
+    note:L2("AGS（先進地熱／封閉迴路）：流體在密閉井管中循環，靠岩石傳導取熱，不需熱儲滲透率。取熱率會隨時間衰減且依岩性與溫度而異，預設值只是範例，請提供場址或模擬結果。","AGS (closed loop): fluid circulates in sealed wellbores and heat is conducted from the rock, so no reservoir permeability is needed. The extraction rate declines over time and depends on rock and temperature; defaults are only examples, so use site or modelling values.")},
+};
 const DN={fixed:L2("固定值","Fixed"),uniform:L2("均勻","Uniform"),tri:L2("三角","Triangular"),normal:L2("常態","Normal"),lognormal:L2("對數常態","Lognormal")};
 const SLOTS={fixed:["a"],uniform:["min","max"],tri:["min","mode","max"],normal:["mean","sd"],lognormal:["mean","sd"]};
-let P=JSON.parse(JSON.stringify(DEF));
-try{ const s=JSON.parse(localStorage.getItem("georesP")||"null"); if(s&&!AREA) s.forEach(x=>{const p=P.find(y=>y.k===x.k); if(p){p.d=x.d;p.v=x.v;}}); }catch(e){}
+let TY=(()=>{ const h=location.hash.slice(1); if(TYPES[h]) return h; try{ const t=localStorage.getItem("georesType"); if(TYPES[t]) return t; }catch(e){} return "porous"; })();
+if(AREA&&!TYPES[TY].hasA) TY="porous";
+let T=TYPES[TY], P, METH=T.meth;
+const clone=o=>JSON.parse(JSON.stringify(o));
+function loadP(){ P=clone(T.def);
+  try{ const s=JSON.parse(localStorage.getItem("georesP_"+TY)||"null"); if(s) s.forEach(x=>{ const p=P.find(y=>y.k===x.k); if(p&&!(AREA&&x.k==="A")){p.d=x.d;p.v=x.v;} }); }catch(e){} }
 const tb=document.querySelector("#ptbl tbody");
 function drawTable(){
   tb.innerHTML=P.map((p,i)=>`<tr><td class="name">${EN?p.en:p.zh}<small>${p.u}</small></td>
@@ -156,30 +217,28 @@ function drawTable(){
     drawTable();});
   tb.querySelectorAll("input").forEach(inp=>inp.oninput=()=>{P[+inp.dataset.i].v[+inp.dataset.j]=inp.value===""?"":+inp.value;});
 }
-drawTable();
 document.getElementById("distnote").textContent=L2("分布參數：固定值 a；均勻 a 最小、b 最大；三角 a 最小、b 最可能、c 最大；常態與對數常態 a 平均、b 標準差。","Distribution inputs: Fixed a; Uniform a=min, b=max; Triangular a=min, b=mode, c=max; Normal and Lognormal a=mean, b=std dev.");
-document.getElementById("reset").onclick=()=>{P=JSON.parse(JSON.stringify(DEF)); try{localStorage.removeItem("georesP")}catch(e){} drawTable();};
-if(AREA){ const lat=Q.get("lat"), lng=Q.get("lng");
-  document.getElementById("areanote").innerHTML=L2(`面積由地圖框選帶入：<b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?`（中心 ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)}）`:""}，預設以 ±20% 的三角分布表示不確定性。`,
-    `Area from the map selection: <b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?` (centre ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)})`:""}; a ±20% triangular distribution is used by default.`);
-  const back=document.getElementById("back"); if(lat) back.href=`taiwan-geothermal.html#${(+lat).toFixed(4)},${(+lng).toFixed(4)}`; }
-document.getElementById("formula").textContent=L2(
-`Cv = ρr·Cr·(1−φ) + ρf·Cf·φ        （體積熱容，J/m³·K）
-V  = A·h
-體積法：     P = V·Cv·(Tr−Ta)·R·ηc ÷ (F·t·31,557,600 s)
-可用熱能法： Q0 = V·Cv·(Tr−T0)
-            W = Q0·R·[1 − T0·ln(Tr/T0)/(Tr−T0)]   （溫度用 K）
-            P = W·ηu ÷ (F·t·31,557,600 s)
-功率密度法： P = A·PD
-（P 以 MWe 表示）`,
-`Cv = ρr·Cr·(1−φ) + ρf·Cf·φ        (volumetric heat capacity, J/m³·K)
-V  = A·h
-Volumetric: P = V·Cv·(Tr−Ta)·R·ηc ÷ (F·t·31,557,600 s)
-Exergy:     Q0 = V·Cv·(Tr−T0)
-            W = Q0·R·[1 − T0·ln(Tr/T0)/(Tr−T0)]   (temperatures in K)
-            P = W·ηu ÷ (F·t·31,557,600 s)
-Power density: P = A·PD
-(P in MWe)`);
+document.getElementById("reset").onclick=()=>{ P=clone(T.def); try{localStorage.removeItem("georesP_"+TY)}catch(e){} drawTable(); };
+const lat=Q.get("lat"), lng=Q.get("lng");
+if(lat) document.getElementById("back").href=`taiwan-geothermal.html#${(+lat).toFixed(4)},${(+lng).toFixed(4)}`;
+// 類型分頁
+const ttabs=document.getElementById("ttabs");
+ttabs.innerHTML=Object.entries(TYPES).map(([k,t])=>`<button type="button" data-k="${k}" aria-pressed="${k===TY}">${EN?t.en:t.zh}</button>`).join("");
+ttabs.querySelectorAll("button").forEach(b=>b.onclick=()=>setType(b.dataset.k));
+function setType(k){
+  TY=k; T=TYPES[k]; METH=T.meth; cur=METH[0].k; RES=null;
+  try{localStorage.setItem("georesType",k)}catch(e){} history.replaceState(null,"",location.search+"#"+k);
+  ttabs.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===k));
+  loadP(); drawTable();
+  document.getElementById("formula").textContent=T.formula();
+  document.getElementById("typenote").textContent=T.note;
+  document.getElementById("areanote").innerHTML=AREA&&T.hasA?L2(`面積由地圖框選帶入：<b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?`（中心 ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)}）`:""}，預設以 ±20% 的三角分布表示不確定性。`,
+    `Area from the map selection: <b>${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km²</b>${lat?` (centre ${(+lat).toFixed(4)}, ${(+lng).toFixed(4)})`:""}; a ±20% triangular distribution is used by default.`)
+    :AREA?L2(`這個類型不用面積（地圖帶入的 ${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km² 只用在孔隙型與裂隙型）。`,`This type does not use area (the ${AREA.toLocaleString(undefined,{maximumFractionDigits:3})} km² from the map applies to porous and fractured only).`):"";
+  Object.values(charts).forEach(c=>c.destroy()); charts={};
+  document.getElementById("results").innerHTML=`<div class="empty">${L2("設定參數後按「執行模擬」。","Set the parameters and press Run.")}</div>`;
+  document.getElementById("chartsec").hidden=true; document.getElementById("status").textContent="";
+}
 
 // ---------- 亂數與分布 ----------
 function rng(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
@@ -210,44 +269,35 @@ function validate(){
   return bad;
 }
 // ---------- 計算 ----------
-const YR=31557600; const K=273.15;
-function power(x){
-  const Cv=x.rr*x.cr*(1-x.phi)+x.rf*x.cf*x.phi, V=x.A*1e6*x.h, den=x.F*x.t*YR*1e6;
-  const vol=V*Cv*Math.max(0,x.Tr-x.Ta)*x.R*x.ec/den;
-  const Tr=x.Tr+K, T0=x.T0+K, Q0=V*Cv*Math.max(0,x.Tr-x.T0), frac=Tr>T0?1-T0*Math.log(Tr/T0)/(Tr-T0):0;
-  const exg=Q0*x.R*frac*x.eu/den;
-  return {vol,exg,pd:x.A*x.PD};
-}
-const METH=[{k:"vol",zh:"體積法",en:"Volumetric"},{k:"exg",zh:"可用熱能法",en:"Exergy"},{k:"pd",zh:"功率密度法",en:"Power density"}];
 const pct=(s,q)=>{ const i=(s.length-1)*q, lo=Math.floor(i), hi=Math.ceil(i); return s[lo]+(s[hi]-s[lo])*(i-lo); };
-let RES=null, cur="vol", charts={};
+let RES=null, cur=METH[0].k, charts={};
 const fmt=v=>!isFinite(v)?"—":Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);
 document.getElementById("run").onclick=()=>{
   const st=document.getElementById("status"), bad=validate();
   if(bad.length){ st.innerHTML=`<span class="warn">${bad.join("；")}</span>`; return; }
   const N=Math.min(200000,Math.max(1000,Math.round(+document.getElementById("n").value||20000))), seed=+document.getElementById("seed").value||1;
-  try{localStorage.setItem("georesP",JSON.stringify(P.map(({k,d,v})=>({k,d,v}))))}catch(e){}
+  try{localStorage.setItem("georesP_"+TY,JSON.stringify(P.map(({k,d,v})=>({k,d,v}))))}catch(e){}
   st.textContent=L2("計算中…","Running…");
   setTimeout(()=>{
     const r=rng(seed), S=Object.fromEntries(P.map(p=>[p.k,sampler(p,r)]));
-    const IN=Object.fromEntries(P.map(p=>[p.k,new Float64Array(N)])), OUT={vol:new Float64Array(N),exg:new Float64Array(N),pd:new Float64Array(N)};
-    for(let i=0;i<N;i++){ const x={}; for(const p of P){ x[p.k]=S[p.k](); IN[p.k][i]=x[p.k]; } const o=power(x); OUT.vol[i]=o.vol; OUT.exg[i]=o.exg; OUT.pd[i]=o.pd; }
+    const IN=Object.fromEntries(P.map(p=>[p.k,new Float64Array(N)])), OUT=Object.fromEntries(METH.map(m=>[m.k,new Float64Array(N)]));
+    for(let i=0;i<N;i++){ const x={}; for(const p of P){ x[p.k]=S[p.k](); IN[p.k][i]=x[p.k]; } const o=T.calc(x); for(const m of METH) OUT[m.k][i]=o[m.k]; }
     const stats={}; METH.forEach(m=>{ const s=Float64Array.from(OUT[m.k]).sort(); let sum=0; for(const v of s) sum+=v;
       stats[m.k]={sorted:s,mean:sum/N,P90:pct(s,.1),P50:pct(s,.5),P10:pct(s,.9),min:s[0],max:s[N-1]}; });
     // 敏感度：其他參數取各自 P50（中位數），單一參數換成它的 P10/P90 分位值
     const qIn=Object.fromEntries(P.map(p=>{ const s=Float64Array.from(IN[p.k]).sort(); return [p.k,{p10:pct(s,.1),p50:pct(s,.5),p90:pct(s,.9)}]; }));
-    const base=Object.fromEntries(P.map(p=>[p.k,qIn[p.k].p50])), b0=power(base);
-    const tor={}; METH.forEach(m=>{ tor[m.k]=P.filter(p=>p.d!=="fixed").map(p=>{ const lo=power({...base,[p.k]:qIn[p.k].p10})[m.k], hi=power({...base,[p.k]:qIn[p.k].p90})[m.k];
+    const base=Object.fromEntries(P.map(p=>[p.k,qIn[p.k].p50])), b0=T.calc(base);
+    const tor={}; METH.forEach(m=>{ tor[m.k]=P.filter(p=>p.d!=="fixed").map(p=>{ const lo=T.calc({...base,[p.k]:qIn[p.k].p10})[m.k], hi=T.calc({...base,[p.k]:qIn[p.k].p90})[m.k];
       return {k:p.k,name:EN?p.en:p.zh,lo,hi,span:Math.abs(hi-lo)}; }).filter(t=>t.span>1e-12).sort((a,b)=>b.span-a.span); });
-    RES={N,seed,IN,OUT,stats,tor,base:b0,when:new Date()};
+    RES={N,seed,IN,OUT,stats,tor,base:b0,when:new Date(),type:TY};
     st.textContent=L2(`完成 ${N.toLocaleString()} 次模擬（種子 ${seed}）。`,`Finished ${N.toLocaleString()} iterations (seed ${seed}).`);
     showResults();
   },20);
 };
 function showResults(){
   const s=RES.stats;
-  document.getElementById("results").innerHTML=`<div class="scroll"><table class="res"><thead><tr><th>${L2("方法（MWe）","Method (MWe)")}</th><th>P90</th><th>P50</th><th>P10</th><th>${L2("平均","Mean")}</th></tr></thead><tbody>
-    ${METH.map(m=>`<tr><td>${EN?m.en:m.zh}</td><td>${fmt(s[m.k].P90)}</td><td><b>${fmt(s[m.k].P50)}</b></td><td>${fmt(s[m.k].P10)}</td><td>${fmt(s[m.k].mean)}</td></tr>`).join("")}</tbody></table></div>`;
+  document.getElementById("results").innerHTML=`<div class="scroll"><table class="res"><thead><tr><th>${L2("方法","Method")}</th><th>${L2("單位","Unit")}</th><th>P90</th><th>P50</th><th>P10</th><th>${L2("平均","Mean")}</th></tr></thead><tbody>
+    ${METH.map(m=>`<tr><td>${EN?m.en:m.zh}</td><td>${m.u}</td><td>${fmt(s[m.k].P90)}</td><td><b>${fmt(s[m.k].P50)}</b></td><td>${fmt(s[m.k].P10)}</td><td>${fmt(s[m.k].mean)}</td></tr>`).join("")}</tbody></table></div>`;
   document.getElementById("chartsec").hidden=false;
   const tabs=document.getElementById("mtabs");
   tabs.innerHTML=METH.map(m=>`<button type="button" data-k="${m.k}" aria-pressed="${m.k===cur}">${EN?m.en:m.zh}</button>`).join("");
@@ -256,7 +306,7 @@ function showResults(){
 }
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function drawCharts(){
-  const st=RES.stats[cur], s=st.sorted, N=s.length, ink=css("--ink"), mut=css("--muted"), rule=css("--rule"), acc=css("--accent"), a2=css("--a2");
+  const U=METH.find(m=>m.k===cur).u, st=RES.stats[cur], s=st.sorted, N=s.length, ink=css("--ink"), mut=css("--muted"), rule=css("--rule"), acc=css("--accent"), a2=css("--a2");
   Chart.defaults.color=mut; Chart.defaults.borderColor=rule; Chart.defaults.font.family=css("--sans");
   Object.values(charts).forEach(c=>c.destroy());
   // 直方圖：40 格，範圍取第 0.5～99.5 百分位，避免極端值把圖壓扁
@@ -266,52 +316,53 @@ function drawCharts(){
   const vline={id:"vline",afterDatasetsDraw(c){ const {ctx,chartArea:a,scales:{x}}=c; ctx.save(); lines.forEach(([t,v,col])=>{ const px=x.getPixelForValue(v); if(px<a.left||px>a.right) return;
     ctx.strokeStyle=col; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(px,a.top); ctx.lineTo(px,a.bottom); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=col; ctx.font="600 11px sans-serif"; ctx.textAlign="center"; ctx.fillText(t,px,a.top+10); }); ctx.restore(); }};
   charts.h=new Chart(document.getElementById("hist"),{type:"bar",data:{datasets:[{data:cnt.map((c,i)=>({x:lo+(i+.5)*w,y:c/N*100})),backgroundColor:a2+"99",borderWidth:0,barPercentage:1,categoryPercentage:1}]},
-    options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>`${fmt(i[0].parsed.x-w/2)}–${fmt(i[0].parsed.x+w/2)} MWe`,label:i=>`${i.parsed.y.toFixed(2)} %`}}},
-      scales:{x:{type:"linear",min:lo,max:hi,ticks:{includeBounds:false},title:{display:true,text:"MWe"}},y:{title:{display:true,text:L2("機率 %","Probability %")}}}},plugins:[vline]});
+    options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>`${fmt(i[0].parsed.x-w/2)}–${fmt(i[0].parsed.x+w/2)} ${U}`,label:i=>`${i.parsed.y.toFixed(2)} %`}}},
+      scales:{x:{type:"linear",min:lo,max:hi,ticks:{includeBounds:false},title:{display:true,text:U}},y:{title:{display:true,text:L2("機率 %","Probability %")}}}},plugins:[vline]});
   // 超越機率曲線
   const step=Math.max(1,Math.floor(N/400)), pts=[]; for(let i=0;i<N;i+=step) pts.push({x:s[i],y:(1-i/(N-1))*100}); pts.push({x:s[N-1],y:0});
   charts.c=new Chart(document.getElementById("cdf"),{type:"line",data:{datasets:[{data:pts,borderColor:acc,borderWidth:2,pointRadius:0,fill:false,tension:0}]},
-    options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>`${fmt(i.parsed.x)} MWe：${L2("超越機率","exceedance")} ${i.parsed.y.toFixed(1)}%`}}},
-      scales:{x:{type:"linear",min:lo,max:hi,ticks:{includeBounds:false},title:{display:true,text:"MWe"}},y:{min:0,max:100,title:{display:true,text:L2("超越機率 %","Exceedance %")}}}},plugins:[vline]});
+    options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>`${fmt(i.parsed.x)} ${U}：${L2("超越機率","exceedance")} ${i.parsed.y.toFixed(1)}%`}}},
+      scales:{x:{type:"linear",min:lo,max:hi,ticks:{includeBounds:false},title:{display:true,text:U}},y:{min:0,max:100,title:{display:true,text:L2("超越機率 %","Exceedance %")}}}},plugins:[vline]});
   // 龍捲風圖
   const T=RES.tor[cur], b=RES.base[cur];
   charts.t=new Chart(document.getElementById("tornado"),{type:"bar",data:{labels:T.map(t=>t.name),datasets:[
       {label:L2("取 P10 分位（低值）","Input P10 (low)"),data:T.map(t=>[b,t.lo]),backgroundColor:a2+"cc"},
       {label:L2("取 P90 分位（高值）","Input P90 (high)"),data:T.map(t=>[b,t.hi]),backgroundColor:acc+"cc"}]},
-    options:{indexAxis:"y",maintainAspectRatio:false,animation:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:i=>`${i.dataset.label}：${fmt(i.raw[1])} MWe`}}},
-      scales:{x:{title:{display:true,text:L2(`MWe（基準 ${fmt(b)}，參數皆取中位數）`,`MWe (base ${fmt(b)} with all inputs at median)`)}},y:{stacked:true}}}});
+    options:{indexAxis:"y",maintainAspectRatio:false,animation:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:i=>`${i.dataset.label}：${fmt(i.raw[1])} ${U}`}}},
+      scales:{x:{title:{display:true,text:L2(`${U}（基準 ${fmt(b)}，參數皆取中位數）`,`${U} (base ${fmt(b)} with all inputs at median)`)}},y:{stacked:true}}}});
 }
 // ---------- 匯出 ----------
 const dl=(blob,name)=>{const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);};
 const stamp=()=>{const d=RES.when,p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;};
 document.getElementById("csv").onclick=()=>{ if(!RES) return; const q=v=>`"${String(v).replace(/"/g,'""')}"`, rows=[];
-  rows.push([L2("地熱資源量評估","Geothermal resource assessment"),RES.when.toISOString(),`N=${RES.N}`,`seed=${RES.seed}`].map(q).join(","));
+  rows.push([L2("地熱資源量評估","Geothermal resource assessment"),EN?T.en:T.zh,RES.when.toISOString(),`N=${RES.N}`,`seed=${RES.seed}`].map(q).join(","));
   rows.push([L2("參數","Parameter"),L2("單位","Unit"),L2("分布","Distribution"),"a","b","c"].map(q).join(","));
   P.forEach(p=>rows.push([EN?p.en:p.zh,p.u,DN[p.d],...p.v.slice(0,SLOTS[p.d].length)].map(q).join(",")));
-  rows.push(""); rows.push([L2("方法（MWe）","Method (MWe)"),"P90","P50","P10",L2("平均","Mean"),"min","max"].map(q).join(","));
-  METH.forEach(m=>{const s=RES.stats[m.k]; rows.push([EN?m.en:m.zh,s.P90,s.P50,s.P10,s.mean,s.min,s.max].map(q).join(","));});
-  rows.push(""); rows.push(["#",...P.map(p=>p.k),"P_vol_MWe","P_exergy_MWe","P_pd_MWe"].map(q).join(","));
-  for(let i=0;i<RES.N;i++) rows.push([i+1,...P.map(p=>+RES.IN[p.k][i].toPrecision(6)),+RES.OUT.vol[i].toPrecision(6),+RES.OUT.exg[i].toPrecision(6),+RES.OUT.pd[i].toPrecision(6)].join(","));
-  dl(new Blob(["﻿"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"}),`geothermal-resource_${stamp()}.csv`); };
+  rows.push(""); rows.push([L2("方法","Method"),L2("單位","Unit"),"P90","P50","P10",L2("平均","Mean"),"min","max"].map(q).join(","));
+  METH.forEach(m=>{const s=RES.stats[m.k]; rows.push([EN?m.en:m.zh,m.u,s.P90,s.P50,s.P10,s.mean,s.min,s.max].map(q).join(","));});
+  rows.push(""); rows.push(["#",...P.map(p=>p.k),...METH.map(m=>`${m.k}_${m.u}`)].map(q).join(","));
+  for(let i=0;i<RES.N;i++) rows.push([i+1,...P.map(p=>+RES.IN[p.k][i].toPrecision(6)),...METH.map(m=>+RES.OUT[m.k][i].toPrecision(6))].join(","));
+  dl(new Blob(["﻿"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"}),`geothermal-resource_${TY}_${stamp()}.csv`); };
 document.getElementById("png").onclick=()=>{ if(!RES) return;
   // 匯出時先把圖表固定成報告用的尺寸再擷取，避免手機或寬螢幕比例跑掉
   const sc=2, W=1200, pad=30, iw=(W-pad*3)/2, ih=320, th=Math.max(260,60+RES.tor[cur].length*42), F=css("--sans");
   const snap=(c,w,h)=>{ c.options.devicePixelRatio=sc; c.resize(w,h); const img=c.canvas; const cp=document.createElement("canvas"); cp.width=img.width; cp.height=img.height; cp.getContext("2d").drawImage(img,0,0); return cp; };
   const ih1=snap(charts.h,iw,ih), ih2=snap(charts.c,iw,ih), it=snap(charts.t,W-pad*2,th);
   [charts.h,charts.c,charts.t].forEach(c=>{ c.options.devicePixelRatio=window.devicePixelRatio; c.resize(); });
-  const H=pad+70+28*4+20+P.length*20+30+ih+40+th+pad;
+  const H=pad+70+28*(METH.length+1)+20+P.length*20+30+ih+40+th+pad;
   const cv=document.createElement("canvas"); cv.width=W*sc; cv.height=H*sc; const g=cv.getContext("2d"); g.scale(sc,sc);
   g.fillStyle="#fff"; g.fillRect(0,0,W,H); g.fillStyle="#111"; g.textBaseline="top";
-  g.font=`700 22px ${F}`; g.fillText(L2("地熱資源量評估（蒙地卡羅）","Geothermal resource assessment (Monte Carlo)"),pad,pad);
+  g.font=`700 22px ${F}`; g.fillText(L2(`地熱資源量評估（蒙地卡羅）・${T.zh}`,`Geothermal resource assessment (Monte Carlo) · ${T.en}`),pad,pad);
   g.font=`13px ${F}`; g.fillStyle="#555"; g.fillText(`${RES.when.toLocaleString(EN?"en":"zh-TW",{hour12:false})}　N=${RES.N.toLocaleString()}　seed=${RES.seed}　${L2(`圖表：${METH.find(m=>m.k===cur).zh}`,`Charts: ${METH.find(m=>m.k===cur).en}`)}`,pad,pad+32);
   let y=pad+70;
-  [[L2("方法（MWe）","Method (MWe)"),"P90","P50","P10",L2("平均","Mean")],...METH.map(m=>{const s=RES.stats[m.k];return [EN?m.en:m.zh,fmt(s.P90),fmt(s.P50),fmt(s.P10),fmt(s.mean)];})].forEach((r,i)=>{
+  [[L2("方法","Method"),"P90","P50","P10",L2("平均","Mean")],...METH.map(m=>{const s=RES.stats[m.k];return [`${EN?m.en:m.zh}（${m.u}）`,fmt(s.P90),fmt(s.P50),fmt(s.P10),fmt(s.mean)];})].forEach((r,i)=>{
     g.fillStyle="#111"; g.font=`${i?400:600} 14px ${F}`; r.forEach((c,j)=>{ g.textAlign=j?"right":"left"; g.fillText(c,j?pad+260+j*120:pad,y); }); y+=28; });
   g.textAlign="left"; y+=20; g.font=`12px ${F}`; g.fillStyle="#333";
   P.forEach(p=>{ g.fillText(`${EN?p.en:p.zh}（${p.u}）：${DN[p.d]} ${p.v.slice(0,SLOTS[p.d].length).join(" / ")}`,pad,y); y+=20; });
   y+=30; g.drawImage(ih1,pad,y,iw,ih); g.drawImage(ih2,pad*2+iw,y,iw,ih);
   y+=ih+40; g.drawImage(it,pad,y,W-pad*2,th);
-  cv.toBlob(b=>dl(b,`geothermal-resource_${stamp()}.png`),"image/png"); };
+  cv.toBlob(b=>dl(b,`geothermal-resource_${TY}_${stamp()}.png`),"image/png"); };
+setType(TY);
 </script>
 </body>
 </html>
