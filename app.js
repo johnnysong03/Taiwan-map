@@ -147,6 +147,23 @@ const nlsc = (id, opt={}) => L.tileLayer(`https://wmts.nlsc.gov.tw/wmts/${id}/de
 
 const map = L.map("map",{zoomControl:false, minZoom:7, maxZoom:21, zoomSnap:0.25,
   maxBounds:L.latLngBounds([20.5,116.5],[27.5,124.5]), maxBoundsViscosity:.8}).setView([23.75,120.95],8);
+// ---------- Canvas 圖層不攔截滑鼠，由地圖統一轉送 ----------
+// Leaflet 的 canvas 會蓋滿整張地圖：只要上層有一個 canvas 圖層，下層的點、標示就點不到。
+// 這裡讓 canvas 不吃滑鼠事件（CSS），改成：游標下若是一般的點／標示就照常處理，否則交給最上層「真的有圖形在游標下」的 canvas。
+(()=>{
+  const mc=map.getContainer(), DOMHIT=".leaflet-interactive,.leaflet-marker-icon,.leaflet-popup,.leaflet-control,.leaflet-tooltip,.leaflet-marker-pane *";
+  const zOf=r=>{ let el=r._container, z=0; while(el&&el!==mc){ const v=parseInt(getComputedStyle(el).zIndex); if(!isNaN(v)) z=Math.max(z,v); el=el.parentElement; } return z; };
+  const renderers=()=>Object.values(map._layers).filter(l=>l instanceof L.Canvas&&l._container&&l._container.style.display!=="none").sort((a,b)=>zOf(b)-zOf(a));
+  const hits=(r,e)=>{ const pt=map.mouseEventToLayerPoint(e); for(let o=r._drawFirst;o;o=o.next){ const l=o.layer; if(l.options.interactive&&l._containsPoint(pt)) return true; } return false; };
+  const top=e=>{ if(e.target.closest?.(DOMHIT)||mc.classList.contains("shotmode")||mc.classList.contains("distmode")) return null; /* 截圖、量測模式時不轉送 */ return renderers().find(r=>hits(r,e))||null; };
+  ["click","dblclick","contextmenu"].forEach(t=>mc.addEventListener(t,e=>{ const r=top(e); if(!r) return; e.stopPropagation(); r._onClick(e); },true));
+  let hovered=null;
+  mc.addEventListener("mousemove",e=>{ const r=top(e);
+    renderers().forEach(x=>{ if(x!==r) x._handleMouseOut(e); });
+    if(r) r._onMouseMove(e);
+    mc.classList.toggle("canvas-hover",!!(r&&r._hoveredLayer)); hovered=r; });
+  mc.addEventListener("mouseleave",e=>{ renderers().forEach(x=>x._handleMouseOut(e)); mc.classList.remove("canvas-hover"); });
+})();
 map.createPane("base").classList.add("leaflet-base-pane"); map.getPane("base").style.zIndex=200;
 map.createPane("otiles").classList.add("leaflet-overlay-tiles-pane"); map.getPane("otiles").style.zIndex=250;
 map.createPane("roads").classList.add("leaflet-road-pane"); map.getPane("roads").style.zIndex=240;

@@ -552,3 +552,7 @@ details.zrule>div{margin:4px 0;line-height:1.6}
 .leaflet-tooltip.distseg::before{display:none}
 @media (max-width:760px){ #distbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} }
 @media (max-width:760px){ #distbanner,#measbanner,#shotbanner{max-width:calc(100% - 200px);white-space:normal;flex-wrap:wrap;gap:4px 12px} }
+
+/* canvas 圖層不直接接收滑鼠事件，由 app.js 轉送（避免擋住下層的點） */
+.leaflet-pane > canvas{pointer-events:none!important}
+.leaflet-container.canvas-hover{cursor:pointer}
