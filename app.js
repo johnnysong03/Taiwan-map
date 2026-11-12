@@ -1733,6 +1733,52 @@ async function luiHTML(lat,lng){
   return `<dl class="zone"><dt class="h">${lab}</dt><dt>${L2("第三級","Level 3")}</dt><dd>${sw(rgb)}${code}　${name}</dd><dt>${L2("上層分類","Parent classes")}</dt><dd>${l1?l1[0]:""} › ${l2||""}</dd></dl>`+
     (desc?`<div class="zdef"><b>${L2("分類說明","Definition")}</b>　${desc}</div>`:`<div class="zdef">${L2("附表沒有列這一類的說明。","The regulation table gives no description for this class.")}</div>`)+src;
 }
+// ---------- 國土利用：點圖磚算出該類別相連範圍的面積（依第 17 級圖磚像素估算） ----------
+const luiTiles=new Map();
+async function luiTile(tx,ty){ const key=`${tx}/${ty}`; if(luiTiles.has(key)) return luiTiles.get(key);
+  const pr=fetch(`https://wmts.nlsc.gov.tw/wmts/LUIMAP/default/GoogleMapsCompatible/17/${ty}/${tx}`).then(q=>q.ok?q.blob():null).then(async b=>{ if(!b) return null;
+    const bmp=await createImageBitmap(b), c=document.createElement("canvas"); c.width=256; c.height=256; const g=c.getContext("2d",{willReadFrequently:true}); g.drawImage(bmp,0,0,256,256);
+    return g.getImageData(0,0,256,256).data; }).catch(()=>null);
+  luiTiles.set(key,pr); if(luiTiles.size>120) luiTiles.delete(luiTiles.keys().next().value); return pr; }
+// 從點選像素往外找同顏色（容許 6）的相連像素；最多往外 R 張圖磚，碰到邊界就回報「至少」
+async function luiArea(lat,lng,R=3){
+  const z=17,n=2**z, xf=(lng+180)/360*n, rr=lat*Math.PI/180, yf=(1-Math.log(Math.tan(rr)+1/Math.cos(rr))/Math.PI)/2*n;
+  const X0=Math.floor(xf*256), Y0=Math.floor(yf*256), T0x=X0>>8, T0y=Y0>>8;
+  const need=[]; for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++) need.push([T0x+dx,T0y+dy]);
+  const tiles={}; await Promise.all(need.map(async([tx,ty])=>{tiles[`${tx},${ty}`]=await luiTile(tx,ty);}));
+  const at=(X,Y)=>{const d=tiles[`${X>>8},${Y>>8}`]; if(!d) return null; const i=((Y&255)*256+(X&255))*4; return d[i+3]<128?null:[d[i],d[i+1],d[i+2]];};
+  const c0=at(X0,Y0); if(!c0) return null;
+  const W=(2*R+1)*256, ox=(T0x-R)*256, oy=(T0y-R)*256, seen=new Uint8Array(W*W), st=[X0,Y0]; let cnt=0, edge=false;
+  seen[(Y0-oy)*W+(X0-ox)]=1;
+  while(st.length){ const Y=st.pop(), X=st.pop(); cnt++;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const x=X+dx,y=Y+dy, lx=x-ox, ly=y-oy;
+      if(lx<0||ly<0||lx>=W||ly>=W){ edge=true; continue; }
+      const k=ly*W+lx; if(seen[k]) continue; const c=at(x,y); if(c&&near(c,c0,6)){ seen[k]=1; st.push(x,y); } } }
+  const mpp=156543.03392*Math.cos(rr)/n;  // 每像素公尺數
+  return {rgb:c0, m2:cnt*mpp*mpp, edge};
+}
+(()=>{ const lui=OVERS["國土利用現況調查"]; if(!lui) return;
+  map.on("click",async e=>{
+    if(!map.hasLayer(lui)||e.propagatedFrom||(window._mkAdding&&window._mkAdding())) return;
+    if(document.getElementById("paneL")&&!document.getElementById("paneL").hidden) return;   // 建築地圖地號查詢模式已經有卡片
+    if(document.getElementById("envZon")?.checked) return;                                    // 地熱地圖土地使用分區查詢已經有彈出視窗
+    if(map.getContainer().classList.contains("shotmode")||map.getContainer().classList.contains("distmode")) return;
+    const pop=L.popup({maxWidth:Math.min(320,POPW),minWidth:Math.min(240,POPW)}).setLatLng(e.latlng).setContent(`<div class="geopop"><div class="m">${L2("查詢國土利用類別…","Looking up land use…")}</div></div>`).openOn(map);
+    try{
+      const [U,A]=await Promise.all([loadLUI(),luiArea(e.latlng.lat,e.latlng.lng)]);
+      if(!A){ pop.setContent(`<div class="geopop"><div class="m">${L2("這裡沒有國土利用調查資料。","No land-use survey data here.")}</div></div>`); return; }
+      const m=U.l3.find(x=>near(A.rgb,x[2],6));
+      if(!m){ pop.setContent(`<div class="geopop"><div class="m">${L2("點到類別交界的混色，請點地塊中間。","You clicked a class boundary; click inside a parcel.")}</div></div>`); return; }
+      const [code,name,rgb,desc]=m, l1=U.l1[code.slice(0,2)], l2=U.l2[code.slice(0,4)];
+      const ha=A.m2/1e4, area=ha>=1?L2(`${ha.toFixed(2)} 公頃`,`${ha.toFixed(2)} ha`):L2(`${Math.round(A.m2).toLocaleString()} 平方公尺`,`${Math.round(A.m2).toLocaleString()} m²`);
+      pop.setContent(`<div class="geopop"><h4>${sw(rgb)} ${code}　${name}</h4><div class="m">${l1?l1[0]:""} › ${l2||""}</div>`+
+        `<table class="sitetab"><tr><td>${L2("估算面積","Estimated area")}</td><td>${A.edge?L2("至少 ","at least "):""}${area}</td></tr></table>`+
+        (desc?`<div class="zdef"><b>${L2("分類說明","Definition")}</b>　${desc}</div>`:"")+
+        `<div class="src">${L2(`面積是把點選位置相連、同一顏色的圖磚像素加總（第 17 級，每像素約 ${(156543.03392*Math.cos(e.latlng.lat*Math.PI/180)/2**17).toFixed(2)} 公尺），是估算值：相鄰的同類地塊會併在一起算，地塊邊線會略為少算${A.edge?"；這塊範圍超出計算範圍（約 2 公里），所以只列下限":""}。分類依 109 年版色碼表與《國土利用現況調查辦法》附表一。`,
+          `Area sums connected pixels of the same colour on level-17 tiles, so it is an estimate: adjacent parcels of the same class are merged${A.edge?"; this patch extends past the ~2 km search window, so only a lower bound is shown":""}.`)}</div></div>`);
+    }catch(err){ pop.setContent(`<div class="geopop"><div class="m">${L2("查詢失敗，請再點一次。","Lookup failed. Click again.")}</div></div>`); }
+  });
+})();
 // ---------- 原住民保留地：點查（先看粗網格，落在網格內才載入範圍檔） ----------
 async function reserveHTML(lat,lng){
   await loadOnce("land/reserve-grid.js",()=>!!window.RESERVE_GRID);
@@ -1779,6 +1825,8 @@ const geoJ=(key,style,pop)=>loadOnce(`geotex/${key}.js`,()=>!!window.GEOTEX_D?.[
 const SRC={
   indig:L2('名單：原住民族委員會公布之「原住民地區」55 個鄉（鎮、市、區），行政院 91 年 4 月 16 日院臺疆字第 0910017300 號函核定。邊界：內政部<a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">鄉鎮市區界線</a>（官方下載站無法連線，改用 taiwan-atlas 套件 2021.9.20 版的 1:10,000 簡化轉檔）',
     'List: the 55 indigenous areas published by the Council of Indigenous Peoples (Executive Yuan approval, 16 Apr 2002). Boundaries: MOI <a href="https://data.gov.tw/dataset/7441" target="_blank" rel="noopener">township boundaries</a> via the taiwan-atlas 2021.9.20 package (1:10,000, simplified)'),
+  indigEth:L2('族別人口：原住民族委員會<a href="https://data.gov.tw/dataset/145512" target="_blank" rel="noopener">台閩縣市鄉鎮市區原住民族人口－按性別族別</a>（資料日期 2026-10-28，為前一個月底結算，不分平地山地、男女合計）',
+    'Population by group: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/145512" target="_blank" rel="noopener">indigenous population by township and group</a> (data date 2026-10-28)'),
   slope:L2('資料：農業部農村發展及水土保持署<a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">115 年度山坡地範圍圖（水保法、不含六都）</a>（檔案日期 115-07-08，簡化 15 公尺）。六都的山坡地範圍由各市政府公告，這裡沒有',
     'Data: ARDSWC <a href="https://data.gov.tw/dataset/178645" target="_blank" rel="noopener">2026 slopeland map (Soil and Water Conservation Act, excluding the six special municipalities)</a>, file dated 2026-07-08, simplified 15 m'),
   pforest:L2('資料：農業部林業及自然保育署<a href="https://data.gov.tw/dataset/9928" target="_blank" rel="noopener">全臺保安林分布概略圖</a>（1151 版，簡化 8 公尺）。概略圖僅供參考，實際範圍以公告為準',
@@ -1817,8 +1865,15 @@ function townDots(D,rows,keyOf,st,title,rowHTML,src){
   return g;
 }
 const LX=[
-  {k:"indig",zh:"原住民族地區（55 個鄉鎮市區）",en:"Indigenous areas (55 townships)",make:async()=>polyLayer(await loadLand("indig"),ST.indig,a=>a[0],
-    a=>lpop(a[0],a[1]==="山地"?L2("山地原住民鄉（區）","Mountain indigenous township"):L2("平地原住民鄉（鎮、市）","Plains indigenous township"),"",SRC.indig)),
+  {k:"indig",zh:"原住民族地區（55 個鄉鎮市區）",en:"Indigenous areas (55 townships)",make:async()=>{const [D,E]=await Promise.all([loadLand("indig"),loadLand("indig_eth")]);
+    const eth=n=>E.t[n], main=n=>{const e=eth(n); return e?e[1].filter(([g,v])=>g!=="尚未申報"&&v>=e[0]*.1).map(([g])=>g).join("、"):"";};
+    return polyLayer(D,ST.indig,a=>{const m=main(a[0]); return m?`${a[0]}・${m}`:a[0];},
+    a=>{const e=eth(a[0]); const body=e?`<table class="sitetab"><tr><td>${L2("原住民人口","Indigenous population")}</td><td>${e[0].toLocaleString()} ${L2("人","")}</td></tr>`+
+      e[1].slice(0,8).map(([g,v])=>`<tr><td>${g}</td><td>${v.toLocaleString()}（${(v/e[0]*100).toFixed(1)}%）</td></tr>`).join("")+
+      (e[1].length>8?`<tr><td>${L2("其他族別","Others")}</td><td>${e[1].slice(8).reduce((x,[,v])=>x+v,0).toLocaleString()}</td></tr>`:"")+
+      (e[2]?`<tr><td>${L2("族別欄未涵蓋","Not in group columns")}</td><td>${e[2].toLocaleString()}</td></tr>`:"")+`</table>`+
+      `<div class="m" style="margin-top:6px">${L2("依設籍人口統計，人數最多的族群不代表傳統領域的歸屬；各族傳統領域請參考「原住民傳統領域」圖層。","Counts are registered residents; the largest group does not determine traditional territory.")}</div>`:"";
+      return lpop(a[0],a[1]==="山地"?L2("山地原住民鄉（區）","Mountain indigenous township"):L2("平地原住民鄉（鎮、市）","Plains indigenous township"),body,SRC.indig+"<br>"+SRC.indigEth);});},
     leg:[[ST.indig(["","山地"]),L2("山地原住民鄉（區），30 個","Mountain indigenous townships (30)")],[ST.indig(["","平地"]),L2("平地原住民鄉（鎮、市），25 個","Plains indigenous townships (25)")]]},
   {k:"lres",zh:"原住民保留地",en:"Indigenous reserved land",geo:1,make:()=>geoJ("land_reserve",ST.lres,p=>lpop(hesc2(p.sect),`${hesc2(p.county)}${hesc2(p.town)}・${hesc2(p.code)}`,
     `<div class="m">${L2("範圍以地段為單位；個別土地是否為原住民保留地，以地政機關的土地登記為準。","Grouped by land section; the land register is authoritative.")}</div>`,SRC.lres)),
@@ -1876,13 +1931,19 @@ const GROUPS=[
   {id:"terrain",zh:"地形",en:"Terrain",overs:["地形陰影","等高線","等高線（國土測繪中心圖磚）"]},
   {id:"use",zh:"土地使用與分區",en:"Land use & zoning",overs:["國土利用現況調查"],lx:["slope"],move:["#zoning","#own"],
     notes:[L2("點地圖可查國土利用類別、土地使用分區與原住民保留地（地熱地圖要先勾「環境資料」裡的「土地使用分區」）。","Click the map for the land-use class, zoning and reserved land (on the geothermal map, turn on zoning under Environment first).")]},
-  {id:"indig",zh:"原住民族",en:"Indigenous lands",lx:["indig","lres","ltrad"],
-    notes:APP==="geo"?[L2("原住民保留地、傳統領域調查成果在左側「土地與保護區」。","Reserved land and traditional territory are in the sidebar under Land & protected areas.")]:[]},
-  {id:"cons",zh:"保育與災害",en:"Conservation & hazards",overs:["地質敏感區（山崩與地滑）","土壤液化潛勢"],lx:["pforest"]},
+  {id:"indig",zh:"原住民族",en:"Indigenous lands",lx:["indig","lres","ltrad","g_land_reserve","g_land_trad","g_land_tradname"]},
+  {id:"cons",zh:"保育與災害",en:"Conservation & hazards",overs:["地質敏感區（山崩與地滑）","土壤液化潛勢"],lx:["g_land_np","pforest"]},
   {id:"prop",zh:"產業與國公有地",en:"Industry & public land",lx:["ind","indo","npa_sale","npa_cft","npa_rent","tsc"],
     notes:[L2("國產署、台糖只公布地段地號，圓點畫在鄉鎮代表點，點開可看清單。國產署沒有公開「閒置土地」清單，這裡用擬讓售、預告標售、標租三份資料代替。","National property and Taiwan Sugar publish only section and lot numbers; dots sit at township reference points. Open a dot for the list.")]},
 ];
 let gOpen={}; try{gOpen=JSON.parse(localStorage.getItem("lgrpOpen")||"{}");}catch(e){}
+// 地熱地圖：左側「土地與保護區（全臺）」搬到這裡（國家公園→保育與災害；保留地、傳統領域、傳統地名→原住民族），勾選行為不變
+const leftLand=document.getElementById("landchecks");
+if(leftLand){
+  ["land_np","land_reserve","land_trad","land_tradname"].forEach(k=>{const lab=document.getElementById("gx_"+k)?.closest("label"); if(lab){lab.dataset.k="g_"+k; rows.appendChild(lab);}});
+  leftLand.hidden=true; const h=leftLand.previousElementSibling; if(h?.classList.contains("wlabel")) h.hidden=true;
+  const ll=document.getElementById("landlegend"); if(ll) setTimeout(()=>ov.appendChild(ll),0);
+}
 const overLab=k=>{const i=Object.keys(OVERS).indexOf(k); return i<0?null:document.getElementById("o"+i)?.closest("label");};
 const groupsBox=document.createElement("div"); groupsBox.className="lgroups";
 ov.appendChild(groupsBox);
