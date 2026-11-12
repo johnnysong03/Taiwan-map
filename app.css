@@ -529,3 +529,26 @@ html[lang="en"] .label,html[lang="en"] .tabs button{letter-spacing:.08em}
 details.zrule{margin:6px 0 2px;font-size:12.5px}
 details.zrule summary{cursor:pointer;color:var(--accent,#a33);font-weight:600}
 details.zrule>div{margin:4px 0;line-height:1.6}
+
+/* ===== 框選量測 ===== */
+#measbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap}
+#measbanner .linkbtn{color:var(--sheet);font-size:13px}
+#measclear{margin-top:2px;align-self:flex-start}
+.leaflet-tooltip.meastip{background:rgba(255,255,255,.92);border:1px solid #1f6fb5;box-shadow:0 2px 6px rgba(0,0,0,.18);padding:5px 8px;color:#1a2a3a}
+.leaflet-tooltip.meastip::before{display:none}
+.measlab{display:grid;gap:1px;font:12.5px/1.45 var(--body);font-variant-numeric:tabular-nums}
+.measlab>div{display:flex;justify-content:space-between;gap:12px}
+.measlab span{color:#5b6672}
+.measlab b{font-weight:700}
+.measlab .ha{justify-content:flex-end;color:#5b6672;font-size:11.5px}
+@media (max-width:760px){ #measbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} }
+#distbanner{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:1060;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+  background:var(--ink);color:var(--sheet);padding:8px 14px;font:600 13px var(--body);box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100% - 28px)}
+#distbanner[hidden]{display:none!important}
+#distbanner .linkbtn{color:var(--sheet);font-size:13px}
+.distmode{cursor:crosshair!important}
+.leaflet-tooltip.distseg{background:rgba(255,255,255,.88);border:1px solid #c0392b;color:#7a1f16;box-shadow:none;padding:1px 5px;font:600 11.5px var(--body)}
+.leaflet-tooltip.distseg::before{display:none}
+@media (max-width:760px){ #distbanner{left:max(14px,env(safe-area-inset-left,0px));transform:none} }
+@media (max-width:760px){ #distbanner,#measbanner,#shotbanner{max-width:calc(100% - 200px);white-space:normal;flex-wrap:wrap;gap:4px 12px} }

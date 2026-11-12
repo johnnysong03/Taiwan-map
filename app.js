@@ -2576,3 +2576,119 @@ function buildChatPane(){
   }
   const dms=(v,h)=>{ const a=Math.abs(v), d=Math.floor(a), mi=Math.floor((a-d)*60), se=Math.round(((a-d)*60-mi)*60); return `${d}°${String(mi).padStart(2,"0")}′${se?String(se).padStart(2,"0")+"″":""}${v<0?(h==="E"?"W":"S"):h}`; };
 })();
+
+// ---------- 框選量測：拖曳框出範圍，顯示東西寬、南北長與面積（1,000 m 以下用 m，以上用 km） ----------
+(()=>{
+  const lay=document.getElementById("layers"), after=document.getElementById("shotset")||document.getElementById("toneset"); if(!lay||!after) return;
+  const fs=document.createElement("fieldset"); fs.id="measset";
+  fs.innerHTML=`<legend class="label">${L2("量測","Measure")}</legend>
+    <button type="button" class="btn filebtn" id="measbtn">${L2("框選量測面積","Measure an area")}</button>
+    <div class="src">${L2("拖曳框出範圍，顯示東西寬、南北長與面積。點量測框可刪除。","Drag a box to see its east–west width, north–south length and area. Click a box to delete it.")}</div>
+    <button type="button" class="btn filebtn" id="distbtn" style="margin-top:6px">${L2("量測距離","Measure a distance")}</button>
+    <div class="src">${L2("在地圖上逐點點選，雙擊或按「完成」結束。","Click points along the route; double-click or press Done to finish.")}</div>
+    <button type="button" class="linkbtn" id="measclear" hidden>${L2("清除全部量測","Clear all measurements")}</button>`;
+  after.after(fs);
+  const btn=fs.querySelector("#measbtn"), clr=fs.querySelector("#measclear"), mc=map.getContainer();
+  const R=6371008.8, rad=d=>d*Math.PI/180;
+  const len=v=>v<1000?`${v<10?v.toFixed(1):Math.round(v).toLocaleString()} m`:`${(v/1000).toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2})} km`;
+  const area=a=>a<1e6?`${Math.round(a).toLocaleString()} m²`:`${(a/1e6).toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2})} km²`;
+  const ha=a=>`${(a/1e4).toLocaleString(undefined,{maximumFractionDigits:a<1e4?4:2})} ${L2("公頃","ha")}`;
+  function measure(b){
+    const N=b.getNorth(),S=b.getSouth(),W=b.getWest(),E=b.getEast(), mid=(N+S)/2;
+    const w=R*Math.cos(rad(mid))*rad(E-W);               // 東西寬（取中央緯度）
+    const h=R*rad(N-S);                                   // 南北長
+    const a=R*R*rad(E-W)*(Math.sin(rad(N))-Math.sin(rad(S))); // 球面上經緯框的面積
+    return {w,h,a};
+  }
+  const label=r=>`<div class="measlab"><div><span>${L2("東西寬","E–W width")}</span><b>${len(r.w)}</b></div><div><span>${L2("南北長","N–S length")}</span><b>${len(r.h)}</b></div><div><span>${L2("面積","Area")}</span><b>${area(r.a)}</b></div><div class="ha">${ha(r.a)}</div></div>`;
+  const group=L.layerGroup().addTo(map);
+  const sync=()=>{ clr.hidden=!group.getLayers().length; };
+  clr.onclick=()=>{ group.clearLayers(); sync(); };
+  let mode=false, start=null, cur=null, eat=false;
+  const banner=document.createElement("div"); banner.id="measbanner"; banner.hidden=true;
+  banner.innerHTML=`<span>${L2("在地圖上拖曳，框出要量測的範圍","Drag on the map to measure an area")}</span><button type="button" class="linkbtn">${L2("取消","Cancel")}</button>`;
+  document.getElementById("mapwrap").appendChild(banner);
+  const setMode=on=>{ mode=on; banner.hidden=!on; mc.classList.toggle("shotmode",on);
+    btn.textContent=on?L2("取消量測","Cancel"):L2("框選量測面積","Measure an area");
+    if(on){ map.dragging.disable(); map.closePopup();
+      if(MOBILE.matches){ if(!lay.classList.contains("min")) document.getElementById("lmin").click(); sheet("peek"); } }
+    else map.dragging.enable(); };
+  btn.onclick=()=>setMode(!mode);
+  banner.querySelector("button").onclick=()=>{ if(cur){ group.removeLayer(cur); cur=null; } start=null; setMode(false); };
+  mc.addEventListener("pointerdown",e=>{ if(!mode||e.target.closest(".leaflet-control")) return;
+    e.preventDefault(); e.stopPropagation(); start=map.mouseEventToLatLng(e);
+    cur=L.rectangle([start,start],{color:"#1f6fb5",weight:2,fillOpacity:.12,dashArray:"5 4"}).addTo(group);
+    cur.bindTooltip("",{permanent:true,direction:"center",className:"meastip",interactive:false});
+    try{ mc.setPointerCapture(e.pointerId); }catch(_){} },true);
+  mc.addEventListener("pointermove",e=>{ if(!mode||!start) return; e.preventDefault(); e.stopPropagation();
+    const b=L.latLngBounds(start,map.mouseEventToLatLng(e)); cur.setBounds(b); cur.setTooltipContent(label(measure(b))); cur.openTooltip(b.getCenter()); },true);
+  mc.addEventListener("pointerup",e=>{ if(!mode||!start) return; e.stopPropagation(); eat=true; setTimeout(()=>eat=false,400);
+    const b=cur.getBounds(), r=cur, a=map.latLngToContainerPoint(b.getNorthWest()), c=map.latLngToContainerPoint(b.getSouthEast());
+    start=null; cur=null; setMode(false);
+    if(c.x-a.x<6||c.y-a.y<6){ group.removeLayer(r); sync(); return; }
+    const m=measure(b); r.setStyle({dashArray:null}); r.setTooltipContent(label(m)); r.openTooltip(b.getCenter());
+    const [x1,y1]=toTM2(b.getNorth(),b.getWest()),[x2,y2]=toTM2(b.getSouth(),b.getEast());
+    r.bindPopup(()=>{ const el=document.createElement("div"); el.className="geopop";
+      el.innerHTML=`<h4>${L2("量測結果","Measurement")}</h4>${label(m)}
+        <div class="m" style="margin-top:6px">TWD97 X ${x1.toFixed(0)}–${x2.toFixed(0)}<br>Y ${y2.toFixed(0)}–${y1.toFixed(0)}</div>
+        <div class="src">${L2("以經緯度框計算：寬取中央緯度，面積為地球球面上的面積，與地籍面積可能略有差異。","Computed from the lat/long box: width at the middle latitude, area on the spherical Earth. May differ slightly from cadastral areas.")}</div>
+        <div class="mkrow"><button type="button" class="linkbtn">${L2("刪除這個量測","Delete this measurement")}</button></div>`;
+      el.querySelector("button").onclick=()=>{ map.closePopup(); group.removeLayer(r); sync(); };
+      return el; });
+    sync(); },true);
+  mc.addEventListener("click",e=>{ if(eat){ e.stopPropagation(); e.preventDefault(); eat=false; } },true);
+})();
+
+// ---------- 量測距離：逐點點選畫折線，顯示每段與總長（1,000 m 以下用 m，以上用 km） ----------
+(()=>{
+  const btn=document.getElementById("distbtn"), clr=document.getElementById("measclear"), lay=document.getElementById("layers"); if(!btn) return;
+  const mc=map.getContainer();
+  const len=v=>v<1000?`${v<10?v.toFixed(1):Math.round(v).toLocaleString()} m`:`${(v/1000).toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2})} km`;
+  const group=L.layerGroup().addTo(map);
+  const oldClr=clr.onclick; clr.onclick=()=>{ oldClr?.(); group.clearLayers(); clr.hidden=true; };
+  const syncClr=()=>{ if(group.getLayers().length) clr.hidden=false; };
+  const banner=document.createElement("div"); banner.id="distbanner"; banner.hidden=true;
+  banner.innerHTML=`<span class="t">${L2("點選起點","Click the starting point")}</span><button type="button" class="linkbtn" data-a="done">${L2("完成","Done")}</button><button type="button" class="linkbtn" data-a="undo">${L2("復原","Undo")}</button><button type="button" class="linkbtn" data-a="x">${L2("取消","Cancel")}</button>`;
+  document.getElementById("mapwrap").appendChild(banner);
+  const bt=banner.querySelector(".t");
+  let mode=false, pts=[], line=null, rubber=null, dots=null, down=null;
+  const total=a=>a.reduce((s,p,i)=>i?s+map.distance(a[i-1],p):0,0);
+  const refresh=()=>{ line.setLatLngs(pts); dots.clearLayers();
+    pts.forEach((p,i)=>L.circleMarker(p,{radius:4,color:"#fff",weight:2,fillColor:"#c0392b",fillOpacity:1,interactive:false}).addTo(dots));
+    bt.textContent=pts.length<2?L2(pts.length?"點下一個點":"點選起點",pts.length?"Click the next point":"Click the starting point")
+      :`${L2("總長","Total")} ${len(total(pts))}${L2("（雙擊或按完成結束）"," (double-click or Done)")}`; };
+  const start=()=>{ mode=true; pts=[]; banner.hidden=false; mc.classList.add("distmode"); map.doubleClickZoom.disable(); map.closePopup();
+    line=L.polyline([],{color:"#c0392b",weight:3,interactive:false}).addTo(group); rubber=L.polyline([],{color:"#c0392b",weight:2,dashArray:"4 5",interactive:false}).addTo(group);
+    dots=L.layerGroup().addTo(group); btn.textContent=L2("取消量測","Cancel"); refresh();
+    if(MOBILE.matches){ if(!lay.classList.contains("min")) document.getElementById("lmin").click(); sheet("peek"); } };
+  const stop=keep=>{ pts=pts.filter((p,i)=>!i||map.distance(pts[i-1],p)>0.5); line?.setLatLngs(pts); /* 雙擊會多點兩次同一點，去掉重複 */ mode=false; banner.hidden=true; mc.classList.remove("distmode"); setTimeout(()=>map.doubleClickZoom.enable(),300);
+    btn.textContent=L2("量測距離","Measure a distance"); group.removeLayer(rubber);
+    if(!keep||pts.length<2){ group.removeLayer(line); group.removeLayer(dots); return; }
+    const fin=pts.slice(), segs=fin.slice(1).map((p,i)=>map.distance(fin[i],p)), tot=segs.reduce((a,b)=>a+b,0);
+    line.setStyle({interactive:true}); line.options.interactive=true; group.removeLayer(line); line.addTo(group);
+    // 每段中點標段長，終點標總長
+    const labs=L.layerGroup().addTo(group);
+    if(segs.length>1) segs.forEach((d,i)=>L.tooltip({permanent:true,direction:"center",className:"distseg",interactive:false})
+      .setLatLng(L.latLngBounds(fin[i],fin[i+1]).getCenter()).setContent(len(d)).addTo(labs));
+    L.tooltip({permanent:true,direction:"right",offset:[8,0],className:"meastip",interactive:false}).setLatLng(fin[fin.length-1])
+      .setContent(`<div class="measlab"><div><span>${L2("總長","Total")}</span><b>${len(tot)}</b></div></div>`).addTo(labs);
+    const del=()=>{ map.closePopup(); [line,dots,labs].forEach(l=>group.removeLayer(l)); };
+    line.bindPopup(()=>{ const el=document.createElement("div"); el.className="geopop";
+      el.innerHTML=`<h4>${L2("距離量測","Distance")}</h4><div class="measlab"><div><span>${L2("總長","Total")}</span><b>${len(tot)}</b></div>
+        ${segs.length>1?segs.map((d,i)=>`<div><span>${L2(`第 ${i+1} 段`,`Segment ${i+1}`)}</span><b>${len(d)}</b></div>`).join(""):""}</div>
+        <div class="src">${L2("以大圓（球面）距離計算，未考慮地形起伏。","Great-circle distance on a sphere; terrain relief is not included.")}</div>
+        <div class="mkrow"><button type="button" class="linkbtn">${L2("刪除這個量測","Delete this measurement")}</button></div>`;
+      el.querySelector("button").onclick=del; return el; });
+    syncClr(); };
+  btn.onclick=()=>mode?stop(false):start();
+  banner.querySelector('[data-a="done"]').onclick=()=>stop(true);
+  banner.querySelector('[data-a="x"]').onclick=()=>stop(false);
+  banner.querySelector('[data-a="undo"]').onclick=()=>{ pts.pop(); refresh(); rubber.setLatLngs([]); };
+  document.addEventListener("keydown",e=>{ if(!mode) return; if(e.key==="Escape") stop(false); if(e.key==="Enter") stop(true); });
+  mc.addEventListener("pointerdown",e=>{ if(mode) down=[e.clientX,e.clientY]; },true);
+  mc.addEventListener("pointermove",e=>{ if(!mode||!pts.length||e.pointerType!=="mouse") return; rubber.setLatLngs([pts[pts.length-1],map.mouseEventToLatLng(e)]); },true);
+  mc.addEventListener("click",e=>{ if(!mode||e.target.closest(".leaflet-control")) return; e.stopPropagation(); e.preventDefault();
+    if(down&&Math.hypot(e.clientX-down[0],e.clientY-down[1])>6) return; // 拖曳地圖不算點
+    pts.push(map.mouseEventToLatLng(e)); refresh(); },true);
+  mc.addEventListener("dblclick",e=>{ if(!mode) return; e.stopPropagation(); e.preventDefault(); stop(true); },true);
+})();
