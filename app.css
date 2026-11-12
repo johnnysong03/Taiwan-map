@@ -561,3 +561,22 @@ details.zrule>div{margin:4px 0;line-height:1.6}
 .leaflet-tooltip-right.measedge::before{border-right-color:#1f6fb5}
 .leaflet-tooltip.distlive{background:#c0392b;line-height:1.35}
 .leaflet-tooltip-right.distlive::before{border-right-color:#c0392b}
+
+/* 圖層依主題分組 */
+.lgroups{display:flex;flex-direction:column;gap:4px;margin-top:2px}
+details.lgrp{border:1px solid var(--rule);background:color-mix(in srgb,var(--paper,#fff) 70%,transparent)}
+details.lgrp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 8px;font-weight:600;font-size:13.5px}
+details.lgrp>summary::-webkit-details-marker{display:none}
+details.lgrp>summary::before{content:"▸";font-size:11px;color:var(--muted);transition:transform .15s}
+details.lgrp[open]>summary::before{transform:rotate(90deg)}
+details.lgrp .gcnt{margin-left:auto;font:500 11px var(--mono,monospace);color:var(--accent,#a33)}
+.lgbody{padding:2px 8px 8px 10px;display:flex;flex-direction:column;gap:1px}
+.lgbody label{display:flex;align-items:flex-start;gap:6px;line-height:1.4;padding:2px 0}
+.lgbody label input{margin-top:3px;flex:none}
+.lgbody .sw{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;margin-top:4px;border:1px solid rgba(0,0,0,.2)}
+.lgbody .gnote{margin:4px 0 0}
+.lgbody .gsub{font-weight:600;color:var(--ink);margin-top:8px}
+.plistbox{max-height:180px;overflow:auto;margin-top:6px;border-top:1px dotted var(--rule)}
+.plistbox .prow{padding:3px 0;border-bottom:1px dotted var(--rule);font-size:12px}
+#lxkml{margin-top:6px}
+@media (max-width:760px){ .lgbody label{padding:6px 0} details.lgrp>summary{padding:10px 8px} }

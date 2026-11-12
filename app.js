@@ -1787,10 +1787,35 @@ const SRC={
     'Data: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/33685" target="_blank" rel="noopener">reserved land extent</a> (listed 2022-08-22, downloaded 2026-11-09; by land section)'),
   ltrad:L2('資料：原住民族委員會<a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">歷年原住民族傳統領域調查成果範圍（91–98 年）</a>。這是調查成果，不是依法公告的傳統領域範圍',
     'Data: Council of Indigenous Peoples <a href="https://data.gov.tw/dataset/45350" target="_blank" rel="noopener">traditional territory survey 2002–2009</a>. Survey results, not legally designated territory'),
+  ind:L2('資料：經濟部產業園區管理局<a href="https://data.gov.tw/dataset/25598" target="_blank" rel="noopener">各產業園區範圍圖</a>（212 處，異動日期 2026-09-17，簡化 3 公尺）。管理單位是園管局的歸「工業區」，其餘歸「其他工業區」',
+    'Data: MOEA Industrial Park Administration <a href="https://data.gov.tw/dataset/25598" target="_blank" rel="noopener">industrial park boundaries</a> (212 parks, updated 2026-09-17, simplified 3 m)'),
+  npa:L2('資料：財政部國有財產署開放資料（2026-11-12 下載）：<a href="https://data.gov.tw/dataset/9661" target="_blank" rel="noopener">擬讓售房地</a>、<a href="https://data.gov.tw/dataset/13145" target="_blank" rel="noopener">預告標售</a>、<a href="https://data.gov.tw/dataset/9656" target="_blank" rel="noopener">標租</a>。只有地段地號、沒有座標，圓點畫在鄉鎮代表點，不是土地實際位置。國產署沒有公開「閒置土地」清單。最新資訊見<a href="https://esvc.fnp.gov.tw/" target="_blank" rel="noopener">國產署線上服務</a>',
+    'Data: National Property Administration open data (downloaded 2026-11-12): parcels for negotiated sale, upcoming tender sale, and tender lease. Section and lot numbers only; dots sit at township reference points, not at the land itself.'),
+  tsc:L2('資料：台灣糖業公司<a href="https://data.gov.tw/dataset/25754" target="_blank" rel="noopener">可供出租土地資訊</a>（13,361 筆，2026-11-12 下載）。只有地段地號、沒有座標，圓點畫在鄉鎮代表點，不是土地實際位置。申租請洽<a href="https://www.taisugar.com.tw/" target="_blank" rel="noopener">台糖公司</a>各經管單位',
+    'Data: Taiwan Sugar Corporation <a href="https://data.gov.tw/dataset/25754" target="_blank" rel="noopener">land available for lease</a> (13,361 parcels, downloaded 2026-11-12). Section and lot numbers only; dots sit at township reference points.'),
 };
 const ST={indig:a=>({color:a[1]==="山地"?"#c92a2a":"#e67700",weight:1.4,fillColor:a[1]==="山地"?"#c92a2a":"#e67700",fillOpacity:.1}),
   lres:{color:"#d9480f",weight:1,fillColor:"#d9480f",fillOpacity:.22},ltrad:{color:"#7048e8",weight:1.6,dashArray:"6 4",fillColor:"#7048e8",fillOpacity:.1},
-  slope:{color:"#795548",weight:.8,fillColor:"#a1887f",fillOpacity:.28},pforest:{color:"#1b5e20",weight:.8,fillColor:"#43a047",fillOpacity:.38}};
+  slope:{color:"#795548",weight:.8,fillColor:"#a1887f",fillOpacity:.28},pforest:{color:"#1b5e20",weight:.8,fillColor:"#43a047",fillOpacity:.38},
+  ind:{color:"#5f3dc4",weight:1.4,fillColor:"#7950f2",fillOpacity:.3},indo:{color:"#ae3ec9",weight:1.4,dashArray:"5 3",fillColor:"#cc5de8",fillOpacity:.22},
+  sale:{color:"#fff",weight:1.2,fillColor:"#1971c2",fillOpacity:.85},cft:{color:"#fff",weight:1.2,fillColor:"#e8590c",fillOpacity:.85},rent:{color:"#fff",weight:1.2,fillColor:"#2f9e44",fillOpacity:.85},
+  tsc:{color:"#fff",weight:1.2,fillColor:"#c2255c",fillOpacity:.8}};
+// 只有地段地號的清單：依鄉鎮彙總成圓點（面積越大圓越大），點開列出清單
+const NPA_SET={sale:["擬讓售房地","Negotiated sale"],cft:["預告標售","Upcoming tender sale"],rent:["標租","Tender lease"]};
+const fmtA=m=>m>=1e4?L2(`${(m/1e4).toFixed(2)} 公頃`,`${(m/1e4).toFixed(2)} ha`):L2(`${Math.round(m).toLocaleString()} 平方公尺`,`${Math.round(m).toLocaleString()} m²`);
+function townDots(D,rows,keyOf,st,title,rowHTML,src){
+  const g=L.layerGroup(), by={};
+  rows.forEach(r=>{(by[keyOf(r)]??=[]).push(r);});
+  Object.entries(by).forEach(([k,list])=>{ const ll=D.towns[k]; if(!ll) return;
+    const area=list.reduce((a,r)=>a+(r.area||0),0);
+    const m=L.circleMarker(ll,Object.assign({renderer:rd,radius:Math.min(22,4+Math.sqrt(list.length)*1.6)},st));
+    m.bindTooltip(L2(`${k}：${list.length} 筆`,`${k}: ${list.length} parcels`),{direction:"top"});
+    m.bindPopup(()=>lpop(hesc2(k),L2(`${title}・${list.length} 筆，合計 ${fmtA(area)}`,`${title} · ${list.length} parcels, ${fmtA(area)}`),
+      `<div class="m">${L2("圓點畫在鄉鎮代表點，不是土地實際位置。","The dot marks the township, not the land itself.")}</div><div class="plistbox">${list.slice(0,300).map(rowHTML).join("")}${list.length>300?`<div class="m">${L2(`另有 ${list.length-300} 筆未列出`,`${list.length-300} more not shown`)}</div>`:""}</div>`,src),{maxWidth:POPW});
+    m._kml={name:k,desc:list.map(r=>rowHTML(r).replace(/<[^>]+>/g," ")).join("\n")};
+    m.addTo(g); });
+  return g;
+}
 const LX=[
   {k:"indig",zh:"原住民族地區（55 個鄉鎮市區）",en:"Indigenous areas (55 townships)",make:async()=>polyLayer(await loadLand("indig"),ST.indig,a=>a[0],
     a=>lpop(a[0],a[1]==="山地"?L2("山地原住民鄉（區）","Mountain indigenous township"):L2("平地原住民鄉（鎮、市）","Plains indigenous township"),"",SRC.indig)),
@@ -1807,18 +1832,31 @@ const LX=[
   {k:"pforest",zh:"保安林地分布概略圖",en:"Protection forests (overview)",make:async()=>polyLayer(await loadLand("pforest"),ST.pforest,a=>L2(`第 ${a[0]} 號保安林`,`Protection forest no. ${a[0]}`),
     a=>lpop(L2(`第 ${a[0]} 號保安林`,`Protection forest no. ${a[0]}`),hesc2(a[1]),tab([[L2("種類","Type"),hesc2(a[2])],[L2("面積","Area"),`${a[3]} ha`],[L2("管理分署","Branch"),hesc2(a[4])]]),SRC.pforest)),
     leg:[[ST.pforest,L2("保安林（概略範圍）","Protection forest (indicative)")]]},
+  ...[["ind",true,"工業區（園管局管理的產業園區）","Industrial parks (managed by the Industrial Park Administration)"],["indo",false,"其他工業區（地方政府、興辦工業人等管理）","Other industrial parks (local governments, developers)"]].map(([k,mine,zh,en])=>({k,zh,en,src:"ind",
+    make:async()=>{const D=await loadLand("indpark"); return polyLayer({f:D.f.filter(x=>(x[0][3]==="經濟部產業園區管理局")===mine)},ST[k],a=>a[0],
+      a=>lpop(hesc2(a[0]),`${hesc2(a[5])}・${hesc2(a[1])}`,tab([[L2("開發狀態","Status"),hesc2(a[2])],[L2("管理單位","Managed by"),hesc2(a[3])],[L2("面積","Area"),`${a[4]} ha`],[L2("依據","Basis"),hesc2(a[6])]]),SRC.ind));},
+    leg:[[ST[k],L2(mine?"園管局管理的產業園區範圍":"地方政府、興辦工業人、公民營事業管理的產業園區範圍",mine?"Parks managed by the Administration":"Parks managed by others")]]})),
+  ...Object.entries(NPA_SET).map(([k,[zh,en]])=>({k:"npa_"+k,zh:`國產署・${zh}（依鄉鎮彙總）`,en:`National property: ${en} (by township)`,src:"npa",
+    make:async()=>{const D=await loadLand("npa"); const rows=D.rows.filter(r=>r[0]===k).map(r=>({c:r[1],t:r[2],s:r[3],no:r[4],area:r[5],use:r[6],x:r[7]}));
+      return townDots(D,rows,r=>r.c+r.t,ST[k],L2(`國產署${zh}`,en),r=>`<div class="prow"><b>${hesc2(r.s)} ${hesc2(r.no)}</b>　${fmtA(r.area)}${r.use?`・${hesc2(r.use)}`:""}${r.x?`<br><span class="m">${hesc2(r.x)}</span>`:""}</div>`,SRC.npa);},
+    leg:[[ST[k],L2(`國產署${zh}：圓點位置為鄉鎮代表點，圓越大筆數越多`,`${en}: township reference points; larger = more parcels`)]]})),
+  {k:"tsc",zh:"台糖可供出租土地（依鄉鎮彙總）",en:"Taiwan Sugar land for lease (by township)",src:"tsc",
+    make:async()=>{const D=await loadLand("tsc"); const rows=D.rows.map(r=>({c:r[0],t:r[1],s:r[2],no:r[3],area:r[4],z:r[5],u:r[6],unit:r[7]}));
+      return townDots(D,rows,r=>r.c+r.t,ST.tsc,L2("台糖可供出租土地","Taiwan Sugar land for lease"),r=>`<div class="prow"><b>${hesc2(r.s)} ${hesc2(r.no)}</b>　${fmtA(r.area)}・${hesc2(r.z)}${r.u&&r.u!=="無"?`／${hesc2(r.u)}`:""}<br><span class="m">${L2("經管","Unit")}：${hesc2(r.unit)}</span></div>`,SRC.tsc);},
+    leg:[[ST.tsc,L2("台糖可供出租土地：圓點位置為鄉鎮代表點，圓越大筆數越多","Taiwan Sugar lease land: township reference points")]]},
 ];
 const on={}, layers={}, rows=fs.querySelector("#lxrows"), lg=fs.querySelector("#lxlegend");
 const luiOver=OVERS["國土利用現況調查"];
-function legend(msg){
-  const parts=LX.filter(x=>on[x.k]).map(x=>`<div class="zl"><b>${L2(x.zh,x.en)}</b>${x.leg.map(([st,t])=>`<span><i style="background:${st.fillColor}55;border:1.5px ${st.dashArray?"dashed":"solid"} ${st.color}"></i>${t}</span>`).join("")}<div class="src">${SRC[x.k]}</div></div>`);
+let legend=function(msg){
+  const parts=LX.filter(x=>on[x.k]).map(x=>`<div class="zl"><b>${L2(x.zh,x.en)}</b>${x.leg.map(([st,t])=>`<span><i style="background:${st.fillColor}${st.color==="#fff"?"":"55"};border:1.5px ${st.dashArray?"dashed":"solid"} ${st.color==="#fff"?st.fillColor:st.color}"></i>${t}</span>`).join("")}<div class="src">${SRC[x.src||x.k]}</div></div>`);
   if(luiOver&&map.hasLayer(luiOver)&&window.LUI) parts.push(`<div class="zl"><b>${L2("國土利用現況調查（第一級）","Land-use survey (level 1)")}</b>`+Object.entries(window.LUI.l1).map(([c,[n,rgb]])=>`<span><i style="background:rgb(${rgb.join(",")})"></i>${c} ${n}</span>`).join("")+
     `<div class="src">${L2("圖磚用第三級 93 類各自的顏色，這裡只列第一級的代表色；點地圖可查該點的第三級類別與分類說明。","Tiles use 93 level-3 colours; only level-1 colours are listed. Click the map for the level-3 class and its definition.")}</div></div>`);
   if(msg) parts.push(`<div class="src">${msg}</div>`);
   lg.innerHTML=parts.join(""); lg.hidden=!parts.length;
 }
 LX.filter(x=>!(x.geo&&APP==="geo")).forEach(x=>{
-  const lab=document.createElement("label"); lab.innerHTML=`<input type="checkbox" id="lx_${x.k}"> ${L2(x.zh,x.en)}`;
+  const lab=document.createElement("label"), st0=typeof ST[x.k]==="function"?ST[x.k](["","山地"]):(ST[x.k]||ST[x.k.replace("npa_","")]);
+  lab.dataset.k=x.k; lab.innerHTML=`<input type="checkbox" id="lx_${x.k}"> <span class="sw" style="background:${st0.fillColor}"></span>${L2(x.zh,x.en)}`;
   const cb=lab.querySelector("input");
   cb.onchange=async()=>{
     if(!cb.checked){ if(layers[x.k]) map.removeLayer(layers[x.k]); on[x.k]=false; legend(); return; }
@@ -1829,11 +1867,62 @@ LX.filter(x=>!(x.geo&&APP==="geo")).forEach(x=>{
   };
   rows.appendChild(lab);
 });
-const note=t=>{const d=document.createElement("div"); d.className="src"; d.style.margin="4px 0"; d.innerHTML=t; rows.appendChild(d);};
-if(APP==="geo") note(L2("原住民保留地、傳統領域調查成果在左側「土地與保護區」。","Reserved land and traditional territory are in the sidebar under Land & protected areas."));
-note(L2('地籍圖：國土測繪中心開放的只有「公有土地地籍圖」（上方疊加圖資），私有地的地籍圖不開放下載；要查個別地號請到<a href="https://easymap.land.moi.gov.tw/" target="_blank" rel="noopener">地籍圖資網路便民服務系統</a>。',
-  'Cadastre: NLSC only publishes the public-land cadastre (in Overlays above); private parcels are not open data. Look up parcels on the <a href="https://easymap.land.moi.gov.tw/" target="_blank" rel="noopener">MOI cadastral map service</a>.'));
-note(L2("國土利用現況調查成果圖在上方疊加圖資，勾選後這裡會顯示圖例。點地圖可查原住民保留地與國土利用類別。","The land-use survey map is in Overlays above; its legend appears here when on. Click the map to check reserved land and the land-use class."));
+const mkNote=t=>{const d=document.createElement("div"); d.className="src gnote"; d.innerHTML=t; return d;};
+// ---------- 依主題分組：把疊加圖資、土地圖層、（建築地圖的）土地使用分區與權屬搬進同一組可收合的清單 ----------
+const GROUPS=[
+  {id:"cad",zh:"地籍與行政界",en:"Cadastre & boundaries",overs:["公有土地地籍圖","地段外圍圖（段籍圖）","分棟建物框","村里界","鄉鎮區界"],
+    notes:[L2('地籍圖：國土測繪中心開放的只有「公有土地地籍圖」，私有地的地籍圖不開放下載；要查個別地號請到<a href="https://easymap.land.moi.gov.tw/" target="_blank" rel="noopener">地籍圖資網路便民服務系統</a>。',
+      'Cadastre: NLSC only publishes the public-land cadastre; private parcels are not open data. Look up parcels on the <a href="https://easymap.land.moi.gov.tw/" target="_blank" rel="noopener">MOI cadastral map service</a>.')]},
+  {id:"terrain",zh:"地形",en:"Terrain",overs:["地形陰影","等高線","等高線（國土測繪中心圖磚）"]},
+  {id:"use",zh:"土地使用與分區",en:"Land use & zoning",overs:["國土利用現況調查"],lx:["slope"],move:["#zoning","#own"],
+    notes:[L2("點地圖可查國土利用類別、土地使用分區與原住民保留地（地熱地圖要先勾「環境資料」裡的「土地使用分區」）。","Click the map for the land-use class, zoning and reserved land (on the geothermal map, turn on zoning under Environment first).")]},
+  {id:"indig",zh:"原住民族",en:"Indigenous lands",lx:["indig","lres","ltrad"],
+    notes:APP==="geo"?[L2("原住民保留地、傳統領域調查成果在左側「土地與保護區」。","Reserved land and traditional territory are in the sidebar under Land & protected areas.")]:[]},
+  {id:"cons",zh:"保育與災害",en:"Conservation & hazards",overs:["地質敏感區（山崩與地滑）","土壤液化潛勢"],lx:["pforest"]},
+  {id:"prop",zh:"產業與國公有地",en:"Industry & public land",lx:["ind","indo","npa_sale","npa_cft","npa_rent","tsc"],
+    notes:[L2("國產署、台糖只公布地段地號，圓點畫在鄉鎮代表點，點開可看清單。國產署沒有公開「閒置土地」清單，這裡用擬讓售、預告標售、標租三份資料代替。","National property and Taiwan Sugar publish only section and lot numbers; dots sit at township reference points. Open a dot for the list.")]},
+];
+let gOpen={}; try{gOpen=JSON.parse(localStorage.getItem("lgrpOpen")||"{}");}catch(e){}
+const overLab=k=>{const i=Object.keys(OVERS).indexOf(k); return i<0?null:document.getElementById("o"+i)?.closest("label");};
+const groupsBox=document.createElement("div"); groupsBox.className="lgroups";
+ov.appendChild(groupsBox);
+GROUPS.forEach(g=>{
+  const items=[];
+  (g.overs||[]).forEach(k=>{const lab=overLab(k); if(!lab) return; items.push(lab); const nx=lab.nextElementSibling; if(nx&&nx.classList.contains("src")&&!nx.querySelector("input")) items.push(nx);});
+  (g.lx||[]).forEach(k=>{const lab=rows.querySelector(`label[data-k="${k}"]`); if(lab) items.push(lab);});
+  (g.move||[]).forEach(sel=>{const fs2=document.querySelector(sel); if(!fs2) return; fs2.querySelectorAll(":scope > :not(legend)").forEach(n=>items.push(n)); fs2.hidden=true;
+    if(sel==="#own"){const h=mkNote(fs2.querySelector("legend")?.textContent||""); h.classList.add("gsub"); items.splice(items.length-fs2.querySelectorAll(":scope > :not(legend)").length,0,h);} });
+  if(!items.length) return;
+  const d=document.createElement("details"); d.className="lgrp"; d.dataset.g=g.id; if(gOpen[g.id]) d.open=true;
+  d.innerHTML=`<summary><span>${L2(g.zh,g.en)}</span><span class="gcnt"></span></summary>`;
+  const body=document.createElement("div"); body.className="lgbody"; items.forEach(n=>body.appendChild(n)); (g.notes||[]).forEach(t=>body.appendChild(mkNote(t)));
+  d.appendChild(body); groupsBox.appendChild(d);
+  d.addEventListener("toggle",()=>{gOpen[g.id]=d.open; try{localStorage.setItem("lgrpOpen",JSON.stringify(gOpen));}catch(e){}});
+});
+// 沒被分組的疊加圖層（之後新加的）留在最上面
+const rest=document.createElement("div"); [...ov.children].filter(n=>n.tagName==="LABEL"||(n.classList?.contains("src")&&n!==groupsBox)).forEach(n=>rest.appendChild(n)); if(rest.children.length) groupsBox.before(rest);
+ov.appendChild(lg); fs.hidden=true;
+const syncCnt=()=>groupsBox.querySelectorAll("details.lgrp").forEach(d=>{const n=d.querySelectorAll(".lgbody input[type=checkbox]:checked, .lgbody input[type=radio]:checked:not([value=''])").length; d.querySelector(".gcnt").textContent=n?L2(`已開 ${n}`,`${n} on`):"";});
+document.getElementById("layers").addEventListener("change",()=>setTimeout(syncCnt,0)); syncCnt();
+// 土地圖層匯出 KML（目前開啟的向量土地圖層）
+const kbtn=document.createElement("button"); kbtn.type="button"; kbtn.className="linkbtn"; kbtn.id="lxkml"; kbtn.textContent=L2("匯出開啟中的土地圖層 KML","Export land layers on to KML"); kbtn.hidden=true; ov.appendChild(kbtn);
+const kx=s=>String(s??"").replace(/[<>&]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]));
+const kc=hex=>{const h=(hex||"#888888").replace("#","");return "ff"+h.slice(4,6)+h.slice(2,4)+h.slice(0,2);};
+kbtn.onclick=()=>{
+  const fold=LX.filter(x=>on[x.k]&&layers[x.k]).map(x=>{const pm=[];
+    layers[x.k].eachLayer(function walk(l){ if(l.eachLayer&&!l.getLatLngs&&!l.getLatLng) return l.eachLayer(walk);
+      const nm=l._kml?.name||l.getTooltip?.()?.getContent?.()||L2(x.zh,x.en), desc=l._kml?.desc||"";
+      if(l.getLatLng&&!l.getLatLngs){const p=l.getLatLng(); pm.push(`<Placemark><name>${kx(nm)}</name><description>${kx(desc)}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`);}
+      else if(l.getLatLngs){const rings=l.getLatLngs(); const rr=Array.isArray(rings[0])?rings:[rings];
+        const ring=r=>r.map(p=>`${p.lng},${p.lat},0`).concat(r.length?[`${r[0].lng},${r[0].lat},0`]:[]).join(" ");
+        pm.push(`<Placemark><name>${kx(typeof nm==="string"?nm:"")}</name><styleUrl>#s_${x.k}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${ring(rr[0])}</coordinates></LinearRing></outerBoundaryIs>${rr.slice(1).map(h=>`<innerBoundaryIs><LinearRing><coordinates>${ring(h)}</coordinates></LinearRing></innerBoundaryIs>`).join("")}</Polygon></Placemark>`);} });
+    const st=typeof ST[x.k]==="function"?ST[x.k](["","山地"]):(ST[x.k]||ST[x.k.replace("npa_","")]);
+    return `<Folder><name>${kx(L2(x.zh,x.en))}</name><description>${kx((SRC[x.src||x.k]||"").replace(/<[^>]+>/g,""))}</description><Style id="s_${x.k}"><LineStyle><color>${kc(st.color==="#fff"?st.fillColor:st.color)}</color><width>1.5</width></LineStyle><PolyStyle><color>55${kc(st.fillColor).slice(2)}</color></PolyStyle></Style>\n${pm.join("\n")}</Folder>`;});
+  if(!fold.length) return;
+  const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${kx(document.title)} 土地圖層</name>\n${fold.join("\n")}\n</Document></kml>`;
+  const u=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"})), a=document.createElement("a"); a.href=u; a.download=`${APP==="geo"?"taiwan-geothermal":"taiwan-architecture"}_land.kml`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
+};
+const _leg=legend; legend=function(msg){_leg(msg); kbtn.hidden=!LX.some(x=>on[x.k]);};
 ov.addEventListener("change",()=>setTimeout(()=>{ if(luiOver&&map.hasLayer(luiOver)) loadLUI().then(()=>legend()).catch(()=>{}); else legend(); },0));
 })();
 
