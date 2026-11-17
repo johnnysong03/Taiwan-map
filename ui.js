@@ -173,3 +173,88 @@ const init=dec(location.hash)||store.get(LAST_KEY);
 if(init&&init.v) applyState(init); else refresh();
 window._ui={toggles,getState,applyState,refresh};
 })();
+
+// ---------- D：找地點（鄉鎮、村里、案場、井、鑽孔、饋線代號、座標）＋定位我的位置 ----------
+(()=>{
+if(APP!=="geo") return;
+const hesc=s=>String(s??"").replace(/[<>&"]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[ch]));
+let IDX=null, pin=null, acc=null;
+const loadIdx=()=>IDX??=new Promise((ok,fail)=>{ const s=document.createElement("script"); s.src="geotex/search-index.js";
+  s.onload=()=>ok(window.SEARCH_INDEX); s.onerror=()=>{IDX=null;fail(new Error("load"));}; document.head.appendChild(s); });
+const ctl=L.control({position:"topleft"});
+ctl.onAdd=()=>{ const d=L.DomUtil.create("div","uifind");
+  d.innerHTML=`<div class="ufrow"><input type="search" id="uifq" placeholder="${L2("找地點：鄉鎮、村里、案場、井、饋線代號、座標","Find: township, village, site, well, feeder, coordinates")}" aria-label="${L2("找地點","Find a place")}" autocomplete="off">
+    <button type="button" id="uiloc" title="${L2("定位我的位置","Show my location")}" aria-label="${L2("定位我的位置","Show my location")}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/></svg></button></div>
+    <div id="uifr" hidden></div>`;
+  L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; };
+ctl.addTo(map);
+const q=document.getElementById("uifq"), out=document.getElementById("uifr");
+const norm=s=>String(s||"").toLowerCase().replace(/[\s・·\-_()（）]/g,"").replace(/台/g,"臺");
+function local(){
+  const D=window.GEOTEX_D||{}, r=[];
+  Object.entries(D).forEach(([k,fc])=>{
+    if(/^ea_/.test(k)) fc.features.forEach(f=>{ const p=f.properties, nm=p.info?.name?L2(p.info.name[0],p.info.name[1]):(p.project?`${p.company}（${p.project}）`:p.company);
+      r.push({t:nm,s:`${L2("地熱案場","Geothermal site")}・${p.cat}・${p.county}${p.town}`,k:p.company+p.project+p.loc,ll:[f.geometry.coordinates[1],f.geometry.coordinates[0]],z:15,kind:"site"}); });
+    else if(/^kmz_/.test(k)) fc.features.forEach(f=>r.push({t:f.properties.name,s:L2("井位（KMZ）","Well (KMZ)"),k:f.properties.name,ll:[f.geometry.coordinates[1],f.geometry.coordinates[0]],z:16,kind:"well"}));
+    else if(k==="bh_logs") fc.features.forEach(f=>{ const p=f.properties; r.push({t:`${L2("鑽孔","Borehole")} ${p.hole}`,s:p.name||p.loc||"",k:p.hole+p.name+p.loc+p.proj,ll:[p.lat,p.lng],z:16,kind:"bh"}); });
+  });
+  return r;
+}
+function coordHit(v){
+  const n=v.replace(/[，,]/g," ").trim().split(/\s+/).map(Number); if(n.length!==2||n.some(isNaN)) return null;
+  let [a,b]=n;
+  if(Math.abs(a)>1000&&Math.abs(b)>1000&&typeof fromTM2==="function"){ const [lat,lng]=a>b?fromTM2(b,a):fromTM2(a,b); return {t:`TWD97 ${a}, ${b}`,s:`${lat.toFixed(5)}, ${lng.toFixed(5)}`,ll:[lat,lng],z:16,kind:"xy"}; }
+  if(a>100&&b<90) [a,b]=[b,a];
+  if(a>=20&&a<=27&&b>=118&&b<=123) return {t:`${a}, ${b}`,s:L2("經緯度","Latitude, longitude"),ll:[a,b],z:16,kind:"xy"};
+  return null;
+}
+let seq=0;
+async function search(){
+  const raw=q.value.trim(), v=norm(raw), my=++seq; if(!v){ out.hidden=true; return; }
+  const hits=[]; const c=coordHit(raw); if(c) hits.push(c);
+  const score=x=>{ const t=norm(x.t), k=norm(x.k||""); return t===v?0:t.startsWith(v)?1:t.includes(v)?2:k.includes(v)?3:9; };
+  local().forEach(x=>{ const sc=score(x); if(sc<9) hits.push({...x,sc}); });
+  let idx=null; try{ idx=await loadIdx(); }catch(e){}
+  if(my!==seq) return;
+  if(idx){
+    idx.towns.forEach(([cty,tw,lng,lat])=>{ const x={t:tw,s:cty,k:cty+tw,ll:[lat,lng],z:13,kind:"town"}; const sc=Math.min(score(x),norm(cty+tw).includes(v)?2:9); if(sc<9) hits.push({...x,sc}); });
+    if(v.length>=2) idx.villages.forEach(([cty,tw,vl,lng,lat])=>{ const x={t:vl,s:cty+tw,k:cty+tw+vl,ll:[lat,lng],z:15,kind:"vill"}; const sc=score(x); if(sc<9) hits.push({...x,sc:sc+.5}); });
+    const up=raw.toUpperCase().replace(/\s/g,"");
+    if(/^[A-Z0-9]{2,5}$/.test(up)) idx.feeders.forEach(([f,k,lng,lat])=>{ if(f.startsWith(up)) hits.push({t:f,s:L2("台電饋線・","Taipower feeder · ")+(window.FEEDER_META?.counties?.[k]?.name||k),ll:[lat,lng],z:14,kind:"feeder",sc:f===up?0:1}); });
+  }
+  hits.sort((a,b)=>(a.sc??0)-(b.sc??0)); const top=hits.slice(0,14);
+  out.innerHTML=top.length?top.map((h,i)=>`<button type="button" class="ufh" data-i="${i}"><b>${hesc(h.t)}</b><small>${hesc(h.s)}</small></button>`).join("")+
+    (idx?`<div class="src">${L2("鄉鎮村里：內政部 2021 版界線；饋線：台電開放資料，位置是變壓器的中間位置。","Townships/villages: MOI boundaries (2021); feeders: Taipower open data, placed at the middle of their transformers.")}</div>`:"")
+    :`<div class="src">${L2("找不到。可以輸入鄉鎮、村里、案場公司、井號、饋線代號（例如 CX39），或座標「25.2, 121.6」、TWD97「310000 2790000」。","Nothing found. Try a township, village, site company, well, feeder code (e.g. CX39), or coordinates.")}</div>`;
+  out.querySelectorAll(".ufh").forEach(b=>b.onclick=()=>go(top[+b.dataset.i]));
+  out.hidden=false;
+}
+function mark(ll,label){
+  if(pin) map.removeLayer(pin);
+  pin=L.marker(ll,{icon:L.divIcon({className:"",iconSize:[22,22],iconAnchor:[11,11],html:'<div class="ufpin"></div>'}),interactive:false,zIndexOffset:1000})
+    .bindTooltip(hesc(label),{permanent:true,direction:"top",offset:[0,-12],className:"uftip"}).addTo(map);
+}
+function go(h){
+  out.hidden=true; q.blur();
+  if(h.kind==="feeder"){ const fd=document.getElementById("fdon"); if(fd&&!fd.checked) fd.click(); }
+  map.flyTo(h.ll,Math.max(h.z,Math.min(map.getZoom(),h.z+2)),{duration:.8});
+  mark(h.ll,h.t);
+  if(MOBILE.matches) sheet("peek");
+}
+let tm=0; q.addEventListener("input",()=>{ clearTimeout(tm); tm=setTimeout(search,180); });
+q.addEventListener("focus",()=>{ loadIdx().catch(()=>{}); if(q.value.trim()) search(); });
+q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); out.querySelector(".ufh")?.click(); } if(e.key==="Escape"){ q.value=""; out.hidden=true; } });
+map.on("click",()=>{ out.hidden=true; });
+// 定位我的位置（瀏覽器會先問要不要分享位置；位置只在這個瀏覽器使用，不會送出）
+document.getElementById("uiloc").onclick=()=>{
+  if(!navigator.geolocation){ alert(L2("這個瀏覽器不支援定位。","Location is not supported in this browser.")); return; }
+  const btn=document.getElementById("uiloc"); btn.classList.add("busy");
+  navigator.geolocation.getCurrentPosition(p=>{ btn.classList.remove("busy");
+    const ll=[p.coords.latitude,p.coords.longitude];
+    if(acc) map.removeLayer(acc); acc=L.circle(ll,{radius:p.coords.accuracy,color:"#1e88e5",weight:1,fillOpacity:.08,interactive:false}).addTo(map);
+    mark(ll,L2(`我的位置（誤差約 ${Math.round(p.coords.accuracy)} m）`,`My location (±${Math.round(p.coords.accuracy)} m)`));
+    map.flyTo(ll,Math.max(map.getZoom(),15),{duration:.8}); },
+  e=>{ btn.classList.remove("busy"); alert(e.code===1?L2("沒有定位權限。請在瀏覽器設定允許這個網站使用位置。","Location permission denied."):L2("暫時無法取得位置，請稍後再試。","Could not get your location. Try again later.")); },
+  {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+};
+})();
