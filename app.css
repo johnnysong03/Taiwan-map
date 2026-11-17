@@ -616,3 +616,52 @@ details.lgrp .gcnt{margin-left:auto;font:500 11px var(--mono,monospace);color:va
 .tksteps{margin:2px 0 4px 1.2em;padding:0;max-height:180px;overflow:auto}
 .tkleg{display:flex;gap:10px;font-size:12px;color:var(--muted)}.tkleg i{display:inline-block;width:14px;height:5px;margin-right:4px;vertical-align:2px;border-radius:2px}
 @media (max-width:760px){ #truckset input[type=number]{font-size:16px} }
+/* ===== 介面整理（ui.js）：可收合區塊、搜尋圖層、已開啟標籤、手機分頁 ===== */
+#uitop{padding:12px 20px 4px;position:sticky;top:0;z-index:3;background:var(--sheet)}
+#uisearch{position:relative}
+#uiq{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--rule);background:var(--paper,#fff);font:14px var(--body);color:var(--ink);border-radius:2px}
+#uiq:focus{outline:2px solid var(--accent);outline-offset:-1px}
+#uires{margin-top:4px;max-height:46vh;overflow-y:auto;border:1px solid var(--rule);background:var(--sheet);padding:4px 8px;box-shadow:0 6px 16px rgba(0,0,0,.12)}
+#uires .ures{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;padding:6px 0;border-bottom:1px dotted var(--rule);cursor:pointer;font-size:14px}
+#uires .ures small{grid-column:2;color:var(--muted);font-size:11.5px}
+#uichips{margin-top:8px}
+#uichips .uchl{display:flex;flex-wrap:wrap;gap:5px}
+.uchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule);background:var(--paper,#fff);color:var(--ink);font:12.5px var(--body);padding:3px 8px;border-radius:12px;cursor:pointer;max-width:100%}
+.uchip span{color:var(--muted);font-size:14px;line-height:1}
+.uchip:hover{border-color:var(--accent)}
+.uchip:hover span{color:var(--accent)}
+#uichips .uchb{display:flex;gap:14px;margin-top:6px}
+details.usec{border-bottom:1px solid var(--rule)}
+details.usec>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0 10px;cursor:pointer;user-select:none}
+details.usec>summary::-webkit-details-marker{display:none}
+details.usec>summary::before{content:"";width:7px;height:7px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-right:2px}
+details.usec[open]>summary::before{transform:rotate(45deg)}
+details.usec>summary .ut{font:600 12px/1.2 var(--display);letter-spacing:.35em;color:var(--ink)}
+html[lang="en"] details.usec>summary .ut{letter-spacing:.08em}
+details.usec>summary .ub{margin-left:auto;background:var(--accent);color:#fff;font:600 11px/1 var(--mono);padding:3px 7px;border-radius:9px}
+details.usec>.ubody{padding-bottom:12px}
+.geopane #geoset{padding-top:0}
+fieldset.ufold>legend{cursor:pointer;user-select:none}
+fieldset.ufold>legend::after{content:"";display:inline-block;width:6px;height:6px;margin-left:8px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg) translateY(-3px);transition:transform .15s}
+fieldset.ufold.closed>legend::after{transform:rotate(-45deg)}
+fieldset.ufold.closed>:not(legend){display:none!important}
+.utab{display:none}
+.upane{padding-top:6px}
+.upane[hidden]{display:none!important}
+@media (max-width:760px){
+  #uitop{padding:10px var(--gut-r) 4px var(--gut-l)}
+  #uiq{font-size:16px}
+  .uchip{padding:5px 10px;font-size:13px}
+  .utab{display:block}
+  .tabs button{letter-spacing:.12em}
+  #layers{display:none!important}
+  .upane fieldset{border:0;padding:0;margin:0 0 4px;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .upane fieldset.closed{gap:0}
+  .upane fieldset.closed>legend{margin-bottom:0}
+  .upane label{display:flex;gap:10px;align-items:center;cursor:pointer;padding:6px 0;font-size:15px}
+  .upane input[type=range]{width:100%}
+  .upane .tones{flex-wrap:wrap}
+  .upane fieldset.ufold>legend{display:block;width:100%;padding:12px 0 10px;border-bottom:1px solid var(--rule);margin-bottom:8px}
+  .upane .op{padding:8px 0 16px}
+  details.usec>summary{padding:14px 0 12px}
+}

@@ -996,6 +996,7 @@ if(regions.includes("全臺")) regSel.add(regOpt("全臺"));
 regSel.value="大屯山區";
 regSel.onchange=()=>{renderGeoChecks();const v=REGION_VIEW[regSel.value];if(v)map.flyTo([v[0],v[1]],v[2],{duration:.7});};
 document.getElementById("geochecks").before(regSel);
+window._geo={GEO_CAT,geoOn,regSel,renderGeoChecks:()=>renderGeoChecks()};  // ui.js（搜尋圖層、網址狀態）要用
 function renderGeoChecks(){
   const box=document.getElementById("geochecks"); box.innerHTML="";
   GEO_CAT.filter(c=>c.region===regSel.value&&!c.well).sort((a,b)=>Object.keys(KIND).indexOf(a.kind)-Object.keys(KIND).indexOf(b.kind)).forEach(c=>{
