@@ -695,3 +695,28 @@ fieldset.ufold.closed>:not(legend){display:none!important}
 #uiload span{margin-top:6px;background:var(--sheet);border:1px solid var(--rule);font:12px var(--body);color:var(--ink);padding:3px 10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
 #uiload.fin span{opacity:0;transition:opacity .3s}
 @media (max-width:760px){ #uiload span{margin-top:calc(64px + env(safe-area-inset-top,0px))} }
+/* 浮動圖例 */
+.uileg{background:var(--sheet);border:1px solid var(--ink);box-shadow:3px 3px 0 rgba(58,40,22,.18);margin:8px 0 0 14px!important;width:min(300px,calc(100vw - 120px));font:12.5px/1.45 var(--body);color:var(--ink)}
+.uileg[hidden]{display:none}
+.uileg .ulh{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:7px 10px;cursor:pointer;font:600 12px var(--display);letter-spacing:.3em;color:var(--ink)}
+.uileg .ulh b{margin-left:auto;background:var(--accent);color:#fff;font:600 11px/1 var(--mono);letter-spacing:0;padding:3px 7px;border-radius:9px}
+.uileg .ulh::after{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);margin:-3px 2px 0 0}
+.uileg .ulh[aria-expanded="false"]::after{transform:rotate(-45deg);margin-top:0}
+.uileg .ulb{border-top:1px solid var(--rule);max-height:min(46vh,420px);overflow-y:auto;padding:4px 10px 8px}
+.uileg section{padding:6px 0;border-bottom:1px dotted var(--rule)}
+.uileg section:last-child{border-bottom:0}
+.uileg h5{margin:0 0 4px;font:600 12px var(--body);color:var(--muted)}
+.uileg .row,.uileg .qleg,.uileg .zl{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:center}
+.uileg .zl b{width:100%;font-weight:600}
+.uileg span,.uileg .wl{display:inline-flex;align-items:center;gap:5px}
+.uileg i{display:inline-block;width:11px;height:11px;flex:none}
+@media (max-width:760px){ .uileg{width:auto;max-width:calc(100vw - 28px);margin:8px 0 0 14px!important} .uileg .ulb{max-height:34vh} }
+/* 彈窗統一：標題下分隔線、來源與標題分開、內容太長可捲動 */
+.leaflet-popup-content{max-height:min(62vh,520px);overflow-y:auto;overscroll-behavior:contain}
+.geopop h4,.ownpop h4{padding-bottom:4px;border-bottom:1px solid var(--rule);margin-bottom:4px}
+.geopop .src,.ownpop .src{border-top:1px dotted var(--rule);padding-top:5px;font-size:11px;color:var(--muted)}
+.geopop table td,.ownpop table td{padding:2px 0;vertical-align:top}
+@media (max-width:760px){ .leaflet-popup-content{max-height:46vh} .leaflet-container a.leaflet-popup-close-button{width:30px;height:30px;font-size:22px;line-height:28px} }
+.uileg .k{display:inline-block;width:12px;height:12px;border:1px solid var(--ink);flex:none}
+.uileg i.ramp{width:48px;border-radius:2px;background:linear-gradient(90deg,hsla(48,95%,58%,.3),hsla(24,95%,48%,.6),hsla(0,95%,38%,.85))}
+@media (max-width:760px){ .popup-on .leaflet-top.leaflet-left{opacity:0;pointer-events:none;transition:opacity .15s} }

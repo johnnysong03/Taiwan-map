@@ -283,3 +283,35 @@ const of=window.fetch.bind(window);
 window.fetch=(u,...a)=>{ const p=of(u,...a); const s=String(u?.url||u);
   if(!/anthropic\.com|jsdelivr|unpkg|cdnjs/.test(s)) track(p.then(r=>r).catch(()=>{})); return p; };
 })();
+
+// ---------- F：浮動圖例（只列目前開啟的圖層；內容取自各區塊的圖例，不含來源說明） ----------
+(()=>{
+const SRC=[["#geolegend","調查地區","Survey area"],["#welllegend","井","Wells"],["#sitelegend","現有地熱案場","Geothermal projects"],["#landlegend","土地與保護區","Land & protected areas"],
+  ["#lxlegend","土地圖層","Land layers"],["#qkpanel .qleg","地震目錄","Earthquakes"],["#fdpanel .qleg","台電饋線","Taipower feeders"],["#envlegend","環境資料","Environment"],["#zonelegend","土地使用分區","Land-use zoning"]];
+const KEY="ui-legend-open";
+let open; try{ open=localStorage.getItem(KEY); }catch(e){} open=open==null?!MOBILE.matches:open==="1";
+const ctl=L.control({position:"topleft"}); let box,body,head;
+ctl.onAdd=()=>{ box=L.DomUtil.create("div","uileg"); box.hidden=true;
+  box.innerHTML=`<button type="button" class="ulh" aria-expanded="${open}"><span>${L2("圖例","Legend")}</span><b></b></button><div class="ulb"${open?"":" hidden"}></div>`;
+  head=box.querySelector(".ulh"); body=box.querySelector(".ulb");
+  head.onclick=()=>{ open=!open; body.hidden=!open; head.setAttribute("aria-expanded",open); try{localStorage.setItem(KEY,open?"1":"0");}catch(e){} };
+  L.DomEvent.disableClickPropagation(box); L.DomEvent.disableScrollPropagation(box); return box; };
+ctl.addTo(map);
+const vis=el=>{ if(!el||el.hidden||!el.textContent.trim()) return false; const pn=el.closest("#qkpanel,#fdpanel"); return !(pn&&pn.hidden); };
+function build(){
+  const parts=[];
+  SRC.forEach(([sel,zh,en])=>{ const els=[...document.querySelectorAll(sel)].filter(vis); if(!els.length) return;
+    const html=els.map(el=>{ const c=el.cloneNode(true); c.removeAttribute("id"); c.querySelectorAll(".src,input,select,button,[hidden],a").forEach(n=>n.remove());
+      c.querySelectorAll("[id]").forEach(n=>n.removeAttribute("id"));
+      // 只留有符號的圖例（純文字摘要、只有標題的不放）
+      return c.querySelector("i,svg,.sw,.k,.wsym,[style*=background]")?`<div class="${el.className}">${c.innerHTML}</div>`:""; }).join("");
+    if(html) parts.push(`<section><h5>${L2(zh,en)}</h5>${html}</section>`); });
+  box.hidden=!parts.length; head.querySelector("b").textContent=parts.length||"";
+  body.innerHTML=parts.join("");
+}
+let t=0; const later=()=>{ clearTimeout(t); t=setTimeout(build,150); };
+const mo=new MutationObserver(later);
+const watch=()=>SRC.forEach(([sel])=>{ const el=document.querySelector(sel); if(el&&!el._uiw){ el._uiw=1; mo.observe(el,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]}); const pn=el.closest("#qkpanel,#fdpanel"); if(pn&&!pn._uiw){ pn._uiw=1; mo.observe(pn,{attributes:true,attributeFilter:["hidden"]}); } } });
+document.addEventListener("change",()=>{ watch(); later(); },true);
+watch(); build();
+})();
