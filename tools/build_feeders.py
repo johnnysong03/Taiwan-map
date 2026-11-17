@@ -13,7 +13,8 @@
   - 推估線路：每條饋線的變壓器用「最小生成樹」連起來（Delaunay 三角網的邊＋Kruskal），讓總長度最短；
     超過 MAXEDGE 的連線不畫（避免跨山跨海的長直線）。這只是示意的連接方式，不是台電實際的線路走向。
   - 變壓器點：放大時才載入。
-輸出到 geotex/feeders/：meta.js（開頁載入）、<縣市>_area.js（服務範圍）、<縣市>_line.js（推估線路）、<縣市>_tr.js（變壓器點，base64）。
+輸出到 geotex/feeders/：meta.js（開頁載入）、<縣市>_area.js（服務範圍）、<縣市>_line.js（推估線路）、
+<縣市>_linelo.js（縮小用的簡化線路，約 1/4 大小）、<縣市>_tr.js（變壓器點，base64）。
 線路檔格式：{feeders:[饋線…], C:[可併網容量 kW 或 null…], N:[變壓器數…], L:[[饋線序號, [x0,y0,dx1,dy1,…]], …]}，座標為 (經度−119, 緯度−21)×1e5 的整數，第一點絕對值、其後為差值。
 """
 import base64, collections, csv, io, json, os, struct, sys, warnings, zipfile, datetime
@@ -28,6 +29,7 @@ OUT = os.path.join(ROOT, "geotex", "feeders")
 SHIFT = (830.61, -203.71)
 BUF, SIMP = 120, 50
 MAXEDGE = 2000  # 推估線路：最小生成樹裡超過這個長度（m）的連線不畫
+LO_TOL, LO_MIN = 200, 400  # 縮小（縮放 12 以下）用的簡化線路：簡化 200 m、短於 400 m 的線段不畫
 NAMES = {"KEELUNG": "基隆市", "TAIPEI": "臺北市", "NEWTAIPEI": "新北市", "TAOYUAN": "桃園市", "HSINCHU": "新竹縣市", "MIAOLI": "苗栗縣",
          "TAICHUNG": "臺中市", "CHANGHUA": "彰化縣", "NANTOU": "南投縣", "YUNLIN": "雲林縣", "CHIAYI": "嘉義縣市", "TAINAN": "臺南市",
          "KAOHSIUNG": "高雄市", "PINGTUNG": "屏東縣", "YILAN": "宜蘭縣", "HUALIEN": "花蓮縣", "TAITUNG": "臺東縣"}
@@ -103,7 +105,7 @@ def main():
         if f.endswith(".js"):
             os.remove(os.path.join(OUT, f))
     meta = {"counties": {}, "built": datetime.date.today().isoformat(), "source": "data.gov.tw/dataset/161874",
-            "buffer": BUF, "simplify": SIMP, "maxEdge": MAXEDGE, "shift": SHIFT}
+            "buffer": BUF, "simplify": SIMP, "maxEdge": MAXEDGE, "loZoom": 12, "shift": SHIFT}
     stats = collections.Counter()
     # 容量表是依台電「區處」分檔，不一定和變壓器所在縣市同一檔（例如新北金山、萬里的 CX 饋線列在基隆檔）。
     # 先查同縣市檔；查不到時，若饋線名稱只在另一個縣市檔出現過一次，就用那筆。
@@ -139,7 +141,7 @@ def main():
                 cap[fd] = next(iter(allcap[fd].values()))
                 stats["capOther"] += 1
         alltr |= set(feeders)
-        feats, trb, lines = [], bytearray(), []
+        feats, trb, lines, lows = [], bytearray(), [], []
         for i, fd in enumerate(feeders):
             ps = pts[fd]
             # 先擴 300 m 再縮 180 m（closing）：相距 600 m 內的變壓器連成一片，邊界約在變壓器外 120 m
@@ -155,6 +157,11 @@ def main():
                 if e:
                     lines.append([i, e])
                     stats["seg"] += 1
+                g = LineString(ln)
+                if g.length >= LO_MIN:
+                    e = enc_line(list(g.simplify(LO_TOL).coords))
+                    if e:
+                        lows.append([i, e])
             for _, _, lo, la in ps:
                 trb += struct.pack("<IIH", round((lo - 119) * 1e6), round((la - 21) * 1e6), i)
             stats["tr"] += len(ps)
@@ -169,6 +176,9 @@ def main():
         open(os.path.join(OUT, f"{k}_line.js"), "w", encoding="utf-8", newline="\n").write(
             f'window.FEEDER_L=window.FEEDER_L||{{}};window.FEEDER_L["{k}"]=' +
             json.dumps({"feeders": feeders, "C": [cap.get(f) for f in feeders], "N": [len(pts[f]) for f in feeders], "L": lines}, separators=(",", ":")) + ";\n")
+        open(os.path.join(OUT, f"{k}_linelo.js"), "w", encoding="utf-8", newline="\n").write(
+            f'window.FEEDER_L=window.FEEDER_L||{{}};window.FEEDER_L["{k}@lo"]=' +
+            json.dumps({"feeders": feeders, "C": [cap.get(f) for f in feeders], "N": [len(pts[f]) for f in feeders], "L": lows}, separators=(",", ":")) + ";\n")
         unmapped = sorted(own - set(pts))
         meta["counties"][k] = {"name": cname, "bbox": bbox, "feeders": len(feeders), "tr": sum(len(v) for v in pts.values()),
                                "noCap": sum(1 for f in feeders if f not in cap),

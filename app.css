@@ -687,3 +687,11 @@ fieldset.ufold.closed>:not(legend){display:none!important}
   #uifq{font-size:16px;padding:10px}
   #uiloc{width:46px}
 }
+/* 載入進度條 */
+#uiload{position:absolute;left:0;right:0;top:0;z-index:1200;pointer-events:none;display:flex;flex-direction:column;align-items:center}
+#uiload[hidden]{display:none}
+#uiload .ulbar{width:100%;height:3px;background:rgba(0,0,0,.08)}
+#uiload .ulbar i{display:block;height:100%;width:8%;background:var(--accent);transition:width .25s}
+#uiload span{margin-top:6px;background:var(--sheet);border:1px solid var(--rule);font:12px var(--body);color:var(--ink);padding:3px 10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+#uiload.fin span{opacity:0;transition:opacity .3s}
+@media (max-width:760px){ #uiload span{margin-top:calc(64px + env(safe-area-inset-top,0px))} }

@@ -1200,7 +1200,8 @@ const FD=(()=>{
     `Taipower publishes transformer locations and their feeders only, not line routes. "Estimated lines" join each feeder's transformers by the shortest total length (links over ${(M.maxEdge||2000)/1000} km omitted); "service areas" are about 120 m around transformers. Both are schematic, not actual lines. Coordinates converted from TWD67 and Taipower notes its own offsets. Capacity changes over time; Taipower's notice is authoritative.`);
   const fmtC=c=>c==null?L2("容量表未列","not in capacity table"):`${c.toLocaleString(undefined,{maximumFractionDigits:1})} kW`;
   const rd=L.canvas({pane:"geofill",padding:.3,tolerance:4}), areaG=L.layerGroup(), A={}, Ln={}, Tr={}, loading={};
-  let mode="line";
+  let mode="line", curKind="";
+  const LZ=M.loZoom||12, LnLo={};   // 縮放 LZ 以下用簡化線路（約 1/4 大小），放大再換完整線路
   const load=(k,kind)=>loading[k+kind]??=new Promise((ok,fail)=>{const s=document.createElement("script");s.src=`geotex/feeders/${k}_${kind}.js`;s.onload=ok;s.onerror=fail;document.head.appendChild(s);});
   const inView=()=>{const b=map.getBounds();return Object.entries(M.counties).filter(([,c])=>b.intersects(L.latLngBounds([c.bbox[1],c.bbox[0]],[c.bbox[3],c.bbox[2]]))).map(([k])=>k);};
   const pop=(k,f,n)=>`<div class="geopop"><h4>${L2("饋線","Feeder")} ${hesc(f)}</h4><div class="m">${L2("台電饋線・","Taipower feeder · ")}${hesc(M.counties[k].name)}</div>`+
@@ -1210,20 +1211,22 @@ const FD=(()=>{
   const CAP={}; const Ax=(k,f)=>CAP[k]?.[f];
   let on=false, status=document.createElement("div"); status.className="src";
   const NN={};
-  function mkLine(k){ const d=window.FEEDER_L[k], per=d.feeders.map(()=>[]); CAP[k]??={}; NN[k]={};
+  function mkLine(k,lo){ const key=lo?k+"@lo":k, d=window.FEEDER_L[key], per=d.feeders.map(()=>[]); CAP[k]??={}; NN[k]={};
     d.feeders.forEach((f,i)=>{CAP[k][f]=d.C[i]; NN[k][f]=d.N[i];});
     for(const [fi,a] of d.L){ let x=a[0],y=a[1]; const ll=[[y/1e5+21,x/1e5+119]]; for(let j=2;j<a.length;j+=2){x+=a[j];y+=a[j+1];ll.push([y/1e5+21,x/1e5+119]);} per[fi].push(ll); }
     const g=L.layerGroup(); per.forEach((ls,i)=>{ if(!ls.length) return; const f=d.feeders[i], c=d.C[i];
       g.addLayer(L.polyline(ls,{renderer:rd,color:col(c),weight:2,opacity:.9,smoothFactor:1.5}).bindPopup(()=>pop(k,f,NN[k][f]))); });
-    delete window.FEEDER_L[k]; return g; }
-  async function refresh(){ if(!on) return; const ks=inView(), kind=mode, S=kind==="line"?Ln:A, miss=ks.filter(k=>!S[k]);
+    delete window.FEEDER_L[key]; return g; }
+  const kindNow=()=>mode==="line"?(map.getZoom()<LZ?"linelo":"line"):"area";
+  async function refresh(){ if(!on) return; const ks=inView(), kind=kindNow(), S=kind==="line"?Ln:kind==="linelo"?LnLo:A, miss=ks.filter(k=>!S[k]);
     if(miss.length){ status.textContent=L2("載入饋線資料中…","Loading feeders…");
       try{ await Promise.all(miss.map(k=>load(k,kind))); }catch(e){ status.textContent=L2("饋線資料載入失敗，請確認 geotex/feeders 資料夾和網頁放在一起。","Could not load geotex/feeders."); return; } }
-    if(kind!==mode) return;
-    for(const k of miss){ if(kind==="line"){ Ln[k]=mkLine(k); continue; } const fc=window.FEEDER_A[k]; CAP[k]??={}; fc.features.forEach(f=>CAP[k][f.properties.f]=f.properties.c);
+    if(kind!==kindNow()) return;
+    for(const k of miss){ if(S[k]) continue;   // 同時有兩次 refresh 在等同一個檔時，只建一次
+      if(kind!=="area"){ S[k]=mkLine(k,kind==="linelo"); continue; } const fc=window.FEEDER_A[k]; CAP[k]??={}; fc.features.forEach(f=>CAP[k][f.properties.f]=f.properties.c);
       A[k]=L.geoJSON(fc,{renderer:rd,style:f=>({color:col(f.properties.c),weight:.7,opacity:.8,fillColor:col(f.properties.c),fillOpacity:.3}),
         onEachFeature:(f,l)=>l.bindPopup(()=>pop(k,f.properties.f,f.properties.n))}); delete window.FEEDER_A[k]; }
-    if(!on) return; ks.forEach(k=>{if(!areaG.hasLayer(S[k])) areaG.addLayer(S[k]);});
+    if(!on) return; if(curKind!==kind){ areaG.clearLayers(); curKind=kind; } ks.forEach(k=>{if(!areaG.hasLayer(S[k])) areaG.addLayer(S[k]);});
     if(map.getZoom()>=PZ){ const mt=ks.filter(k=>!Tr[k]); if(mt.length){ try{ await Promise.all(mt.map(k=>load(k,"tr"))); }catch(e){}
         mt.forEach(k=>{const d=window.FEEDER_T?.[k]; if(!d) return; const b=atob(d.b64),u=new Uint8Array(b.length); for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
           const v=new DataView(u.buffer),n=u.length/10,t={n,feeders:d.feeders,lng:new Float64Array(n),lat:new Float64Array(n),fi:new Uint16Array(n)};
@@ -1235,7 +1238,7 @@ const FD=(()=>{
   function draw(){ if(!cvs) return; const sz=map.getSize(), dpr=window.devicePixelRatio||1; cvs.width=sz.x*dpr; cvs.height=sz.y*dpr; cvs.style.width=sz.x+"px"; cvs.style.height=sz.y+"px";
     L.DomUtil.setPosition(cvs,map.containerPointToLayerPoint([0,0])); cvs.style.opacity=1; const g=cvs.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,sz.x,sz.y); hits=[];
     const z=map.getZoom(); let shown=0;
-    [A,Ln].forEach(S=>Object.values(S).forEach(g=>g.eachLayer(l=>{l.options.interactive=z<PZ;})));  // 放大看變壓器時，範圍面只顯示、不搶點擊
+    [A,Ln,LnLo].forEach(S=>Object.values(S).forEach(g=>g.eachLayer(l=>{l.options.interactive=z<PZ;})));  // 放大看變壓器時，範圍面只顯示、不搶點擊
     if(!on||z<PZ){ status.textContent=on?(mode==="line"?L2(`顯示各饋線的推估線路；放大到街區層級（縮放 ${PZ} 以上）會顯示變壓器。`,`Showing estimated feeder lines; zoom to level ${PZ}+ for transformers.`):L2(`顯示各饋線的服務範圍；放大到街區層級（縮放 ${PZ} 以上）會顯示變壓器。`,`Showing feeder service areas; zoom to level ${PZ}+ for transformers.`)):""; return; }
     const pb=map.getPixelBounds().min;
     for(const k of inView()){ const t=Tr[k]; if(!t) continue;

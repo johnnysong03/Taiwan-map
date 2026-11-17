@@ -258,3 +258,28 @@ document.getElementById("uiloc").onclick=()=>{
   {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 };
 })();
+
+// ---------- E：載入進度條（隨選載入的資料檔、API 查詢） ----------
+(()=>{
+const wrap=document.getElementById("mapwrap"); if(!wrap) return;
+const bar=document.createElement("div"); bar.id="uiload"; bar.hidden=true;
+bar.innerHTML=`<div class="ulbar"><i></i></div><span></span>`; wrap.appendChild(bar);
+const txt=bar.querySelector("span"), fill=bar.querySelector("i");
+let pend=0, done=0, hideT=0;
+const upd=()=>{
+  if(pend>0){ clearTimeout(hideT); bar.hidden=false; bar.classList.remove("fin");
+    const tot=pend+done; fill.style.width=Math.max(8,Math.round(done/tot*100))+"%";
+    txt.textContent=L2(`載入資料中…（還有 ${pend} 個）`,`Loading data… (${pend} left)`); }
+  else{ fill.style.width="100%"; bar.classList.add("fin"); hideT=setTimeout(()=>{ bar.hidden=true; done=0; },450); }
+};
+const track=p=>{ pend++; upd(); const end=()=>{ pend--; done++; upd(); }; p.then(end,end); };
+// 動態加進 <head> 的資料檔（geotex/、env/、land/、zoning/ 等）
+const isData=src=>/(^|\/)(geotex|env|land|zoning)\//.test(src)||/-data\.js$/.test(src);
+new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{
+  if(n.tagName==="SCRIPT"&&n.src&&isData(n.getAttribute("src")||"")) track(new Promise(r=>{ n.addEventListener("load",r); n.addEventListener("error",r); }));
+}))).observe(document.head,{childList:true});
+// fetch（WFS、開放資料 API 等）；Claude 對話的串流不算
+const of=window.fetch.bind(window);
+window.fetch=(u,...a)=>{ const p=of(u,...a); const s=String(u?.url||u);
+  if(!/anthropic\.com|jsdelivr|unpkg|cdnjs/.test(s)) track(p.then(r=>r).catch(()=>{})); return p; };
+})();
