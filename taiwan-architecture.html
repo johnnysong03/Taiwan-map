@@ -25,7 +25,7 @@
   </div>
   <div id="paneL" class="pane" hidden>
     <div class="controls">
-      <div class="hint" id="lhint" data-en="Click anywhere on the map to find its land section and list the public parcels in it (Taipei City only).">在地圖上點任一點，查出那裡的地段，並列出該地段的公有地號。</div>
+      <div class="hint" id="lhint" data-en="Click anywhere on the map to find its land section and land-use zoning (all Taiwan), plus the public parcels in that section (Taipei City only).">在地圖上點任一點，查出那裡的地段與土地使用分區（全臺），臺北市另列出該地段的公有地號。</div>
       <div id="sectinfo" hidden></div>
       <div class="row">
         <select id="lsect" aria-label="地段"><option value="" data-en="Loading land sections…">載入地段清單中…</option></select>
@@ -60,7 +60,7 @@
   </div>
   <ol id="list"></ol>
   </div>
-  <div class="foot" id="footB" data-en="“Featured” entries are compiled by hand with approximate locations. Monuments and historic buildings come from the &lt;a href=&quot;https://nchdb.boch.gov.tw/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;National Cultural Heritage Database&lt;/a&gt; open data (downloaded 2026-11-07); dates are taken from the history text and are approximate. Building names and addresses are shown in Chinese. Base maps: National Land Surveying and Mapping Center.">「精選建築」為整理資料，座標為約略位置。古蹟、歷史建築等來自<a href="https://nchdb.boch.gov.tw/" target="_blank" rel="noopener">國家文化資產網</a>開放資料（2026-11-07 下載），年代由沿革文字推得，僅供參考。底圖與圖資：內政部國土測繪中心。</div>
+  <div class="foot" id="footB" data-en="“Featured” entries are compiled by hand with approximate locations. Monuments and historic buildings come from the &lt;a href=&quot;https://nchdb.boch.gov.tw/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;National Cultural Heritage Database&lt;/a&gt; open data (downloaded 2026-11-07); dates are taken from the history text and are approximate. Building names and addresses are shown in Chinese. Base maps: National Land Surveying and Mapping Center. Full list: &lt;a href=&quot;sources.html&quot;&gt;Sources and references&lt;/a&gt;.">「精選建築」為整理資料，座標為約略位置。古蹟、歷史建築等來自<a href="https://nchdb.boch.gov.tw/" target="_blank" rel="noopener">國家文化資產網</a>開放資料（2026-11-07 下載），年代由沿革文字推得，僅供參考。底圖與圖資：內政部國土測繪中心。完整出處見<a href="sources.html">資料來源與參考文獻</a>。</div>
 </aside>
 
 <main id="mapwrap">
@@ -87,6 +87,12 @@
       <input id="roadop" type="range" min="0" max="1" step="0.05" value="0.45">
     </fieldset>
     <fieldset id="overs"><legend class="label" data-en="Overlays">疊加圖資</legend></fieldset>
+    <fieldset id="zoning"><legend class="label" data-en="Land-use zoning">土地使用分區</legend>
+      <label><input type="checkbox" id="zTpe"> <span data-en="Urban plan zoning (Taipei, New Taipei)">都市計畫使用分區（臺北市、新北市）</span></label>
+      <label><input type="checkbox" id="zN1"> <span data-en="Non-urban land zoning">非都市土地使用分區</span></label>
+      <label><input type="checkbox" id="zN2"> <span data-en="Non-urban land-use type">非都市土地使用地類別</span></label>
+      <div id="zonelegend" hidden></div>
+    </fieldset>
     <fieldset id="own"><legend class="label" data-en="Land ownership (Taipei districts)">土地權屬（臺北市行政區統計）</legend>
       <label><input type="radio" name="own" id="own0" value="" checked> <span data-en="Off">不顯示</span></label>
       <label><input type="radio" name="own" id="own1" value="pub"> <span data-en="Public land share">公有面積比例</span></label>
@@ -112,5 +118,6 @@
 <script src="navy-style.js"></script>
 <script src="heritage-data.js"></script>
 <script src="app.js"></script>
+<script src="ui.js"></script>
 </body>
 </html>

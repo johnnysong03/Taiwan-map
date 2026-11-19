@@ -9,6 +9,8 @@ Different map layer in Taiwan.
 
 兩張地圖都可以切換中文／English，也能匯入 Excel／CSV 點位。
 
+線上版（GitHub Pages）：https://johnnysong03.github.io/Taiwan-map/
+
 ## 本機執行
 
 ```
